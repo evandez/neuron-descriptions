@@ -22,13 +22,13 @@ jobs:
         pip install -r requirements.txt
     - name: flake8
       run: |
-        flake8 --count --show-source --statistics itis
+        flake8 --count --show-source --statistics vocabulary
     - name: isort
       run: |
-        isort -c itis
+        isort -c vocabulary
     - name: mypy
       run: |
-        mypy itis
+        mypy vocabulary
     - name: pytest
       run: |
-        pytest itis
+        pytest vocabulary
