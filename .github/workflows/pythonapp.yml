@@ -31,4 +31,4 @@ jobs:
         mypy vocabulary
     - name: pytest
       run: |
-        pytest vocabulary
+        pytest tests
