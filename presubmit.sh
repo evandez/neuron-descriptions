@@ -92,7 +92,7 @@ COMMANDS=(
     'mypy vocabulary'
     'flake8 vocabulary'
     'isort -c vocabulary'
-    'pytest')
+    'pytest tests')
 for CMD in "${COMMANDS[@]}"
 do
     $PYTHON -m $CMD >presubmit.log 2>&1 &
