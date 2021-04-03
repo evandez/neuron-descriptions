@@ -1,8 +1,10 @@
 attrs==20.3.0
+botocore==1.20.43
 flake8==3.9.0
 flake8-docstrings==1.6.0
 iniconfig==1.1.1
 isort==5.8.0
+jmespath==0.10.0
 mccabe==0.6.1
 mypy==0.812
 mypy-extensions==0.4.3
@@ -16,10 +18,15 @@ pydocstyle==6.0.0
 pyflakes==2.3.1
 pyparsing==2.4.7
 pytest==6.2.2
+python-dateutil==2.8.1
+PyYAML==5.4.1
+s3transfer==0.3.6
+six==1.15.0
 snowballstemmer==2.1.0
 toml==0.10.2
 torch==1.8.1
 torchvision==0.9.1
 typed-ast==1.4.2
 typing-extensions==3.7.4.3
+urllib3==1.26.4
 yapf==0.31.0
