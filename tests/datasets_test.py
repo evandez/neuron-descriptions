@@ -2,6 +2,8 @@
 import pathlib
 import tempfile
 
+from torch._C import Value
+
 from vocabulary import datasets
 
 import pytest
@@ -68,6 +70,23 @@ def test_top_images_dataset_init_cache(root, images, cache):
 
     for actual, expected in zip(dataset.images, expected_images):
         assert actual.allclose(expected, atol=1e-2)
+
+
+@pytest.mark.parametrize('validate_top_image_counts', (True, False))
+def test_top_images_dataset_init_differing_top_image_count(
+        root, validate_top_image_counts):
+    """Test TopImagesDataset.__init__ uses validate_top_image_count."""
+    file = root / 'layer-0' / 'unit-0' / 'im-0.png'
+    assert file.is_file()
+    file.unlink()
+
+    if validate_top_image_counts:
+        with pytest.raises(ValueError, match='.*differing.*'):
+            datasets.TopImagesDataset(
+                root, validate_top_image_counts=validate_top_image_counts)
+    else:
+        datasets.TopImagesDataset(
+            root, validate_top_image_counts=validate_top_image_counts)
 
 
 @pytest.mark.parametrize('cache', (False, True))

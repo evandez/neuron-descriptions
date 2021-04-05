@@ -30,7 +30,8 @@ class TopImagesDataset(data.Dataset[TopImages]):
                  layers: Optional[Iterable[str]] = None,
                  transform: Transform = DEFAULT_TRANSFORM,
                  cache: Union[bool, str, torch.device] = False,
-                 display_progress: bool = True):
+                 display_progress: bool = True,
+                 validate_top_image_counts: bool = True):
         """Initialize the dataset.
 
         Args:
@@ -45,11 +46,19 @@ class TopImagesDataset(data.Dataset[TopImages]):
             cache (Union[bool, str, torch.device], optional): If set, read all
                 images from disk into memory. If a device or string is
                 specified, images are sent to this device. Defaults to False.
-            display_progress (bool, optional): [description]. Defaults to True.
+            display_progress (bool, optional): Show the progress bar when
+                reading images into menu. Has no effect if `cache` is not set.
+                Defaults to True.
+            validate_top_image_counts (bool, optional): Check that all units
+                have the same number of top images. The methods on this
+                class will still work even if they don't, but some torch tools
+                such as `torch.utils.DataLoader` will not out of the box.
+                Defaults to True.
 
         Raises:
             FileNotFoundError: If root directory does not exist.
-            ValueError: If no layers found or provided.
+            ValueError: If no layers found or provided, or if units have
+                different number of top images.
 
         """
         if not root.is_dir():
@@ -82,6 +91,11 @@ class TopImagesDataset(data.Dataset[TopImages]):
                                         key=lambda kv: kv[0]):
                 sample = (layer, unit, indices)
                 self.samples.append(sample)
+
+            if validate_top_image_counts:
+                counts = {len(indices) for _, _, indices in self.samples}
+                if len(counts) != 1:
+                    raise ValueError(f'differing top image counts: {counts}')
 
         self.images = None
         if cache:
