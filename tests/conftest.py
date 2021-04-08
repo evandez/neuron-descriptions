@@ -1,4 +1,5 @@
 """Test data shared across vocabulary modules."""
+import csv
 import pathlib
 import tempfile
 
@@ -57,3 +58,39 @@ def top_images_root(top_image_tensors):
                     unit_image_file = unit_dir / image(unit_image_index)
                     to_pil_image(unit_image).save(str(unit_image_file))
         yield root
+
+
+def annotation(layer_index, unit_index):
+    """Create a fake annotation for the given layer and unit indices."""
+    return f'({layer(layer_index)}, {unit(unit_index)}) annotation'
+
+
+@pytest.fixture
+def top_image_annotations():
+    """Return fake annotations for testing."""
+    return [[
+        layer(layer_index),
+        unit(unit_index),
+        annotation(layer_index, unit_index)
+    ]
+            for layer_index in range(N_LAYERS)
+            for unit_index in range(N_UNITS_PER_LAYER)]
+
+
+LAYER_COLUMN = 'the_layer'
+UNIT_COLUMN = 'the_unit'
+ANNOTATION_COLUMN = 'the_annotation'
+
+
+@pytest.fixture
+def top_images_annotations_csv_file(top_images_root, top_image_annotations):
+    """Return a fake annotations CSV file for testing."""
+    rows = [[LAYER_COLUMN, UNIT_COLUMN, ANNOTATION_COLUMN]]
+    rows += top_image_annotations
+
+    annotations_csv_file = top_images_root / 'annotations.csv'
+    with annotations_csv_file.open('w') as handle:
+        writer = csv.writer(handle)
+        writer.writerows(rows)
+
+    return annotations_csv_file
