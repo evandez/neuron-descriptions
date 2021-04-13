@@ -3,7 +3,7 @@ import pathlib
 import shutil
 from typing import Any, Callable, Optional, Tuple, Union
 
-from third_party.netdissect import imgsave, imgviz, nethook, pbar, tally
+from third_party.netdissect_old import imgsave, imgviz, nethook, pbar, tally
 
 import numpy
 import torch
