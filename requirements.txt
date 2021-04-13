@@ -21,6 +21,7 @@ pytest==6.2.2
 python-dateutil==2.8.1
 PyYAML==5.4.1
 s3transfer==0.3.6
+scipy==1.6.2
 six==1.15.0
 snowballstemmer==2.1.0
 toml==0.10.2
