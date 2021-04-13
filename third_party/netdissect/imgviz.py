@@ -136,6 +136,7 @@ class ImageVisualizer:
 
     def pytorch_masked_image(self,
                              imagedata,
+                             renormalize=True,
                              activations=None,
                              unit=None,
                              level=None,
@@ -150,7 +151,9 @@ class ImageVisualizer:
         Visualizes the given activations, thresholded at a specified level,
         overlaid on the given image, as a pytorch byte tensor (channel first).
         '''
-        scaled_image = self.pytorch_image(imagedata).float().cpu()
+        scaled_image = imagedata
+        if renormalize:
+            scaled_image = self.pytorch_image(imagedata).float().cpu()
         if mask is None:
             mask = self.pytorch_mask(activations,
                                      unit,
@@ -360,17 +363,11 @@ class ImageVisualizer:
             for gather_for, acts, imgt in (zip(gather_indices, acts_batch,
                                                image_batch)):
                 for unit, rank in gather_for:
-                    pytorch_image = self.pytorch_image(imgt)\
-                        .permute(1, 2, 0)\
-                        .clamp(0, 255)\
-                        .byte()\
-                        .cpu()
-                    pytorch_mask = self.pytorch_mask(acts, unit)\
-                        .byte()\
-                        .unsqueeze(-1)\
-                        .cpu()
+                    pytorch_image = self.pytorch_image(imgt).cpu()
+                    pytorch_mask = self.pytorch_mask(acts,
+                                                     unit)[None].float().cpu()
                     pytorch_image_and_mask = torch.cat(
-                        (pytorch_image, pytorch_mask), dim=-1)
+                        (pytorch_image, pytorch_mask))
                     yield ((unit, rank), pytorch_image_and_mask)
 
         gt = tally.gather_topk(compute_viz, dataset, topk=topk, k=k, **kwargs)

@@ -124,10 +124,10 @@ def dissect(compute_topk_and_quantile: ComputeTopKAndQuantileFn,
         pin_memory=True,
         cachefile=topk_images_cache_file)
 
-    unit_images = unit_images_and_masks[:, :, :, :, :-1]
+    unit_images = unit_images_and_masks[:, :, :-1]
     numpy.save(f'{results_dir}/images.npy', unit_images)
 
-    unit_masks = unit_images_and_masks[:, :, :, :, -1:]
+    unit_masks = unit_images_and_masks[:, :, -1:]
     numpy.save(f'{results_dir}/masks.npy', unit_masks)
 
     # Now save the top images with the masks overlaid. A bit manual in order
@@ -135,7 +135,10 @@ def dissect(compute_topk_and_quantile: ComputeTopKAndQuantileFn,
     # yapf: disable
     unit_masked_images = imgviz.gather_tensor_to_individual_images([
         [
-            viz.pytorch_masked_image(image, mask=mask)
+            viz.pytorch_masked_image(image, mask=mask.bool().squeeze())
+               .permute(1, 2, 0)
+               .clamp(0, 255)
+               .byte()
             for image, mask in zip(images, masks)
         ]
         for images, masks in zip(unit_images, unit_masks)
