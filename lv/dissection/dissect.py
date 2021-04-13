@@ -1,4 +1,4 @@
-"""Functions for dissecting individual units in vision models."""
+"""Functions for dissecting convolutional units in vision models."""
 import pathlib
 import shutil
 from typing import Any, Callable, Optional
@@ -13,20 +13,20 @@ from torch import nn
 from torch.utils import data
 
 
-def dissect(compute_topk_and_quantile: Callable[..., TensorPair],
-            compute_activations: imgviz.ComputeActivationsFn,
-            dataset: data.Dataset,
-            k: int = 15,
-            quantile: float = 0.99,
-            batch_size: int = 128,
-            image_size: int = 224,
-            num_workers: int = 30,
-            results_dir: PathLike = 'dissection-results',
-            tally_cache_file: Optional[PathLike] = None,
-            masks_cache_file: Optional[PathLike] = None,
-            clear_cache_files: bool = False,
-            clear_results_dir: bool = False,
-            display_progress: bool = True) -> None:
+def run(compute_topk_and_quantile: Callable[..., TensorPair],
+        compute_activations: imgviz.ComputeActivationsFn,
+        dataset: data.Dataset,
+        k: int = 15,
+        quantile: float = 0.99,
+        batch_size: int = 128,
+        image_size: int = 224,
+        num_workers: int = 30,
+        results_dir: PathLike = 'dissection-results',
+        tally_cache_file: Optional[PathLike] = None,
+        masks_cache_file: Optional[PathLike] = None,
+        clear_cache_files: bool = False,
+        clear_results_dir: bool = False,
+        display_progress: bool = True) -> None:
     """Find and visualize the top-activating images for each unit.
 
     Top-activating images are found with network dissection [Bau et al., 2017].
@@ -184,7 +184,7 @@ def discriminative(model: nn.Sequential,
             outputs = model(images.to(device))
         return outputs
 
-    dissect(compute_topk_and_quantile, compute_activations, dataset, **kwargs)
+    run(compute_topk_and_quantile, compute_activations, dataset, **kwargs)
 
 
 def generative(model: nn.Sequential,
@@ -228,5 +228,4 @@ def generative(model: nn.Sequential,
                 images = model(zs.to(device))
             return instrumented.retained_layer(layer), images
 
-        dissect(compute_topk_and_quantile, compute_activations, dataset,
-                **kwargs)
+        run(compute_topk_and_quantile, compute_activations, dataset, **kwargs)
