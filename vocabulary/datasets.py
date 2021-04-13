@@ -5,14 +5,13 @@ import pathlib
 from typing import (Any, Callable, Iterable, NamedTuple, Optional, Sequence,
                     Union)
 
+from vocabulary.typing import PathLike
+
 import torch
 import tqdm
 from PIL import Image
 from torch.utils import data
 from torchvision import datasets, transforms
-
-# TODO(evandez): Unify this with other PathLike types...
-PathLike = Union[str, pathlib.Path]
 
 Transform = Callable[[Image.Image], torch.Tensor]
 

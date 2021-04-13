@@ -1,109 +1,20 @@
 """Functions for dissecting individual units in vision models."""
 import pathlib
 import shutil
-from typing import Any, Callable, Iterator, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Optional
 
-from third_party.netdissect import (imgsave, imgviz, nethook, pbar,
-                                    runningstats, tally)
+from third_party.netdissect import imgsave, nethook, pbar, tally
+from vocabulary.ext.netdissect import imgviz
+from vocabulary.typing import Layer, PathLike, TensorPair
 
 import numpy
 import torch
-from PIL import Image
 from torch import nn
 from torch.utils import data
 
-Layer = Union[int, str]
 
-TensorPair = Tuple[torch.Tensor, torch.Tensor]
-ComputeTopKAndQuantileFn = Callable[..., TensorPair]
-ComputeActivationsFn = Callable[..., Union[torch.Tensor, TensorPair]]
-
-PathLike = Union[str, pathlib.Path]
-
-UnitRank = Tuple[int, int]
-IndividualMaskedImages = Sequence[Sequence[Image.Image]]
-
-
-class ImageVisualizer(imgviz.ImageVisualizer):
-    """A NetDissect ImageVisualizer with additional utility functions."""
-
-    def image_and_mask_grid_for_topk(
-            self, compute: ComputeActivationsFn, dataset: data.Dataset,
-            topk: runningstats.RunningTopK,
-            **kwargs: Any) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Return top masks, images, and masked images.
-
-        You can think of this method as a counterpart to the NetDissect
-        `ImageVisualizer.masked_image_grid_for_topk` method. The only real
-        difference is that, in addition to returning the masked images,
-        it also returns the binary masks and the original unmasked images.
-
-        The **kwargs are forwarded to `tally.gather_topk`.
-
-        Args:
-            compute (ComputeActivationsFn): Compute function. Should return
-                activations given a batch from the dataset.
-            dataset (data.Dataset): The dataset to compute activations on.
-                See `tally.gather_topk`.
-            topk (runningstats.RunningTopK): Top-k results.
-                See `tally.gather_topk`.
-
-        Returns:
-            Tuple[torch.Tensor, torch.Tensor, torch.Tensor]: Image masks
-                of shape (units, k, 1, height, width), unmasked images
-                of shape (units, k, 3, height, width), masked images
-                of shape (units, k, 3, height, width), all byte tensors.
-
-        """
-
-        def compute_viz(
-                gather: Sequence[Sequence[UnitRank]],
-                *batch: Any) -> Iterator[Tuple[UnitRank, torch.Tensor]]:
-            activations = compute(*batch)
-            if isinstance(activations, tuple):
-                activations, images = activations
-            else:
-                images, *_ = batch
-            for ranks, acts, image in zip(gather, activations, images):
-                for unit, rank in ranks:
-                    image = self.pytorch_image(image).cpu()
-                    mask = self.pytorch_mask(acts, unit).cpu()
-                    masked = self.pytorch_masked_image(image,
-                                                       mask=mask,
-                                                       outside_bright=.25,
-                                                       thickness=0).cpu()
-                    result = torch.cat([
-                        component.float().clamp(0, 255).byte()
-                        for component in (masked, image, mask[None])
-                    ])
-                    yield ((unit, rank), result)
-
-        gt = tally.gather_topk(compute_viz, dataset, topk, **kwargs).result()
-        masked, images, mask = gt[:, :, :3], gt[:, :, 3:6], gt[:, :, 6:]
-        return masked, images, mask
-
-    def individual_masked_images_for_topk(
-        self,
-        *args: Any,
-        **kwargs: Any,
-    ) -> Tuple[Sequence[Sequence[Image.Image]], torch.Tensor, torch.Tensor]:
-        """Return individual masked PIL images and separate masks/images.
-
-        You can think of this method as a counterpart to the NetDissect
-        `ImageVisualizer.individual_masked_images_for_topk` method. The only
-        difference is it also returns the masks and images separately.
-        """
-        grids = self.image_and_mask_grid_for_topk(*args, **kwargs)
-        masked, images, masks = grids
-        masked = masked.permute(0, 1, 3, 4, 2)
-        individual = [
-            [Image.fromarray(mi.numpy()) for mi in mis] for mis in masked
-        ]
-        return individual, images, masks
-
-
-def dissect(compute_topk_and_quantile: ComputeTopKAndQuantileFn,
-            compute_activations: ComputeActivationsFn,
+def dissect(compute_topk_and_quantile: Callable[..., TensorPair],
+            compute_activations: imgviz.ComputeActivationsFn,
             dataset: data.Dataset,
             k: int = 15,
             quantile: float = 0.99,
@@ -124,12 +35,12 @@ def dissect(compute_topk_and_quantile: ComputeTopKAndQuantileFn,
     batches as input and return unit activations as output.
 
     Args:
-        compute_topk_and_quantile (ComputeTopKAndQuantileFn): Function taking
+        compute_topk_and_quantile (Callable[..., TensorPair]): Function taking
             dataset batch as input and returning tuple of (1) pooled unit
             activations with shape (batch_size, units), and (2) unpooled unit
             activations with shape (*, units).
-        compute_activations (ComputeActivationsFn): Function taking dataset
-            batch as input and returning activations with shape
+        compute_activations (imgviz.ComputeActivationsFn): Function taking
+            dataset batch as input and returning activations with shape
             (batch_size, channels, *) and optionally the associated images
             of shape (batch_size, channels, height, width).
         dataset (data.Dataset): Dataset to compute activations on.
@@ -197,7 +108,7 @@ def dissect(compute_topk_and_quantile: ComputeTopKAndQuantileFn,
     if display_progress:
         pbar.descnext('compute top images')
     levels = rq.quantiles(quantile).reshape(-1)
-    viz = ImageVisualizer(image_size, source=dataset, level=levels)
+    viz = imgviz.ImageVisualizer(image_size, source=dataset, level=levels)
     masked, images, masks = viz.individual_masked_images_for_topk(
         compute_activations,
         dataset,
