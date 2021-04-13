@@ -10,11 +10,13 @@ from torch.utils import data
 
 
 def __getattr__(name: str) -> Any:
+    """Forward to `third_party.netdissect.imgviz`."""
     return getattr(imgviz, name)
 
 
 ComputeActivationsFn = Callable[..., Union[torch.Tensor, TensorPair]]
 UnitRank = Tuple[int, int]
+UnitRanks = Sequence[Sequence[UnitRank]]
 IndividualMaskedImages = Sequence[Sequence[Image.Image]]
 
 
@@ -51,8 +53,9 @@ class ImageVisualizer(imgviz.ImageVisualizer):
         """
 
         def compute_viz(
-                gather: Sequence[Sequence[UnitRank]],
-                *batch: Any) -> Iterator[Tuple[UnitRank, torch.Tensor]]:
+            gather: UnitRanks,
+            *batch: Any,
+        ) -> Iterator[Tuple[UnitRank, torch.Tensor]]:
             activations = compute(*batch)
             if isinstance(activations, tuple):
                 activations, images = activations
@@ -80,7 +83,7 @@ class ImageVisualizer(imgviz.ImageVisualizer):
         self,
         *args: Any,
         **kwargs: Any,
-    ) -> Tuple[Sequence[Sequence[Image.Image]], torch.Tensor, torch.Tensor]:
+    ) -> Tuple[IndividualMaskedImages, torch.Tensor, torch.Tensor]:
         """Return individual masked PIL images and separate masks/images.
 
         You can think of this method as a counterpart to the NetDissect
