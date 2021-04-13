@@ -4,8 +4,8 @@ import pathlib
 import tempfile
 
 from tests import conftest
-from vocabulary import datasets
-from vocabulary.mturk import hits
+from lv import datasets
+from lv.mturk import hits
 
 import pytest
 

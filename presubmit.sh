@@ -89,9 +89,9 @@ function spinner() {
 }
 
 COMMANDS=(
-    'mypy vocabulary'
-    'flake8 vocabulary'
-    'isort -c vocabulary'
+    'mypy lv'
+    'flake8 lv'
+    'isort -c lv'
     'pytest tests')
 for CMD in "${COMMANDS[@]}"
 do

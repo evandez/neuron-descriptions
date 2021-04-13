@@ -1,15 +1,13 @@
 """Tools for generating MTurk HITS."""
 import csv
 import pathlib
-from typing import Callable, Sequence, Union
+from typing import Callable, Sequence
 from urllib import request
 
-from vocabulary import datasets
+from lv import datasets
+from lv.typing import PathLike
 
 import tqdm
-
-# TODO(evandez): Unify this with the PathLike in vocabulary/dissection.py
-PathLike = Union[str, pathlib.Path]
 
 
 def generate_hits_csv(dataset: datasets.TopImagesDataset,

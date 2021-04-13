@@ -1,1 +1,1 @@
-"""Unit tests for vocabulary/mturk module."""
+"""Unit tests for lv/mturk module."""

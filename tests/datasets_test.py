@@ -1,8 +1,8 @@
-"""Unit tests for the vocabulary/datasets module."""
+"""Unit tests for the lv/datasets module."""
 import csv
 
 from tests import conftest
-from vocabulary import datasets
+from lv import datasets
 
 import pytest
 import torch

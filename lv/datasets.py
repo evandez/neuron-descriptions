@@ -5,7 +5,7 @@ import pathlib
 from typing import (Any, Callable, Iterable, NamedTuple, Optional, Sequence,
                     Union)
 
-from vocabulary.typing import PathLike
+from lv.typing import PathLike
 
 import torch
 import tqdm

@@ -3,9 +3,9 @@ import pathlib
 import shutil
 from typing import Any, Callable, Optional
 
+from lv.ext.netdissect import imgviz
+from lv.typing import Layer, PathLike, TensorPair
 from third_party.netdissect import imgsave, nethook, pbar, tally
-from vocabulary.ext.netdissect import imgviz
-from vocabulary.typing import Layer, PathLike, TensorPair
 
 import numpy
 import torch
