@@ -115,6 +115,7 @@ def dissect(compute_topk_and_quantile: ComputeTopKAndQuantileFn,
 
     levels = rq.quantiles(quantile).reshape(-1)
     viz = imgviz.ImageVisualizer(image_size, source=dataset, level=levels)
+    # TODO(evandez): Migrate this function into our codebase?
     unit_images_and_masks = viz.image_and_mask_grid_for_topk(
         compute_activations,
         dataset,
@@ -132,6 +133,7 @@ def dissect(compute_topk_and_quantile: ComputeTopKAndQuantileFn,
 
     # Now save the top images with the masks overlaid. A bit manual in order
     # to avoid recomputing top images, but also pretty quick.
+    # TODO(evandez): Find a cleaner way to do the below.
     # yapf: disable
     unit_masked_images = imgviz.gather_tensor_to_individual_images([
         [
