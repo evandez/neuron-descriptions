@@ -155,10 +155,11 @@ def dissect(compute_topk_and_quantile: ComputeTopKAndQuantileFn,
 
     # Finally, save important metadata.
     activations, ids = topk.result()
-    for metadata, name in ((activations, 'activations'), (ids, 'ids')):
+    for metadata, name, fmt in ((activations, 'activations', '%.5e'),
+                                (ids, 'ids', '%i')):
         metadata = metadata.view(len(unit_images), k).cpu().numpy()
         metadata_file = results_dir / f'{name}.csv'
-        numpy.savetxt(str(metadata_file), metadata, delimiter=',')
+        numpy.savetxt(str(metadata_file), metadata, delimiter=',', fmt=fmt)
 
     lightbox_dir = pathlib.Path(__file__).parents[1] / 'third_party'
     lightbox_file = lightbox_dir / 'lightbox.html'
