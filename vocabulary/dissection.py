@@ -141,6 +141,7 @@ def dissect(compute_topk_and_quantile: ComputeTopKAndQuantileFn,
             viz.pytorch_masked_image(image,
                                      scale=False,
                                      mask=mask.bool().squeeze(),
+                                     outside_bright=.25,
                                      thickness=0)
                .permute(1, 2, 0)
                .clamp(0, 255)
