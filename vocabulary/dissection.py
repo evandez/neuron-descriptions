@@ -69,7 +69,7 @@ class ImageVisualizer(imgviz.ImageVisualizer):
                     image = self.pytorch_image(image)
                     mask = self.pytorch_mask(acts, unit)
                     masked = self.pytorch_masked_image(image,
-                                                       mask=mask,
+                                                       mask=mask.cpu(),
                                                        outside_bright=.25,
                                                        thickness=0)
                     result = torch.cat([
