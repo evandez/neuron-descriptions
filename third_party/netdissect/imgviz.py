@@ -136,7 +136,6 @@ class ImageVisualizer:
 
     def pytorch_masked_image(self,
                              imagedata,
-                             renormalize=True,
                              activations=None,
                              unit=None,
                              level=None,
@@ -151,9 +150,7 @@ class ImageVisualizer:
         Visualizes the given activations, thresholded at a specified level,
         overlaid on the given image, as a pytorch byte tensor (channel first).
         '''
-        scaled_image = imagedata
-        if renormalize:
-            scaled_image = self.pytorch_image(imagedata).float().cpu()
+        scaled_image = self.pytorch_image(imagedata).float().cpu()
         if mask is None:
             mask = self.pytorch_mask(activations,
                                      unit,
