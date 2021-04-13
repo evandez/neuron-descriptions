@@ -10,8 +10,6 @@ import torch
 from torch import nn
 from torch.utils import data
 
-Dataset = data.Dataset[Tuple[torch.Tensor, ...]]
-
 Layer = Union[int, str]
 
 TensorPair = Tuple[torch.Tensor, torch.Tensor]
@@ -23,7 +21,7 @@ PathLike = Union[str, pathlib.Path]
 
 def dissect(compute_topk_and_quantile: ComputeTopKAndQuantileFn,
             compute_activations: ComputeActivationsFn,
-            dataset: Dataset,
+            dataset: data.Dataset[Tuple[torch.Tensor, ...]],
             k: int = 15,
             quantile: float = 0.99,
             batch_size: int = 128,
@@ -151,7 +149,7 @@ def dissect(compute_topk_and_quantile: ComputeTopKAndQuantileFn,
 
 
 def discriminative(model: nn.Sequential,
-                   dataset: Dataset,
+                   dataset: data.Dataset[Tuple[torch.Tensor, ...]],
                    layer: Optional[Layer] = None,
                    device: Optional[torch.device] = None,
                    **kwargs: Any) -> None:
@@ -192,7 +190,7 @@ def discriminative(model: nn.Sequential,
 
 
 def generative(model: nn.Sequential,
-               dataset: Dataset,
+               dataset: data.Dataset[Tuple[torch.Tensor, ...]],
                layer: Optional[Layer] = None,
                device: Optional[torch.device] = None,
                **kwargs: Any) -> None:
