@@ -95,6 +95,7 @@ class ImageVisualizer(imgviz.ImageVisualizer):
         """
         grids = self.image_and_mask_grid_for_topk(*args, **kwargs)
         masked, images, masks = grids
+        masked = masked.permute(0, 1, 3, 4, 2)
         individual = [
             [Image.fromarray(mi.numpy()) for mi in mis] for mis in masked
         ]
