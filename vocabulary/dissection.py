@@ -104,6 +104,7 @@ def dissect(compute_topk_and_quantile: ComputeTopKAndQuantileFn,
         pbar.descnext('rq')
     topk, rq = tally.tally_topk_and_quantile(compute_topk_and_quantile,
                                              dataset,
+                                             k=k,
                                              batch_size=batch_size,
                                              num_workers=num_workers,
                                              pin_memory=True,
