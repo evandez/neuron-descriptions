@@ -152,6 +152,20 @@ def dissect(compute_topk_and_quantile: ComputeTopKAndQuantileFn,
                            f'{results_dir}/viz/unit_%d/image_%d.png',
                            sourcefile=topk_images_cache_file)
 
+    # Finally, save important metadata.
+    activations, ids = topk.result()
+    for metadata, name in ((activations, 'activations'), (ids, 'ids')):
+        metadata = metadata.view(len(unit_images), k).cpu().numpy()
+        metadata_file = results_dir / f'{name}.csv'
+        numpy.savetxt(metadata, str(metadata_file), delimiter=',')
+
+    lightbox_dir = pathlib.Path(__file__).parents[1] / 'third_party'
+    lightbox_file = lightbox_dir / 'lightbox.html'
+    for unit in range(len(unit_images)):
+        unit_dir = results_dir / f'viz/unit_{unit}'
+        unit_lightbox_file = unit_dir / '+lightbox.html'
+        shutil.copy(lightbox_file, unit_lightbox_file)
+
 
 def discriminative(model: nn.Sequential,
                    dataset: data.Dataset,
