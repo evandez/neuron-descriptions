@@ -21,7 +21,7 @@ PathLike = Union[str, pathlib.Path]
 
 def dissect(compute_topk_and_quantile: ComputeTopKAndQuantileFn,
             compute_activations: ComputeActivationsFn,
-            dataset: data.Dataset[Tuple[torch.Tensor, ...]],
+            dataset: data.Dataset,
             k: int = 15,
             quantile: float = 0.99,
             batch_size: int = 128,
@@ -49,8 +49,7 @@ def dissect(compute_topk_and_quantile: ComputeTopKAndQuantileFn,
             batch as input and returning activations with shape
             (batch_size, channels, *) and optionally the associated images
             of shape (batch_size, channels, height, width).
-        dataset (data.Dataset[Tuple[torch.Tensor, ...]]): Dataset to compute
-            activations on.
+        dataset (data.Dataset): Dataset to compute activations on.
         k (int, optional): Number of top-activating images to save.
             Defaults to 15.
         quantile (float, optional): Activation quantile to use when visualizing
@@ -149,7 +148,7 @@ def dissect(compute_topk_and_quantile: ComputeTopKAndQuantileFn,
 
 
 def discriminative(model: nn.Sequential,
-                   dataset: data.Dataset[Tuple[torch.Tensor, ...]],
+                   dataset: data.Dataset,
                    layer: Optional[Layer] = None,
                    device: Optional[torch.device] = None,
                    **kwargs: Any) -> None:
@@ -161,7 +160,7 @@ def discriminative(model: nn.Sequential,
         model (nn.Sequential): The model to dissect. It must be a
             `torch.nn.Sequential` so we can slice it up and look at
             the activations.
-        dataset (Dataset): Dataset of images used to compute the
+        dataset (data.Dataset): Dataset of images used to compute the
             top-activating images.
         layer (Optional[Layer], optional): Track unit activations for this
             layer. If not set, NetDissect will only look at the final output
@@ -190,7 +189,7 @@ def discriminative(model: nn.Sequential,
 
 
 def generative(model: nn.Sequential,
-               dataset: data.Dataset[Tuple[torch.Tensor, ...]],
+               dataset: data.Dataset,
                layer: Optional[Layer] = None,
                device: Optional[torch.device] = None,
                **kwargs: Any) -> None:
@@ -202,8 +201,8 @@ def generative(model: nn.Sequential,
         model (nn.Sequential): The model to dissect. It must be a
             `torch.nn.Sequential` so we can slice it up and look at
             the activations.
-        dataset (Dataset): Dataset of representations used to generate images.
-            The top-activating images will be taken from them.
+        dataset (data.Dataset): Dataset of representations used to generate
+            images. The top-activating images will be taken from them.
         layer (Optional[Layer], optional): Track unit activations for this
             layer. If not set, NetDissect will only look at the final output
             of the model. Defaults to None.
