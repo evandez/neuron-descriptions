@@ -138,7 +138,10 @@ def dissect(compute_topk_and_quantile: ComputeTopKAndQuantileFn,
     # yapf: disable
     unit_masked_images = imgviz.gather_tensor_to_individual_images([
         [
-            viz.pytorch_masked_image(image, mask=mask.bool().squeeze())
+            viz.pytorch_masked_image(image,
+                                     scale=False,
+                                     mask=mask.bool().squeeze(),
+                                     thickness=0)
                .permute(1, 2, 0)
                .clamp(0, 255)
                .byte()
