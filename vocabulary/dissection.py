@@ -66,14 +66,14 @@ class ImageVisualizer(imgviz.ImageVisualizer):
                 images, *_ = batch
             for ranks, acts, image in zip(gather, activations, images):
                 for unit, rank in ranks:
-                    image = self.pytorch_image(image)
-                    mask = self.pytorch_mask(acts, unit)
+                    image = self.pytorch_image(image).cpu()
+                    mask = self.pytorch_mask(acts, unit).cpu()
                     masked = self.pytorch_masked_image(image,
-                                                       mask=mask.cpu(),
+                                                       mask=mask,
                                                        outside_bright=.25,
-                                                       thickness=0)
+                                                       thickness=0).cpu()
                     result = torch.cat([
-                        component.clamp(0, 255).byte().cpu()
+                        component.float().clamp(0, 255).byte()
                         for component in (masked, image, mask[None])
                     ])
                     yield ((unit, rank), result)
