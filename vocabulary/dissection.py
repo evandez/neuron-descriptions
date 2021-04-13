@@ -63,7 +63,7 @@ class ImageVisualizer(imgviz.ImageVisualizer):
             if isinstance(activations, tuple):
                 activations, images = activations
             else:
-                images, = batch
+                images, *_ = batch
             for ranks, acts, image in zip(gather, activations, images):
                 for unit, rank in ranks:
                     image = self.pytorch_image(image)
