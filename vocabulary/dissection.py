@@ -97,6 +97,7 @@ def dissect(compute_topk_and_quantile: ComputeTopKAndQuantileFn,
     # Clear results directory if requested.
     if clear_results_dir and results_dir.exists():
         shutil.rmtree(results_dir)
+    results_dir.mkdir(exist_ok=True, parents=True)
 
     # Compute activation statistics across dataset.
     if display_progress:
