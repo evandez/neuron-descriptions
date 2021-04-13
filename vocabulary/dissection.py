@@ -32,18 +32,15 @@ def dissect(compute_topk_and_quantile: ComputeTopKAndQuantileFn,
             results_dir: PathLike = 'dissection-results',
             tally_cache_file: Optional[PathLike] = None,
             topk_images_cache_file: Optional[PathLike] = None,
-            topk_masks_cache_file: Optional[PathLike] = None,
-            topk_masked_images_cache_file: Optional[PathLike] = None,
             clear_cache_files: bool = False,
             clear_results_dir: bool = False,
             display_progress: bool = True) -> None:
     """Find and visualize the top-activating images for each unit.
 
-    Top-activating images are found using tools from the well known
-    NetDissect framework [Bau et al., 2017]. This function just forwards
-    to the NetDissect library. We do not explicitly take a model as input
-    but rather two blackbox functions which take dataset batches as input
-    and return unit activations as output.
+    Top-activating images are found with network dissection [Bau et al., 2017].
+    This function just forwards to the NetDissect library. We do not explicitly
+    take a model as input but rather two blackbox functions which take dataset
+    batches as input and return unit activations as output.
 
     Args:
         compute_topk_and_quantile (ComputeTopKAndQuantileFn): Function taking
@@ -73,12 +70,6 @@ def dissect(compute_topk_and_quantile: ComputeTopKAndQuantileFn,
         topk_images_cache_file (Optional[PathLike], optional): Write
             intermediate results for determining top-k images to this file.
             Defaults to None.
-        topk_masks_cache_file (Optional[PathLike], optional): Write
-            intermediate results for determining top-k image masks to this
-            file. Defaults to None.
-        topk_masked_images_cache_file (Optional[PathLike], optional): Write
-            intermediate results for determining top-k masked images to this
-            file. Defaults to None.
         clear_cache_files (bool, optional): If set, clear existing cache files
             with the same name as any of the *_cache_file arguments to this
             function. Useful if you want to redo all computation.
@@ -99,9 +90,7 @@ def dissect(compute_topk_and_quantile: ComputeTopKAndQuantileFn,
 
     # Clear cache files if requested.
     if clear_cache_files:
-        for cache_file in (tally_cache_file, topk_images_cache_file,
-                           topk_masks_cache_file,
-                           topk_masked_images_cache_file):
+        for cache_file in (tally_cache_file, topk_images_cache_file):
             if cache_file is None:
                 continue
             cache_file = pathlib.Path(cache_file)
@@ -122,12 +111,13 @@ def dissect(compute_topk_and_quantile: ComputeTopKAndQuantileFn,
                                              pin_memory=True,
                                              cachefile=tally_cache_file)
 
-    # Find images causing top activations and write them out.
+    # Now compute top images and masks for the highest-activating pixels.
     if display_progress:
-        pbar.descnext('unit top images')
+        pbar.descnext('compute top images')
+
     levels = rq.quantiles(quantile).reshape(-1)
     viz = imgviz.ImageVisualizer(image_size, source=dataset, level=levels)
-    unit_images = viz.individual_images_for_topk(
+    unit_images_and_masks = viz.image_and_mask_grid_for_topk(
         compute_activations,
         dataset,
         topk,
@@ -136,39 +126,28 @@ def dissect(compute_topk_and_quantile: ComputeTopKAndQuantileFn,
         pin_memory=True,
         cachefile=topk_images_cache_file)
 
-    if display_progress:
-        pbar.descnext('saving top images')
-    imgsave.save_image_set(unit_images,
-                           f'{results_dir}/unit_%d/orig_%d.png',
-                           sourcefile=topk_images_cache_file)
+    unit_images = unit_images_and_masks[:, :, :, :, :-1]
+    numpy.save(f'{results_dir}/images.npy', unit_images)
 
-    # Now compute masks for the highest-activating pixels and write them out.
-    unit_masks = viz.mask_grid_for_topk(compute_activations,
-                                        dataset,
-                                        topk,
-                                        k=k,
-                                        num_workers=num_workers,
-                                        pin_memory=True,
-                                        cachefile=topk_masks_cache_file)
-    for unit, masks in enumerate(unit_masks):
-        numpy.save(f'{results_dir}/unit_{unit}/masks.npy', masks)
+    unit_masks = unit_images_and_masks[:, :, :, :, -1:]
+    numpy.save(f'{results_dir}/masks.npy', unit_masks)
 
-    # Now save the same images, but with the masks overlaid. We accidentally
-    # recompute the masks in this step, but eh, it doesn't take that long...
-    pbar.descnext('unit top masked images')
-    unit_masked_images = viz.individual_masked_images_for_topk(
-        compute_activations,
-        dataset,
-        topk,
-        k=k,
-        num_workers=num_workers,
-        pin_memory=True,
-        cachefile=topk_masked_images_cache_file)
+    # Now save the top images with the masks overlaid. A bit manual in order
+    # to avoid recomputing top images, but also pretty quick.
+    # yapf: disable
+    unit_masked_images = imgviz.gather_tensor_to_individual_images([
+        [
+            viz.pytorch_masked_image(image, mask=mask)
+            for image, mask in zip(images, masks)
+        ]
+        for images, masks in zip(unit_images, unit_masks)
+    ])
+    # yapf: enable
 
     pbar.descnext('saving top masked images')
     imgsave.save_image_set(unit_masked_images,
-                           f'{results_dir}/unit_%d/masked_%d.png',
-                           sourcefile=topk_masked_images_cache_file)
+                           f'{results_dir}/viz/unit_%d/image_%d.png',
+                           sourcefile=topk_images_cache_file)
 
 
 def discriminative(model: nn.Sequential,

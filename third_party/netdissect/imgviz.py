@@ -2,11 +2,21 @@ import PIL, torch
 from . import upsample, renormalize, segcrop, segviz, tally
 from matplotlib import cm
 
+
 class ImageVisualizer:
-    def __init__(self, size, image_size=None, data_size=None,
-            renormalizer=None, scale_offset=None, level=None, actrange=None,
-            source=None, convolutions=None, quantiles=None,
-            percent_level=None):
+
+    def __init__(self,
+                 size,
+                 image_size=None,
+                 data_size=None,
+                 renormalizer=None,
+                 scale_offset=None,
+                 level=None,
+                 actrange=None,
+                 source=None,
+                 convolutions=None,
+                 quantiles=None,
+                 percent_level=None):
         '''
         An ImageVisualizer produces visualizations of unit activations
         as heatmaps or overlays on top of the original image.  The output
@@ -24,14 +34,14 @@ class ImageVisualizer:
         if image_size is None and source is not None:
             image_size = upsample.image_size_from_source(source)
         if renormalizer is None and source is not None:
-            renormalizer = renormalize.renormalizer(
-                    source=source, target='byte')
+            renormalizer = renormalize.renormalizer(source=source,
+                                                    target='byte')
         if scale_offset is None and convolutions is not None:
             scale_offset = upsample.sequence_scale_offset(convolutions)
         if data_size is None and convolutions is not None:
             data_size = upsample.sequence_data_size(convolutions, image_size)
         if level is None and quantiles is not None:
-            level = quantiles.quantiles([percent_level or 0.95])[:,0]
+            level = quantiles.quantiles([percent_level or 0.95])[:, 0]
         if actrange is None and quantiles is not None:
             actrange = quantiles.quantiles([0.01, 0.99])
         if isinstance(size, int):
@@ -47,12 +57,17 @@ class ImageVisualizer:
         self.quantiles = quantiles
         self.upsampler = None
         if self.data_size is not None:
-            self.upsampler = upsample.upsampler(size, data_size,
-                    image_size=self.image_size,
-                    scale_offset=scale_offset)
+            self.upsampler = upsample.upsampler(size,
+                                                data_size,
+                                                image_size=self.image_size,
+                                                scale_offset=scale_offset)
 
-    def heatmap(self, activations, unit=None, mode='bilinear',
-            amax=None, amin=None):
+    def heatmap(self,
+                activations,
+                unit=None,
+                mode='bilinear',
+                amax=None,
+                amin=None):
         '''
         Produces a heatmap from the given activations.  The unit,
         if specified, is an index into the activations tensor,
@@ -65,10 +80,9 @@ class ImageVisualizer:
         else:
             a = activations[unit]
         upsampler = self.upsampler_for(a)
-        a = upsampler(a[None,None,...], mode=mode)[0,0].cpu()
-        return PIL.Image.fromarray(
-                (cm.hot((a - amin) / (1e-10 + amax - amin)) * 255
-                    ).astype('uint8'))
+        a = upsampler(a[None, None, ...], mode=mode)[0, 0].cpu()
+        return PIL.Image.fromarray((cm.hot(
+            (a - amin) / (1e-10 + amax - amin)) * 255).astype('uint8'))
 
     def segmentation(self, segmentations, label=None):
         '''
@@ -97,68 +111,98 @@ class ImageVisualizer:
         Converts the given tensor imagedata to a PIL image, scaling
         and renormalizing as needed.
         '''
-        return PIL.Image.fromarray(self.pytorch_image(imagedata)
-                .permute(1, 2, 0).byte().cpu().numpy())
+        return PIL.Image.fromarray(
+            self.pytorch_image(imagedata).permute(1, 2,
+                                                  0).byte().cpu().numpy())
 
-    def masked_image(self, imagedata, activations=None, unit=None,
-            level=None, percent_level=None, **kwargs):
+    def masked_image(self,
+                     imagedata,
+                     activations=None,
+                     unit=None,
+                     level=None,
+                     percent_level=None,
+                     **kwargs):
         '''
         Visualizes the given activations, thresholded at a specified level,
         overlaid on the given image, as a PIL image.
         '''
         result_image = self.pytorch_masked_image(imagedata,
-                activations=activations,
-                unit=unit, level=level, percent_level=percent_level,
-                **kwargs)
-        return PIL.Image.fromarray(
-            result_image.permute(1, 2, 0).cpu().numpy())
+                                                 activations=activations,
+                                                 unit=unit,
+                                                 level=level,
+                                                 percent_level=percent_level,
+                                                 **kwargs)
+        return PIL.Image.fromarray(result_image.permute(1, 2, 0).cpu().numpy())
 
-    def pytorch_masked_image(self, imagedata, activations=None, unit=None,
-            level=None, percent_level=None, thickness=1, mask=None,
-            border_color=None, outside_bright=0.5, inside_color=None,
-            crop_size_around_largest_segment=None):
+    def pytorch_masked_image(self,
+                             imagedata,
+                             activations=None,
+                             unit=None,
+                             level=None,
+                             percent_level=None,
+                             thickness=1,
+                             mask=None,
+                             border_color=None,
+                             outside_bright=0.5,
+                             inside_color=None,
+                             crop_size_around_largest_segment=None):
         '''
         Visualizes the given activations, thresholded at a specified level,
         overlaid on the given image, as a pytorch byte tensor (channel first).
         '''
         scaled_image = self.pytorch_image(imagedata).float().cpu()
         if mask is None:
-            mask = self.pytorch_mask(activations, unit, level=level,
-                    percent_level=percent_level).cpu()
+            mask = self.pytorch_mask(activations,
+                                     unit,
+                                     level=level,
+                                     percent_level=percent_level).cpu()
         if crop_size_around_largest_segment is not None:
-	        scaled_image, mask = segcrop.crop_by_largest_segment(
-                    scaled_image, mask, size=crop_size_around_largest_segment)
+            scaled_image, mask = segcrop.crop_by_largest_segment(
+                scaled_image, mask, size=crop_size_around_largest_segment)
         border = border_from_mask(mask, thickness)
         inside = (mask & (~border))
         outside = (~mask & (~border))
-        inside, outside, border = [d.float() for d in [inside, outside, border]]
+        inside, outside, border = [
+            d.float() for d in [inside, outside, border]
+        ]
         if border_color is None:
-            border_color = [255.0, 255.0, 0] # yellow
+            border_color = [255.0, 255.0, 0]  # yellow
         border_color = torch.tensor(border_color,
-                dtype=border.dtype, device=border.device)[:,None,None]
+                                    dtype=border.dtype,
+                                    device=border.device)[:, None, None]
         if inside_color is not None:
             inside_color = torch.tensor(inside_color,
-                dtype=border.dtype, device=border.device)[:,None,None]
+                                        dtype=border.dtype,
+                                        device=border.device)[:, None, None]
         result_image = (
-                (scaled_image if inside_color is None
-                    else inside_color) * inside +
-                border_color * border +
-                outside_bright * scaled_image * outside).clamp(0, 255).byte()
+            (scaled_image if inside_color is None else inside_color) * inside +
+            border_color * border +
+            outside_bright * scaled_image * outside).clamp(0, 255).byte()
         return result_image
 
-    def masked_delta(self, imagedata, activations, unit=None,
-            above=None, below=None):
+    def masked_delta(self,
+                     imagedata,
+                     activations,
+                     unit=None,
+                     above=None,
+                     below=None):
         '''
         Visualizes the given activations, thresholded at a specified level,
         overlaid on the given image, as a PIL image.
         '''
-        result_image = self.pytorch_masked_delta(imagedata, activations,
-                unit=unit, above=above, below=below)
-        return PIL.Image.fromarray(
-            result_image.permute(1, 2, 0).cpu().numpy())
+        result_image = self.pytorch_masked_delta(imagedata,
+                                                 activations,
+                                                 unit=unit,
+                                                 above=above,
+                                                 below=below)
+        return PIL.Image.fromarray(result_image.permute(1, 2, 0).cpu().numpy())
 
-    def pytorch_masked_delta(self, imagedata, delta, unit=None,
-            above=None, below=None):
+    def pytorch_masked_delta(self,
+                             imagedata,
+                             delta,
+                             unit=None,
+                             above=None,
+                             below=None):
         '''
         Visualizes the given activations, thresholded at a specified level,
         with green for high numbrers and red for low numbers.
@@ -173,15 +217,17 @@ class ImageVisualizer:
             bborder = border_from_mask(bmask)
         inside = ((amask | bmask) & ~(aborder | bborder))
         outside = (~(amask | bmask) & ~(aborder | bborder))
-        inside, outside, aborder, bborder = [d.float()
-                for d in [inside, outside, aborder, bborder]]
-        red, green = [torch.tensor(c, dtype=torch.float, device=aborder.device
-            )[:,None,None] for c in [[255, 0, 0], [0, 255, 0]]]
-        result_image = (
-                scaled_image * inside +
-                green * aborder +
-                red * bborder +
-                0.5 * scaled_image * outside).clamp(0, 255).byte()
+        inside, outside, aborder, bborder = [
+            d.float() for d in [inside, outside, aborder, bborder]
+        ]
+        red, green = [
+            torch.tensor(c, dtype=torch.float, device=aborder.device)[:, None,
+                                                                      None]
+            for c in [[255, 0, 0], [0, 255, 0]]
+        ]
+        result_image = (scaled_image * inside + green * aborder +
+                        red * bborder + 0.5 * scaled_image * outside).clamp(
+                            0, 255).byte()
         return result_image
 
     def pytorch_mask(self, activations, unit, level=None, percent_level=None):
@@ -194,10 +240,11 @@ class ImageVisualizer:
         else:
             a = activations[unit]
         if level is None:
-            level = self.level_for(activations, unit,
-                    percent_level=percent_level)
+            level = self.level_for(activations,
+                                   unit,
+                                   percent_level=percent_level)
         upsampler = self.upsampler_for(a)
-        return (upsampler(a[None, None,...])[0,0] > level)
+        return (upsampler(a[None, None, ...])[0, 0] > level)
 
     def pytorch_image(self, imagedata):
         '''
@@ -208,8 +255,7 @@ class ImageVisualizer:
             imagedata = imagedata[0]
         renormalizer = self.renormalizer_for(imagedata)
         return torch.nn.functional.interpolate(
-                renormalizer(imagedata).float()[None,...],
-                size=self.size)[0]
+            renormalizer(imagedata).float()[None, ...], size=self.size)[0]
 
     def upsampler_for(self, a):
         '''
@@ -218,10 +264,12 @@ class ImageVisualizer:
         '''
         if self.upsampler is not None:
             return self.upsampler
-        return upsample.upsampler(self.size, a.shape,
-                    image_size=self.image_size,
-                    scale_offset=self.scale_offset,
-                    dtype=a.dtype, device=a.device)
+        return upsample.upsampler(self.size,
+                                  a.shape,
+                                  image_size=self.image_size,
+                                  scale_offset=self.scale_offset,
+                                  dtype=a.dtype,
+                                  device=a.device)
 
     def range_for(self, activations, unit):
         '''
@@ -262,47 +310,91 @@ class ImageVisualizer:
         return renormalize.renormalizer('zc', 'byte')
 
     def image_grid_for_topk(self, compute, dataset, topk, k=None, **kwargs):
+
         def compute_viz(gather_indices, *data_batch):
             acts_batch = compute(*data_batch)
             if isinstance(acts_batch, tuple):
                 acts_batch, image_batch = acts_batch
             else:
                 image_batch = data_batch[0]
-            for gather_for, acts, imgt in (
-                    zip(gather_indices, acts_batch, image_batch)):
+            for gather_for, _, imgt in (zip(gather_indices, acts_batch,
+                                            image_batch)):
                 for unit, rank in gather_for:
-                    pytorch_image = self.pytorch_image(imgt).permute(1,2,0).clamp(0, 255).byte().cpu()
+                    pytorch_image = self.pytorch_image(imgt).permute(
+                        1, 2, 0).clamp(0, 255).byte().cpu()
                     yield ((unit, rank), pytorch_image)
+
         gt = tally.gather_topk(compute_viz, dataset, topk=topk, k=k, **kwargs)
         return gt.result()
 
     def mask_grid_for_topk(self, compute, dataset, topk, k=None, **kwargs):
+
         def compute_viz(gather_indices, *data_batch):
             acts_batch = compute(*data_batch)
             if isinstance(acts_batch, tuple):
                 acts_batch, image_batch = acts_batch
             else:
                 image_batch = data_batch[0]
-            for gather_for, acts, imgt in (
-                    zip(gather_indices, acts_batch, image_batch)):
+            for gather_for, acts, _ in (zip(gather_indices, acts_batch,
+                                            image_batch)):
                 for unit, rank in gather_for:
                     pytorch_mask = self.pytorch_mask(acts, unit).float().cpu()
                     yield ((unit, rank), pytorch_mask)
+
         gt = tally.gather_topk(compute_viz, dataset, topk=topk, k=k, **kwargs)
         return gt.result()
 
-    def masked_image_grid_for_topk(
-            self, compute, dataset, topk, k=None, border_color=None,
-	        outside_bright=0.5, thickness=1, crop_size_around_largest_segment=None,
-            **kwargs):
+    def image_and_mask_grid_for_topk(self,
+                                     compute,
+                                     dataset,
+                                     topk,
+                                     k=None,
+                                     **kwargs):
+
         def compute_viz(gather_indices, *data_batch):
             acts_batch = compute(*data_batch)
             if isinstance(acts_batch, tuple):
                 acts_batch, image_batch = acts_batch
             else:
                 image_batch = data_batch[0]
-            for gather_for, acts, imgt in (
-                    zip(gather_indices, acts_batch, image_batch)):
+            for gather_for, acts, imgt in (zip(gather_indices, acts_batch,
+                                               image_batch)):
+                for unit, rank in gather_for:
+                    pytorch_image = self.pytorch_image(imgt)\
+                        .permute(1, 2, 0)\
+                        .clamp(0, 255)\
+                        .byte()\
+                        .cpu()
+                    pytorch_mask = self.pytorch_mask(acts, unit)\
+                        .byte()\
+                        .unsqueeze(-1)\
+                        .cpu()
+                    pytorch_image_and_mask = torch.cat(
+                        (pytorch_image, pytorch_mask), dim=-1)
+                    yield ((unit, rank), pytorch_image_and_mask)
+
+        gt = tally.gather_topk(compute_viz, dataset, topk=topk, k=k, **kwargs)
+        return gt.result()
+
+    def masked_image_grid_for_topk(self,
+                                   compute,
+                                   dataset,
+                                   topk,
+                                   k=None,
+                                   border_color=None,
+                                   outside_bright=0.5,
+                                   thickness=1,
+                                   crop_size_around_largest_segment=None,
+                                   **kwargs):
+
+        def compute_viz(gather_indices, *data_batch):
+            acts_batch = compute(*data_batch)
+            if isinstance(acts_batch, tuple):
+                acts_batch, image_batch = acts_batch
+            else:
+                image_batch = data_batch[0]
+            for gather_for, acts, imgt in (zip(gather_indices, acts_batch,
+                                               image_batch)):
                 for unit, rank in gather_for:
                     pytorch_masked_image = self.pytorch_masked_image(
                         imgt,
@@ -311,98 +403,125 @@ class ImageVisualizer:
                         border_color=border_color,
                         outside_bright=outside_bright,
                         thickness=thickness,
-                        crop_size_around_largest_segment=crop_size_around_largest_segment,
-		            ).permute(1,2,0).cpu()
-                    yield((unit, rank), pytorch_masked_image)
+                        crop_size_around_largest_segment=
+                        crop_size_around_largest_segment,
+                    ).permute(1, 2, 0).cpu()
+                    yield ((unit, rank), pytorch_masked_image)
+
         gt = tally.gather_topk(compute_viz, dataset, topk=topk, k=k, **kwargs)
         return gt.result()
 
-    def individual_images_for_topk(
-            self, compute, dataset, topk, k=None, **kwargs):
+    def individual_images_for_topk(self,
+                                   compute,
+                                   dataset,
+                                   topk,
+                                   k=None,
+                                   **kwargs):
         # Example compute function:
         # def compute(image_batch):
         #   image_batch = image_batch.cuda()
         #   acts_batch = model.retained_layer(layername)
-        gt = self.image_grid_for_topk(
-                compute, dataset, topk, k=k, **kwargs)
-        return [[PIL.Image.fromarray(d.cpu().numpy()) for d in row]
-                for row in gt]
+        gt = self.image_grid_for_topk(compute, dataset, topk, k=k, **kwargs)
+        return gather_tensor_to_individual_images(gt)
 
-    def individual_masked_images_for_topk(
-            self, compute, dataset, topk, k=None, **kwargs):
+    def individual_masked_images_for_topk(self,
+                                          compute,
+                                          dataset,
+                                          topk,
+                                          k=None,
+                                          **kwargs):
         # Example compute function:
         # def compute(image_batch):
         #   image_batch = image_batch.cuda()
         #   acts_batch = model.retained_layer(layername)
-        gt = self.masked_image_grid_for_topk(
-                compute, dataset, topk, k=k, **kwargs)
-        return [[PIL.Image.fromarray(d.cpu().numpy()) for d in row]
-                for row in gt]
+        gt = self.masked_image_grid_for_topk(compute,
+                                             dataset,
+                                             topk,
+                                             k=k,
+                                             **kwargs)
+        return gather_tensor_to_individual_images(gt)
 
-    def masked_images_for_topk(
-            self, compute, dataset, topk, k=None, gap=5, **kwargs):
+    def masked_images_for_topk(self,
+                               compute,
+                               dataset,
+                               topk,
+                               k=None,
+                               gap=5,
+                               **kwargs):
         # Example compute function:
         # def compute(image_batch):
         #   image_batch = image_batch.cuda()
         #   acts_batch = model.retained_layer(layername)
-        gt = self.masked_image_grid_for_topk(
-                compute, dataset, topk, k=k, **kwargs)
+        gt = self.masked_image_grid_for_topk(compute,
+                                             dataset,
+                                             topk,
+                                             k=k,
+                                             **kwargs)
         return [strip_image_from_grid_row(row, gap=gap) for row in gt]
-
 
     def masked_image_grid_for_row(self, compute, dataset, unit, indexes):
         results = []
         for rank in indexes:
-            img_batch = dataset[rank][0][None,...]
+            img_batch = dataset[rank][0][None, ...]
             acts_batch = compute(img_batch)
-            results.append(self.pytorch_masked_image(
-                img_batch[0], acts_batch[0], unit)
-                .permute(1,2,0).cpu()[None,...])
+            results.append(
+                self.pytorch_masked_image(img_batch[0], acts_batch[0],
+                                          unit).permute(1, 2, 0).cpu()[None,
+                                                                       ...])
         return torch.cat(results)
 
     def masked_image_row(self, compute, dataset, unit, indexes, gap=5):
-        row = self.masked_image_grid_for_row(
-                compute, dataset, unit, indexes)
+        row = self.masked_image_grid_for_row(compute, dataset, unit, indexes)
         return strip_image_from_grid_row(row, gap=gap)
 
-    def masked_image_for_conditional_topk(self, compute, dataset,
-            ctk, classnum, unit, k=10, gap=5):
+    def masked_image_for_conditional_topk(self,
+                                          compute,
+                                          dataset,
+                                          ctk,
+                                          classnum,
+                                          unit,
+                                          k=10,
+                                          gap=5):
         row = self.masked_image_grid_for_row(
-                compute, dataset, unit,
-                ctk.conditional(classnum).result()[1][unit][:k])
+            compute, dataset, unit,
+            ctk.conditional(classnum).result()[1][unit][:k])
         return strip_image_from_grid_row(row, gap=gap)
+
+
+def gather_tensor_to_individual_images(gt):
+    return [[PIL.Image.fromarray(d.cpu().numpy()) for d in row] for row in gt]
+
 
 def strip_image_from_grid_row(row, gap=5, bg=255):
-    strip = torch.full(
-            (row.shape[1],
-             row.shape[0] * (row.shape[2] + gap) - gap,
-             row.shape[3]), bg, dtype=row.dtype)
+    strip = torch.full((row.shape[1], row.shape[0] *
+                        (row.shape[2] + gap) - gap, row.shape[3]),
+                       bg,
+                       dtype=row.dtype)
     for i, img in enumerate(row):
-        strip[:,
-              i * (row.shape[2] + gap) : (i+1) * (row.shape[2] + gap) - gap,
-              :] = img
+        strip[:, i * (row.shape[2] + gap):(i + 1) * (row.shape[2] + gap) -
+              gap, :] = img
     return PIL.Image.fromarray(strip.numpy())
+
 
 def border_from_mask(mask, thickness=1, outside=True):
     a = mask
     out = torch.zeros_like(a)
     for it in range(thickness):
-        h = (a[:-1,:] != a[1:,:])
-        v = (a[:,:-1] != a[:,1:])
-        d = (a[:-1,:-1] != a[1:,1:])
-        u = (a[1:,:-1] != a[:-1,1:])
-        out[:-1,:-1] |= d
-        out[1:,1:] |= d
-        out[1:,:-1] |= u
-        out[:-1,1:] |= u
-        out[:-1,:] |= h
-        out[1:,:] |= h
-        out[:,:-1] |= v
-        out[:,1:] |= v
+        h = (a[:-1, :] != a[1:, :])
+        v = (a[:, :-1] != a[:, 1:])
+        d = (a[:-1, :-1] != a[1:, 1:])
+        u = (a[1:, :-1] != a[:-1, 1:])
+        out[:-1, :-1] |= d
+        out[1:, 1:] |= d
+        out[1:, :-1] |= u
+        out[:-1, 1:] |= u
+        out[:-1, :] |= h
+        out[1:, :] |= h
+        out[:, :-1] |= v
+        out[:, 1:] |= v
         if it > 0:
             out |= a
         a = out
     if outside:
         out &= ~mask
     return out
-
