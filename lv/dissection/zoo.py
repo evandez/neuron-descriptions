@@ -1,13 +1,155 @@
 """Defines dissection configurations."""
 import dataclasses
 import pathlib
-from typing import Any, Callable, Mapping, Optional, Type, TypeVar
+from typing import (Any, Callable, Iterable, Mapping, Optional, Sequence, Tuple,
+                    Type, TypeVar, Union)
 
-from lv.typing import PathLike
+from lv.typing import Layer, PathLike
 from third_party.netdissect import renormalize
 
+import torch
+from torch import hub, nn
 from torch.utils import data
 from torchvision import datasets, transforms
+
+ModelConfigT = TypeVar('ModelConfigT', bound='ModelConfig')
+ModelConfigsT = Mapping[str, Mapping[str, ModelConfigT]]
+Model = Tuple[nn.Sequential, Sequence[Layer]]
+
+
+@dataclasses.dataclass(frozen=True)
+class ModelConfig:
+    """Model configuration.
+
+    This dataclass wraps a factory for the model and, optionally, the names
+    of its layers, the url containing its pretrained weights, and default
+    keyword arguments to be passed to the factory, all of which can be
+    overridden at construction.
+    """
+
+    def __init__(self,
+                 factory: Callable[..., nn.Sequential],
+                 layers: Optional[Iterable[str]] = None,
+                 url: Optional[str] = None,
+                 load_weights: bool = True,
+                 **defaults: Any):
+        """Initialize  the configuration.
+
+        The keyword arguments are treated as defaults for the model.
+
+        Args:
+            factory (Callable[..., nn.Sequential]): Factory function that
+                creates a model from arbitrary keyword arguments.
+            layers (Optional[Iterable[str]], optional): Layers to return
+                when model is instantiated. By default, set to the keys
+                returned by `model.named_children()`.
+            url (Optional[str], optional): URL hosting pretrained weights.
+                If set and path provided to `load` does not exist, weights
+                will be downloaded. Defaults to None.
+            load_weights (bool, optional): If True, attempt to load
+                pretrained weights. Otherwise, model will be immediately
+                returned after instantiation from the factory. Set this to
+                False if the model returned by the factory has already loaded
+                pretrained weights.
+
+        """
+        self.factory = factory
+        self.defaults = defaults
+
+        self.url = url
+        self.layers = layers
+        self.load_weights = load_weights
+
+    def load(self,
+             path: Optional[PathLike] = None,
+             map_location: Optional[Union[str, torch.device]] = None,
+             **kwargs: Any) -> Model:
+        """Load the model from the given path.
+
+        Args:
+            path (Optional[PathLike], optional): Path to the pretrained model
+                weights. If not set, model will be initialized to whatever the
+                factory function returns. If set and path does not exist but
+                URL field is set, weights will be downloaded to this path.
+            map_location (Optional[Union[str, torch.device]], optional): Passed
+                to `torch.load`, effectively sending all model weights to this
+                device at load time. Defaults to None.
+
+        Returns:
+            Model: The loaded model and layers.
+
+        """
+        for key, default in self.defaults.items():
+            kwargs.setdefault(key, default)
+
+        model = self.factory(**kwargs)
+
+        if path is not None and self.load_weights:
+            path = pathlib.Path(path)
+            if not path.exists() and self.url is not None:
+                hub.download_url_to_file(self.url, path)
+            if not path.exists():
+                raise FileNotFoundError(f'model path not found: {path}')
+            state_dict = torch.load(path, map_location=map_location)
+            model.load_state_dict(state_dict)
+
+        layers = self.layers
+        if layers is None:
+            layers = [key for key, _ in model.named_children()]
+
+        return model, tuple(layers)
+
+    @classmethod
+    def configs(cls: Type[ModelConfigT]) -> ModelConfigsT:
+        """Return default configs."""
+        return {}
+
+
+ModelConfigs = Mapping[str, Mapping[str, ModelConfig]]
+
+
+def model(name: str,
+          dataset: str,
+          path: Optional[PathLike] = None,
+          configs: Optional[ModelConfigs] = None,
+          **kwargs: Any) -> Model:
+    """Load the model trained on the given dataset.
+
+    Args:
+        name (str): Name of the model.
+        dataset (str): Name of the dataset.
+        path (Optional[PathLike], optional): Path to the model weights.
+            If not set, defaults to `.zoo/models/{name}-{dataset}.pth`.
+            If path does not exist but `url` is set on the model config,
+            weights will be downloaded from URL to the path.
+        configs (Optional[ModelConfigs], optional): Mapping from model names
+            to a mapping from dataset names to model configs. By default,
+            calls `ModelConfigs.configs()`.
+
+    Raises:
+        KeyError: If no model with given name exists, or if model has no
+            weights for the given dataset.
+
+    Returns:
+        Model: The loaded model as an `nn.Sequential` along with its layer
+            names according to the config.
+
+    """
+    if configs is None:
+        configs = ModelConfig.configs()
+    if name not in configs:
+        raise KeyError(f'no such model in zoo: {name}')
+    if dataset not in configs[name]:
+        raise KeyError(f'no {name} model for dataset: {dataset}')
+    config = configs[name][dataset]
+
+    if path is None:
+        path = pathlib.Path(
+            __file__).parents[2] / '.zoo/models' / f'{name}-{dataset}.pth'
+
+    model, layers = config.load(path, **kwargs)
+    return model, layers
+
 
 DatasetConfigT = TypeVar('DatasetConfigT', bound='DatasetConfig')
 
@@ -85,6 +227,9 @@ def dataset(name: str,
             all options.
         path (Optional[PathLike], optional): Path to dataset. Defaults to
             .zoo/datasets/{name} at the root of this repository.
+        configs (Optional[Mapping[str, DatasetConfig]], optional): Mapping
+            from config names to dataset configs. By default, calls
+            `DatasetConfigs.configs()`.
 
     Returns:
         data.Dataset: The loaded dataset.
