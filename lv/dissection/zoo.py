@@ -1,9 +1,10 @@
 """Defines dissection configurations."""
 import dataclasses
 import pathlib
-from typing import (Any, Callable, Iterable, Mapping, Optional, Sequence, Tuple,
-                    Type, TypeVar, Union)
+from typing import (Any, Callable, Iterable, Mapping, Optional, Sequence,
+                    Tuple, Type, TypeVar, Union)
 
+from lv.ext.torchvision import models
 from lv.typing import Layer, PathLike
 from third_party.netdissect import renormalize
 
@@ -102,7 +103,24 @@ class ModelConfig:
     @classmethod
     def configs(cls: Type[ModelConfigT]) -> ModelConfigsT:
         """Return default configs."""
-        return {}
+        return {
+            'alexnet': {
+                'imagenet':
+                    cls(models.alexnet_seq,
+                        pretrained=True,
+                        load_weights=False),
+            },
+            'resnet18': {
+                'imagenet':
+                    cls(models.resnet18_seq,
+                        pretrained=True,
+                        load_weights=False)
+            },
+            'vgg16': {
+                'imagenet':
+                    cls(models.vgg16_seq, pretrained=True, load_weights=False)
+            }
+        }
 
 
 ModelConfigs = Mapping[str, Mapping[str, ModelConfig]]
