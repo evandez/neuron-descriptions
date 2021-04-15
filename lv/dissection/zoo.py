@@ -18,7 +18,7 @@ ModelConfigsT = Mapping[str, Mapping[str, ModelConfigT]]
 Model = Tuple[nn.Sequential, Sequence[Layer]]
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass
 class ModelConfig:
     """Model configuration.
 
@@ -172,7 +172,6 @@ def model(name: str,
 DatasetConfigT = TypeVar('DatasetConfigT', bound='DatasetConfig')
 
 
-@dataclasses.dataclass(frozen=True)
 class DatasetConfig:
     """Dataset configuration.
 
