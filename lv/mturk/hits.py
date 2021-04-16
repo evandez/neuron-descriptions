@@ -1,7 +1,7 @@
 """Tools for generating MTurk HITS."""
 import csv
 import pathlib
-from typing import Callable, Sequence
+from typing import Callable, Optional, Sequence
 from urllib import request
 
 from lv import datasets
@@ -14,6 +14,9 @@ def generate_hits_csv(dataset: datasets.TopImagesDataset,
                       csv_file: PathLike,
                       generate_urls: Callable[[str, int, int], Sequence[str]],
                       validate_urls: bool = True,
+                      layer_column: str = 'layer',
+                      unit_column: str = 'unit',
+                      image_url_column_prefix: str = 'image_url_',
                       display_progress: bool = True) -> None:
     """Generate MTurk hits CSV file for the given dataset.
 
@@ -33,6 +36,13 @@ def generate_hits_csv(dataset: datasets.TopImagesDataset,
             all URLs.
         validate_urls (bool, optional): If set, make sure all image URLs
             actually open. Defaults to True.
+        layer_column (str, optional): Layer column in generated CSV.
+            Defaults to 'layer'.
+        unit_column (str, optional): Unit column in generated CSV.
+            Defaults to 'unit'.
+        image_url_column_prefix (str, optional): Prefix for image URL columns.
+            Will be postfixed with index of the image in the top images list.
+            Defaults to 'image_url_'.
         display_progress (bool, optional): If True, display progress bar.
             Defaults to True.
 
@@ -44,8 +54,10 @@ def generate_hits_csv(dataset: datasets.TopImagesDataset,
     csv_file = pathlib.Path(csv_file)
     csv_file.parent.mkdir(exist_ok=True, parents=True)
 
-    header = ['layer', 'unit']
-    header += [f'image_url_{index + 1}' for index in range(dataset.k)]
+    header = [layer_column, unit_column]
+    header += [
+        f'{image_url_column_prefix}{index + 1}' for index in range(dataset.k)
+    ]
 
     samples = dataset.samples
     if display_progress:
@@ -73,3 +85,62 @@ def generate_hits_csv(dataset: datasets.TopImagesDataset,
     with csv_file.open('w') as handle:
         writer = csv.writer(handle)
         writer.writerows(rows)
+
+
+def strip_results_csv(results_csv_file: PathLike,
+                      out_csv_file: Optional[PathLike] = None,
+                      in_layer_column: str = 'Input.layer',
+                      in_unit_column: str = 'Input.unit',
+                      in_annotation_column: str = 'Answer.summary',
+                      out_layer_column: str = 'layer',
+                      out_unit_column: str = 'unit',
+                      out_annotation_column: str = 'summary') -> None:
+    """Strip the results CSV of everything but layer, unit, and annotation.
+
+    Args:
+        results_csv_file (PathLike): Results CSV downloaded from MTurk.
+        out_csv_file (Optional[PathLike], optional): Where to put stripped CSV.
+            Defaults to original CSV.
+        in_layer_column (str, optional): Layer column in input CSV.
+            Defaults to 'Input.layer'.
+        in_unit_column (str, optional): Unit column in input CSV.
+            Defaults to 'Input.unit'.
+        in_annotation_column (str, optional): Annotation column in input CSV.
+            Defaults to 'Answer.summary'.
+        out_layer_column (str, optional): Layer column in output CSV.
+            Defaults to 'layer'.
+        out_unit_column (str, optional): Unit column in output CSV.
+            Defaults to 'unit'.
+        out_annotation_column (str, optional): Annotation column in output CSV.
+            Defaults to 'summary'.
+
+    """
+    results_csv_file = pathlib.Path(results_csv_file)
+    if not results_csv_file.is_file():
+        raise FileNotFoundError(f'file not found: {results_csv_file}')
+
+    if out_csv_file is None:
+        out_csv_file = results_csv_file
+    out_csv_file = pathlib.Path(out_csv_file)
+    out_csv_file.parent.mkdir(exist_ok=True, parents=True)
+
+    with results_csv_file.open('r') as handle:
+        reader = csv.DictReader(handle)
+        assert reader.fieldnames is not None, 'null columns?'
+        fields = set(reader.fieldnames)
+        inputs = tuple(reader)
+
+    for column in (in_layer_column, in_unit_column, in_annotation_column):
+        if column not in fields:
+            raise KeyError(f'mturk results csv missing column: {column}')
+
+    header = (out_layer_column, out_unit_column, out_annotation_column)
+    outputs = [header]
+    for input in inputs:
+        output = (input[in_layer_column], input[in_unit_column],
+                  input[in_annotation_column])
+        outputs.append(output)
+
+    with out_csv_file.open('w') as handle:
+        writer = csv.writer(handle)
+        writer.writerows(outputs)

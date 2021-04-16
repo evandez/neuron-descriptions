@@ -96,3 +96,70 @@ def test_generate_hits_csv_too_many_urls(top_images_dataset, csv_file):
                                (conftest.N_TOP_IMAGES_PER_UNIT + 1),
                                display_progress=False,
                                validate_urls=False)
+
+
+RESULTS_CSV = f'''\
+Input.layer,ignore1,Input.unit,ignore2,Answer.summary,ignore3
+"{conftest.layer(0)}",foo,0,bar,"{conftest.annotation(0, 0)}",baz
+"{conftest.layer(1)}",foo,1,bar,"{conftest.annotation(1, 1)}",baz
+"{conftest.layer(2)}",foo,2,bar,"{conftest.annotation(2, 2)}",baz
+'''
+
+
+@pytest.yield_fixture
+def results_csv_file():
+    """Yield a fake results csv file for testing."""
+    with tempfile.TemporaryDirectory() as tempdir:
+        file = pathlib.Path(tempdir) / 'results.csv'
+        with file.open('w') as handle:
+            handle.write(RESULTS_CSV)
+        yield file
+
+
+@pytest.mark.parametrize('out_csv_file', (None, 'out.csv'))
+def test_strip_results_csv(results_csv_file, out_csv_file):
+    """Test strip_results_csv correctly strips the CSV."""
+    if out_csv_file is not None:
+        out_csv_file = results_csv_file.parent / out_csv_file
+
+    hits.strip_results_csv(results_csv_file, out_csv_file=out_csv_file)
+
+    if out_csv_file is None:
+        out_csv_file = results_csv_file
+
+    with out_csv_file.open('r') as handle:
+        rows = list(csv.reader(handle))
+
+    assert rows == [
+        ['layer', 'unit', 'summary'],
+        [conftest.layer(0), '0',
+         conftest.annotation(0, 0)],
+        [conftest.layer(1), '1',
+         conftest.annotation(1, 1)],
+        [conftest.layer(2), '2',
+         conftest.annotation(2, 2)],
+    ]
+
+
+def test_strip_results_csv_no_results_csv(results_csv_file):
+    """Test strip_results_csv dies when results_csv_file does not exist."""
+    results_csv_file.unlink()
+    with pytest.raises(FileNotFoundError, match=f'.*{results_csv_file}'):
+        hits.strip_results_csv(results_csv_file)
+
+
+@pytest.mark.parametrize('kwargs', (
+    {
+        'in_layer_column': 'foo'
+    },
+    {
+        'in_unit_column': 'bar'
+    },
+    {
+        'in_annotation_column': 'baz'
+    },
+))
+def test_strip_results_csv_bad_column(results_csv_file, kwargs):
+    """Test strip_results_csv dies on missing column."""
+    with pytest.raises(KeyError, match='.*missing column.*'):
+        hits.strip_results_csv(results_csv_file, **kwargs)
