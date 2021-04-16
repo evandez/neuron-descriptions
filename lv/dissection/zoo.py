@@ -1,8 +1,8 @@
 """Defines dissection configurations."""
 import dataclasses
 import pathlib
-from typing import (Any, Callable, Iterable, Mapping, Optional, Sequence,
-                    Tuple, Type, TypeVar, Union)
+from typing import (Any, Callable, Iterable, Mapping, Optional, Tuple, Type,
+                    TypeVar, Union)
 
 from lv.ext.torchvision import models
 from lv.typing import Layer, PathLike
@@ -15,7 +15,6 @@ from torchvision import datasets, transforms
 
 ModelConfigT = TypeVar('ModelConfigT', bound='ModelConfig')
 ModelConfigsT = Mapping[str, Mapping[str, ModelConfigT]]
-Model = Tuple[nn.Sequential, Sequence[Layer]]
 
 
 @dataclasses.dataclass
@@ -30,8 +29,9 @@ class ModelConfig:
 
     def __init__(self,
                  factory: Callable[..., nn.Sequential],
-                 layers: Optional[Iterable[str]] = None,
+                 layers: Optional[Iterable[Layer]] = None,
                  url: Optional[str] = None,
+                 generative: bool = False,
                  load_weights: bool = True,
                  **defaults: Any):
         """Initialize  the configuration.
@@ -41,12 +41,14 @@ class ModelConfig:
         Args:
             factory (Callable[..., nn.Sequential]): Factory function that
                 creates a model from arbitrary keyword arguments.
-            layers (Optional[Iterable[str]], optional): Layers to return
+            layers (Optional[Iterable[Layer]], optional): Layers to return
                 when model is instantiated. By default, set to the keys
                 returned by `model.named_children()`.
             url (Optional[str], optional): URL hosting pretrained weights.
                 If set and path provided to `load` does not exist, weights
                 will be downloaded. Defaults to None.
+            generative (bool, optional): Set to True if this is a generative
+                model of images. Defaults to False.
             load_weights (bool, optional): If True, attempt to load
                 pretrained weights. Otherwise, model will be immediately
                 returned after instantiation from the factory. Set this to
@@ -58,13 +60,14 @@ class ModelConfig:
         self.defaults = defaults
 
         self.url = url
+        self.generative = generative
         self.layers = layers
         self.load_weights = load_weights
 
     def load(self,
              path: Optional[PathLike] = None,
              map_location: Optional[Union[str, torch.device]] = None,
-             **kwargs: Any) -> Model:
+             **kwargs: Any) -> nn.Sequential:
         """Load the model from the given path.
 
         Args:
@@ -77,7 +80,7 @@ class ModelConfig:
                 device at load time. Defaults to None.
 
         Returns:
-            Model: The loaded model and layers.
+            nn.Sequential: The loaded model.
 
         """
         for key, default in self.defaults.items():
@@ -98,7 +101,7 @@ class ModelConfig:
         if layers is None:
             layers = [key for key, _ in model.named_children()]
 
-        return model, tuple(layers)
+        return model
 
     @classmethod
     def configs(cls: Type[ModelConfigT]) -> ModelConfigsT:
@@ -130,7 +133,7 @@ def model(name: str,
           dataset: str,
           path: Optional[PathLike] = None,
           configs: Optional[ModelConfigs] = None,
-          **kwargs: Any) -> Model:
+          **kwargs: Any) -> Tuple[nn.Sequential, ModelConfig]:
     """Load the model trained on the given dataset.
 
     Args:
@@ -149,8 +152,8 @@ def model(name: str,
             weights for the given dataset.
 
     Returns:
-        Model: The loaded model as an `nn.Sequential` along with its layer
-            names according to the config.
+        Tuple[nn.Sequential, ModelConfig]: The loaded model as an
+            `nn.Sequential` along with its config.
 
     """
     if configs is None:
@@ -165,8 +168,8 @@ def model(name: str,
         path = pathlib.Path(
             __file__).parents[2] / '.zoo/models' / f'{name}-{dataset}.pth'
 
-    model, layers = config.load(path, **kwargs)
-    return model, layers
+    model = config.load(path, **kwargs)
+    return model, config
 
 
 DatasetConfigT = TypeVar('DatasetConfigT', bound='DatasetConfig')
