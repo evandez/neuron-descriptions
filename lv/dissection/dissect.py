@@ -95,7 +95,7 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
 
     # Compute activation statistics across dataset.
     if display_progress:
-        pbar.descnext('rq')
+        pbar.descnext('tally activations')
     topk, rq = tally.tally_topk_and_quantile(compute_topk_and_quantile,
                                              dataset,
                                              k=k,
