@@ -23,11 +23,11 @@ def csv_file():
         yield pathlib.Path(tempdir) / 'hits.csv'
 
 
-def generate_urls(layer, unit):
+def generate_urls(layer, unit, k):
     """Generate fake URLs for the given layer and unit."""
     return [
         f'https://images.com/{layer}/{unit}/im-{index}.png'
-        for index in range(conftest.N_TOP_IMAGES_PER_UNIT)
+        for index in range(k)
     ]
 
 
@@ -48,10 +48,12 @@ def test_generate_hits_csv(top_images_dataset, csv_file):
         for index in range(conftest.N_TOP_IMAGES_PER_UNIT)
     ]
 
-    lus = [(conftest.layer(layer), conftest.unit(unit))
+    lus = [(conftest.layer(layer), str(unit))
            for layer in range(conftest.N_LAYERS)
            for unit in range(conftest.N_UNITS_PER_LAYER)]
-    rows = [[layer, unit] + generate_urls(layer, unit) for layer, unit in lus]
+    rows = [[layer, unit] +
+            generate_urls(layer, unit, conftest.N_TOP_IMAGES_PER_UNIT)
+            for layer, unit in lus]
 
     expected = [header] + rows
     assert actual == expected
@@ -75,7 +77,7 @@ def test_generate_hits_csv_too_few_urls(top_images_dataset, csv_file):
         for index in range(conftest.N_TOP_IMAGES_PER_UNIT)
     ]
 
-    lus = [(conftest.layer(layer), conftest.unit(unit))
+    lus = [(conftest.layer(layer), str(unit))
            for layer in range(conftest.N_LAYERS)
            for unit in range(conftest.N_UNITS_PER_LAYER)]
     rows = [[layer, unit] + urls + [''] * (conftest.N_TOP_IMAGES_PER_UNIT - 2)

@@ -7,23 +7,21 @@ from typing import (Any, Callable, Iterable, NamedTuple, Optional, Sequence,
 
 from lv.typing import PathLike
 
+import numpy
 import torch
 import tqdm
-from PIL import Image
 from torch.utils import data
-from torchvision import datasets, transforms
 
-Transform = Callable[[Image.Image], torch.Tensor]
-
-DEFAULT_TRANSFORM = transforms.ToTensor()
+Transform = Callable[[torch.Tensor], torch.Tensor]
 
 
 class TopImages(NamedTuple):
     """Top images for a unit."""
 
     layer: str
-    unit: str
+    unit: int
     images: torch.Tensor
+    masks: torch.Tensor
 
 
 class TopImagesDataset(data.Dataset[TopImages]):
@@ -32,10 +30,10 @@ class TopImagesDataset(data.Dataset[TopImages]):
     def __init__(self,
                  root: PathLike,
                  layers: Optional[Iterable[str]] = None,
-                 transform: Transform = DEFAULT_TRANSFORM,
-                 cache: Union[bool, str, torch.device] = False,
-                 display_progress: bool = True,
-                 validate_top_image_counts: bool = True):
+                 transform: Optional[Transform] = None,
+                 device: Optional[Union[str, torch.device]] = None,
+                 eager: bool = True,
+                 display_progress: bool = True):
         """Initialize the dataset.
 
         Args:
@@ -44,23 +42,19 @@ class TopImagesDataset(data.Dataset[TopImages]):
             layers (Optional[Iterable[str]], optional): The layers to load.
                 Layer data is assumed to be a subdirectory of the root.
                 By default, all subdirectories of root are treated as layers.
-            transform (Transform, optional): Call this function on every image
-                when it is read and use the returned result. Note that this
-                function MUST return a tensor. Defaults to DEFAULT_TRANSFORM.
-            cache (Union[bool, str, torch.device], optional): If set, read all
-                images from disk into memory. If a device or string is
-                specified, images are sent to this device. Defaults to False.
+            transform (Optional[Transform], optional): Call this function on
+                every image when it is read and use the returned result. Note
+                that this function MUST return a tensor. Defaults to None.
+            device (Optional[Union[str, torch.device]], optional): Send all
+                tensors to this device.
+            eager (bool, optional): If set, eagerly transform images and send
+                them to the given device. Defaults to True.
             display_progress (bool, optional): Show the progress bar when
-                reading images into menu. Has no effect if `cache` is not set.
-                Defaults to True.
-            validate_top_image_counts (bool, optional): Check that all units
-                have the same number of top images. The methods on this
-                class will still work even if they don't, but some torch tools
-                such as `torch.utils.DataLoader` will not out of the box.
-                Defaults to True.
+                reading images into menu. Defaults to True.
 
         Raises:
-            FileNotFoundError: If root directory does not exist.
+            FileNotFoundError: If root directory does not exist or if layer
+                directory is missing images or masks.
             ValueError: If no layers found or provided, or if units have
                 different number of top images.
 
@@ -74,51 +68,60 @@ class TopImagesDataset(data.Dataset[TopImages]):
             raise ValueError('no layers given and root has no subdirectories')
 
         self.root = root
-        self.layers = tuple(sorted(layers))
+        self.layers = layers = tuple(sorted(layers))
         self.transform = transform
-        self.cache = cache
+        self.device = device
+        self.eager = eager
 
-        self.datasets_by_layer = {}
-        for layer in self.layers:
-            self.datasets_by_layer[layer] = datasets.ImageFolder(
-                root / layer, transform=transform)
+        images_by_layer = {}
+        masks_by_layer = {}
+        for layer in tqdm.tqdm(layers) if display_progress else layers:
+            images_file = root / layer / 'images.npy'
+            masks_file = root / layer / 'masks.npy'
+            for file in (images_file, masks_file):
+                if not file.exists():
+                    raise FileNotFoundError(f'{layer} is missing {file.name}')
+
+            images = torch.from_numpy(numpy.load(root / layer / 'images.npy'))
+            masks = torch.from_numpy(numpy.load(root / layer / 'masks.npy'))
+
+            for name, tensor in (('images', images), ('masks', masks)):
+                if tensor.ndimension() != 5:
+                    raise ValueError(f'expected 5D {name}, '
+                                     f'got {tensor.ndimension()}D '
+                                     f'in layer {layer}')
+            if images.shape[:2] != masks.shape[:2]:
+                raise ValueError(f'layer {layer} masks/images have '
+                                 'different # unit/images: '
+                                 f'{images.shape[:2]} vs. {masks.shape[:2]}')
+            if images.shape[3:] != masks.shape[3:]:
+                raise ValueError(f'layer {layer} masks/images have '
+                                 'different height/width '
+                                 f'{images.shape[3:]} vs. {masks.shape[3:]}')
+
+            if eager and transform is not None:
+                shape = images.shape
+                images = images.view(-1, *shape[1:])
+                for index, image in enumerate(images):
+                    images[index] = transform(image)
+                images = images.view(*shape)
+
+            if eager and device is not None:
+                images = images.to(device)
+                masks = masks.to(device)
+
+            images_by_layer[layer] = images
+            masks_by_layer[layer] = masks
 
         self.samples = []
-        for layer in self.layers:
-            dataset = self.datasets_by_layer[layer]
-
-            samples_by_unit = collections.defaultdict(list)
-            for index, (_, unit_index) in enumerate(dataset.samples):
-                unit = dataset.classes[unit_index]
-                samples_by_unit[unit].append(index)
-
-            for unit, indices in sorted(samples_by_unit.items(),
-                                        key=lambda kv: kv[0]):
-                sample = (layer, unit, indices)
+        for layer in layers:
+            units = zip(images_by_layer[layer], masks_by_layer[layer])
+            for unit, (images, masks) in enumerate(units):
+                sample = TopImages(layer=layer,
+                                   unit=unit,
+                                   images=images,
+                                   masks=masks)
                 self.samples.append(sample)
-
-            if validate_top_image_counts:
-                counts = {len(indices) for _, _, indices in self.samples}
-                if len(counts) != 1:
-                    raise ValueError(f'differing top image counts: {counts}; '
-                                     'set validate_top_image_counts=False '
-                                     'to ignore')
-
-        self.images = None
-        if cache:
-            device = cache if not isinstance(cache, bool) else None
-
-            samples = self.samples
-            if display_progress:
-                samples = tqdm.tqdm(samples,
-                                    desc=f'caching images from {root.name}')
-
-            self.images = []
-            for layer, _, indices in samples:
-                dataset = self.datasets_by_layer[layer]
-                images = torch.stack([dataset[i][0] for i in indices])
-                images = images.to(device)
-                self.images.append(images)
 
     def __getitem__(self, index: int) -> TopImages:
         """Return the top images.
@@ -130,17 +133,28 @@ class TopImagesDataset(data.Dataset[TopImages]):
             TopImages: The sample.
 
         """
-        layer, unit, indices = self.samples[index]
-        if self.images is not None:
-            images = self.images[index]
-        else:
-            dataset = self.datasets_by_layer[layer]
-            images = torch.stack([dataset[i][0] for i in indices])
-        return TopImages(layer=layer, unit=unit, images=images)
+        sample = self.samples[index]
+        if not self.eager and self.transform is not None:
+            sample = TopImages(layer=sample.layer,
+                               unit=sample.unit,
+                               images=self.transform(sample.images),
+                               masks=sample.masks)
+        if not self.eager and self.device is not None:
+            sample = TopImages(layer=sample.layer,
+                               unit=sample.unit,
+                               images=sample.images.to(self.device),
+                               masks=sample.masks.to(self.device))
+        return sample
 
     def __len__(self) -> int:
         """Return the number of samples in the dataset."""
         return len(self.samples)
+
+    @property
+    def k(self) -> int:
+        """Return the "k" in "top-k images"."""
+        assert len(self) > 0, 'empty dataset?'
+        return self.samples[0].images.shape[0]
 
 
 DEFAULT_LAYER_COLUMN = 'layer'
@@ -153,8 +167,9 @@ class AnnotatedTopImages(NamedTuple):
     """Top images and annotation for a unit."""
 
     layer: str
-    unit: str
+    unit: int
     images: torch.Tensor
+    masks: torch.Tensor
     annotations: Sequence[str]
 
 
@@ -221,7 +236,7 @@ class AnnotatedTopImagesDataset(data.Dataset[AnnotatedTopImages]):
         annotations = collections.defaultdict(list)
         for row in rows:
             layer = row[layer_column]
-            unit = row[unit_column]
+            unit = int(row[unit_column])
             annotation = row[annotation_column]
             annotations[layer, unit].append(annotation)
         self.annotations = {k: tuple(vs) for k, vs in annotations.items()}
@@ -260,6 +275,7 @@ class AnnotatedTopImagesDataset(data.Dataset[AnnotatedTopImages]):
         return AnnotatedTopImages(layer=top_images.layer,
                                   unit=top_images.unit,
                                   images=top_images.images,
+                                  masks=top_images.masks,
                                   annotations=annotations)
 
     def __len__(self) -> int:

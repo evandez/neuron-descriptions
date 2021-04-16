@@ -3,16 +3,21 @@ import csv
 import pathlib
 import tempfile
 
+import numpy
 import pytest
 import torch
-from torchvision import transforms
 
 N_LAYERS = 2
 N_UNITS_PER_LAYER = 5
 N_TOP_IMAGES_PER_UNIT = 10
+N_SAMPLES = N_LAYERS * N_UNITS_PER_LAYER
 
 IMAGE_SIZE = 224
 IMAGE_SHAPE = (3, 224, 224)
+TOP_IMAGES_SHAPE = (N_TOP_IMAGES_PER_UNIT, *IMAGE_SHAPE)
+
+MASK_SHAPE = (1, 224, 224)
+TOP_IMAGES_MASKS_SHAPE = (N_TOP_IMAGES_PER_UNIT, *MASK_SHAPE)
 
 
 @pytest.fixture
@@ -22,20 +27,30 @@ def top_image_tensors():
     for _ in range(N_LAYERS):
         unit_images = []
         for _ in range(N_UNITS_PER_LAYER):
-            images = torch.rand(N_TOP_IMAGES_PER_UNIT, *IMAGE_SHAPE)
+            images = torch.rand(*TOP_IMAGES_SHAPE)
             unit_images.append(images)
-        layer_images.append(unit_images)
-    return layer_images
+        layer_images.append(torch.stack(unit_images))
+    return torch.stack(layer_images)
+
+
+@pytest.fixture
+def top_image_masks():
+    """Return top image masks for testing."""
+    layer_masks = []
+    for _ in range(N_LAYERS):
+        unit_masks = []
+        for _ in range(N_UNITS_PER_LAYER):
+            masks = torch.randint(1,
+                                  size=TOP_IMAGES_MASKS_SHAPE,
+                                  dtype=torch.uint8)
+            unit_masks.append(masks)
+        layer_masks.append(torch.stack(unit_masks))
+    return torch.stack(layer_masks)
 
 
 def layer(index):
     """Return the layer name for the given index."""
     return f'layer-{index}'
-
-
-def unit(index):
-    """Return the unit name for the given index."""
-    return f'unit-{index}'
 
 
 def image(index):
@@ -44,33 +59,29 @@ def image(index):
 
 
 @pytest.yield_fixture
-def top_images_root(top_image_tensors):
+def top_images_root(top_image_tensors, top_image_masks):
     """Yield a fake top images root directory for testing."""
-    to_pil_image = transforms.ToPILImage()
     with tempfile.TemporaryDirectory() as tempdir:
         root = pathlib.Path(tempdir) / 'root'
-        for layer_index, layer_images in enumerate(top_image_tensors):
+        layer_data = zip(top_image_tensors, top_image_masks)
+        for layer_index, (layer_images, layer_masks) in enumerate(layer_data):
             layer_dir = root / layer(layer_index)
-            for unit_index, unit_images in enumerate(layer_images):
-                unit_dir = layer_dir / unit(unit_index)
-                unit_dir.mkdir(exist_ok=True, parents=True)
-                for unit_image_index, unit_image in enumerate(unit_images):
-                    unit_image_file = unit_dir / image(unit_image_index)
-                    to_pil_image(unit_image).save(str(unit_image_file))
+            layer_dir.mkdir(parents=True)
+            numpy.save(layer_dir / 'images.npy', layer_images.numpy())
+            numpy.save(layer_dir / 'masks.npy', layer_masks.numpy())
         yield root
 
 
 def annotation(layer_index, unit_index):
     """Create a fake annotation for the given layer and unit indices."""
-    return f'({layer(layer_index)}, {unit(unit_index)}) annotation'
+    return f'({layer(layer_index)}, {unit_index}) annotation'
 
 
 @pytest.fixture
 def top_image_annotations():
     """Return fake annotations for testing."""
     return [[
-        layer(layer_index),
-        unit(unit_index),
+        layer(layer_index), unit_index,
         annotation(layer_index, unit_index)
     ]
             for layer_index in range(N_LAYERS)
