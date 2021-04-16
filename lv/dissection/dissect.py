@@ -146,30 +146,26 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
         shutil.copy(lightbox_file, unit_lightbox_file)
 
 
-def discriminative(model: nn.Sequential,
+def discriminative(model: nn.Module,
                    dataset: data.Dataset,
-                   layer: Optional[Layer] = None,
                    device: Optional[torch.device] = None,
                    **kwargs: Any) -> None:
     """Run dissection on a discriminative model.
 
-    That is, a model for which image goes in, prediction comes out.
+    That is, a model for which image goes in, prediction comes out. Its outputs
+    will be interpretted as the neuron activations to track.
+
+    Keyword arguments are forwarded to `run`.
 
     Args:
-        model (nn.Sequential): The model to dissect. It must be a
-            `torch.nn.Sequential` so we can slice it up and look at
-            the activations.
+        model (nn.Module): The model to dissect.
         dataset (data.Dataset): Dataset of images used to compute the
             top-activating images.
-        layer (Optional[Layer], optional): Track unit activations for this
-            layer. If not set, NetDissect will only look at the final output
-            of the model. Defaults to None.
         device (Optional[torch.device], optional): Run all computations on this
             device. Defaults to None.
 
     """
     model.to(device)
-    model = nethook.subsequence(model, last_layer=layer)
 
     def compute_topk_and_quantile(images: torch.Tensor, *_: Any) -> TensorPair:
         with torch.no_grad():
@@ -187,24 +183,53 @@ def discriminative(model: nn.Sequential,
     run(compute_topk_and_quantile, compute_activations, dataset, **kwargs)
 
 
-def generative(model: nn.Sequential,
+def sequential(model: nn.Sequential,
                dataset: data.Dataset,
                layer: Optional[Layer] = None,
+               **kwargs: Any) -> None:
+    """Run dissection on a sequential discriminative model.
+
+    That is, a model for which image goes in, prediction comes out.
+    Because this function assumes the model is a `torch.nn.Sequential`,
+    you can specify the layer to look at activations for.
+
+    Keyword arguments are forwarded to `discriminative`.
+
+    Args:
+        model (nn.Sequential): The sequential model to dissect.
+        dataset (data.Dataset): Dataset of images used to compute the
+            top-activating images.
+        layer (Optional[Layer], optional): Track unit activations for this
+            layer. If not set, NetDissect will only look at the final output
+            of the model. Defaults to None.
+
+    """
+    if layer is not None:
+        model = nethook.subsequence(model, last_layer=layer)
+    discriminative(model, dataset, **kwargs)
+
+
+def generative(model: nn.Sequential,
+               dataset: data.Dataset,
+               layer: Layer,
                device: Optional[torch.device] = None,
                **kwargs: Any) -> None:
     """Run dissection on a generative model of images.
 
     That is, a model for which representation goes in, image comes out.
+    Because of the way these models are structured, we need both the generated
+    images and the intermediate activation. To facilitate this, we require the
+    model be implemented as a `torch.nn.Sequential` so we can slice it up and
+    look at intermediate values while also saving the generated images for
+    visualization downstream.
+
+    Keyword arguments are forwarded to `run`.
 
     Args:
-        model (nn.Sequential): The model to dissect. It must be a
-            `torch.nn.Sequential` so we can slice it up and look at
-            the activations.
+        model (nn.Sequential): The model to dissect.
         dataset (data.Dataset): Dataset of representations used to generate
             images. The top-activating images will be taken from them.
-        layer (Optional[Layer], optional): Track unit activations for this
-            layer. If not set, NetDissect will only look at the final output
-            of the model. Defaults to None.
+        layer (Layer): Track unit activations for this layer.
         device (Optional[torch.device], optional): Run all computations on this
             device. Defaults to None.
 
