@@ -5,7 +5,7 @@ from typing import Any, Callable, Optional
 
 from lv.ext.netdissect import imgviz
 from lv.utils.typing import Layer, PathLike, TensorPair
-from third_party.netdissect import imgsave, nethook, pbar, tally
+from third_party.netdissect import imgsave, nethook, pbar, renormalize, tally
 
 import numpy
 import torch
@@ -18,10 +18,12 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
         dataset: data.Dataset,
         k: int = 15,
         quantile: float = 0.99,
+        output_size: int = 224,
         batch_size: int = 128,
-        image_size: int = 224,
+        image_size: Optional[int] = None,
+        renormalizer: Optional[renormalize.Renormalizer] = None,
         num_workers: int = 30,
-        results_dir: PathLike = 'dissection-results',
+        results_dir: Optional[PathLike] = None,
         tally_cache_file: Optional[PathLike] = None,
         masks_cache_file: Optional[PathLike] = None,
         clear_cache_files: bool = False,
@@ -50,11 +52,19 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
             top images. Defaults to 0.99 (top 1% of activations).
         batch_size (int, optional): Max number of images to send through the
             model at any given time. Defaults to 128.
-        image_size (int, optional): Top images will be resized to be square
-            in this size. Defaults to 224.
+        output_size (int, optional): Top images and masks will be resized to be
+            square in this size. Defaults to 224.
+        image_size (Optional[int], optional): Expected size of dataset images.
+            If not set, will attempt to infer from the dataset's `transform`
+            property. If dataset does not have `transform`, dissection fails.
+            Defaults to None.
+        renormalizer (Optional[renormalize.Renormalizer], optional): NetDissect
+            renormalizer for the dataset images. If not set, NetDissect will
+            attempt to infer it from the dataset's `transform` property.
+            Defaults to None.
         num_workers (int, optional): When loading or saving data in parallel,
             use this many worker threads. Defaults to 30.
-        results_dir (PathLike, optional): Directory to write
+        results_dir (Optional[PathLike], optional): Directory to write
             results to. Defaults to 'dissection-results'.
         tally_cache_file (Optional[PathLike], optional): Write intermediate
             results for tally step to this file. Defaults to None.
@@ -70,12 +80,20 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
         display_progress (bool, optional): If True, display progress bar.
             Defaults to True.
 
+    Raises:
+        ValueError: If `k` or `quantile` are invalid.
+
     """
     if k < 1:
         raise ValueError(f'must have k >= 1, got k={k}')
     if quantile <= 0 or quantile >= 1:
         raise ValueError('must have quantile in range (0, 1), '
                          f'got quantile={quantile}')
+    if image_size is None and not hasattr(dataset, 'transform'):
+        raise ValueError('dataset has no `transform` property so '
+                         'image_size= must be set')
+    if results_dir is None:
+        results_dir = pathlib.Path(__file__).parents[2] / 'dissection-results'
     if not isinstance(results_dir, pathlib.Path):
         results_dir = pathlib.Path(results_dir)
 
@@ -108,7 +126,11 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
     if display_progress:
         pbar.descnext('compute top images')
     levels = rq.quantiles(quantile).reshape(-1)
-    viz = imgviz.ImageVisualizer(image_size, source=dataset, level=levels)
+    viz = imgviz.ImageVisualizer(output_size,
+                                 image_size=image_size,
+                                 renormalizer=renormalizer,
+                                 source=dataset,
+                                 level=levels)
     masked, images, masks = viz.individual_masked_images_for_topk(
         compute_activations,
         dataset,
@@ -138,7 +160,7 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
         numpy.savetxt(str(metadata_file), metadata, delimiter=',', fmt=fmt)
 
     # The lightbox lets us view all the masked images at once. Pretty handy!
-    lightbox_dir = pathlib.Path(__file__).parents[1] / 'third_party'
+    lightbox_dir = pathlib.Path(__file__).parents[2] / 'third_party'
     lightbox_file = lightbox_dir / 'lightbox.html'
     for unit in range(len(images)):
         unit_dir = results_dir / f'viz/unit_{unit}'
@@ -149,6 +171,7 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
 def discriminative(model: nn.Module,
                    dataset: data.Dataset,
                    device: Optional[torch.device] = None,
+                   results_dir: Optional[PathLike] = None,
                    **kwargs: Any) -> None:
     """Run dissection on a discriminative model.
 
@@ -163,6 +186,8 @@ def discriminative(model: nn.Module,
             top-activating images.
         device (Optional[torch.device], optional): Run all computations on this
             device. Defaults to None.
+        results_dir (PathLike, optional): Directory to write results to.
+            Defaults to same as `run`.
 
     """
     model.to(device)
@@ -180,12 +205,17 @@ def discriminative(model: nn.Module,
             outputs = model(images.to(device))
         return outputs
 
-    run(compute_topk_and_quantile, compute_activations, dataset, **kwargs)
+    run(compute_topk_and_quantile,
+        compute_activations,
+        dataset,
+        results_dir=results_dir,
+        **kwargs)
 
 
 def sequential(model: nn.Sequential,
                dataset: data.Dataset,
                layer: Optional[Layer] = None,
+               results_dir: Optional[PathLike] = None,
                **kwargs: Any) -> None:
     """Run dissection on a sequential discriminative model.
 
@@ -202,17 +232,24 @@ def sequential(model: nn.Sequential,
         layer (Optional[Layer], optional): Track unit activations for this
             layer. If not set, NetDissect will only look at the final output
             of the model. Defaults to None.
+        results_dir (PathLike, optional): Directory to write results to.
+            If set and layer is also set, layer name will be appended to path.
+            Defaults to same as `run`.
 
     """
+    if results_dir is not None:
+        results_dir = pathlib.Path(results_dir)
+        results_dir /= str(layer) if layer is not None else 'outputs'
     if layer is not None:
         model = nethook.subsequence(model, last_layer=layer)
-    discriminative(model, dataset, **kwargs)
+    discriminative(model, dataset, results_dir=results_dir, **kwargs)
 
 
 def generative(model: nn.Sequential,
                dataset: data.Dataset,
                layer: Layer,
                device: Optional[torch.device] = None,
+               results_dir: Optional[PathLike] = None,
                **kwargs: Any) -> None:
     """Run dissection on a generative model of images.
 
@@ -232,10 +269,15 @@ def generative(model: nn.Sequential,
         layer (Layer): Track unit activations for this layer.
         device (Optional[torch.device], optional): Run all computations on this
             device. Defaults to None.
+        results_dir (PathLike, optional): Directory to write results to.
+            If set, layer name will be appended to path. Defaults to same
+            as `run`.
 
     """
-    model.to(device)
+    if results_dir is not None:
+        results_dir = pathlib.Path(results_dir) / str(layer)
 
+    model.to(device)
     with nethook.InstrumentedModel(model) as instrumented:
         instrumented.retain_layer(layer)
 
@@ -245,7 +287,7 @@ def generative(model: nn.Sequential,
             output = instrumented.retained_layer(layer)
             batch_size, channels, *_ = output.shape
             activations = output.permute(0, 2, 3, 1).reshape(-1, channels)
-            pooled = output.view(batch_size, channels, -1).max(dim=2)
+            pooled, _ = output.view(batch_size, channels, -1).max(dim=2)
             return pooled, activations
 
         def compute_activations(zs: torch.Tensor, *_: Any) -> TensorPair:
@@ -253,4 +295,8 @@ def generative(model: nn.Sequential,
                 images = model(zs.to(device))
             return instrumented.retained_layer(layer), images
 
-        run(compute_topk_and_quantile, compute_activations, dataset, **kwargs)
+        run(compute_topk_and_quantile,
+            compute_activations,
+            dataset,
+            results_dir=results_dir,
+            **kwargs)

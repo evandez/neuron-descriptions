@@ -6,18 +6,27 @@ import tempfile
 import numpy
 import pytest
 import torch
+from torch.utils import data
 
 N_LAYERS = 2
-N_UNITS_PER_LAYER = 5
-N_TOP_IMAGES_PER_UNIT = 10
+N_UNITS_PER_LAYER = 3
+N_TOP_IMAGES_PER_UNIT = 5
 N_SAMPLES = N_LAYERS * N_UNITS_PER_LAYER
 
-IMAGE_SIZE = 224
-IMAGE_SHAPE = (3, 224, 224)
+IMAGE_SIZE = 16
+IMAGE_SHAPE = (3, IMAGE_SIZE, IMAGE_SIZE)
 TOP_IMAGES_SHAPE = (N_TOP_IMAGES_PER_UNIT, *IMAGE_SHAPE)
 
-MASK_SHAPE = (1, 224, 224)
+MASK_SHAPE = (1, IMAGE_SIZE, IMAGE_SIZE)
 TOP_IMAGES_MASKS_SHAPE = (N_TOP_IMAGES_PER_UNIT, *MASK_SHAPE)
+
+N_IMAGES_IN_DATASET = 10
+
+
+@pytest.fixture
+def dataset():
+    """Return a simple image dataset for testing."""
+    return data.TensorDataset(torch.rand(N_IMAGES_IN_DATASET, *IMAGE_SHAPE))
 
 
 @pytest.fixture
