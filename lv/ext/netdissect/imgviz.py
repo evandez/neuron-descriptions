@@ -1,7 +1,7 @@
 """Extensions to the imgviz module."""
 from typing import Any, Callable, Iterator, Sequence, Tuple, Union
 
-from lv.typing import TensorPair, TensorTriplet
+from lv.utils.typing import TensorPair, TensorTriplet
 from third_party.netdissect import imgviz, runningstats, tally
 
 import torch

@@ -5,7 +5,7 @@ from typing import Callable, Optional, Sequence
 from urllib import request
 
 from lv import datasets
-from lv.typing import PathLike
+from lv.utils.typing import PathLike
 
 import tqdm
 

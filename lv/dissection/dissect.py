@@ -4,7 +4,7 @@ import shutil
 from typing import Any, Callable, Optional
 
 from lv.ext.netdissect import imgviz
-from lv.typing import Layer, PathLike, TensorPair
+from lv.utils.typing import Layer, PathLike, TensorPair
 from third_party.netdissect import imgsave, nethook, pbar, tally
 
 import numpy

@@ -5,7 +5,7 @@ from typing import (Any, Callable, Iterable, Mapping, Optional, Tuple, Type,
                     TypeVar, Union)
 
 from lv.ext.torchvision import models
-from lv.typing import Layer, PathLike
+from lv.utils.typing import Layer, PathLike
 from third_party.netdissect import renormalize
 
 import torch
