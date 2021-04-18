@@ -1,14 +1,14 @@
 """Functions for loading models/datasets by name."""
 import pathlib
-from typing import Any, Mapping, Optional, Tuple
+from typing import Any, Mapping, Iterable, Optional, Tuple
 
-from lv.utils.typing import PathLike
+from lv.utils.typing import Layer, PathLike
 from lv.zoo import configs, core
 
 from torch import nn
 from torch.utils import data
 
-Model = Tuple[nn.Sequential, core.ModelConfig]
+Model = Tuple[nn.Sequential, Iterable[Layer], core.ModelConfig]
 
 
 def model(name: str,
@@ -34,7 +34,7 @@ def model(name: str,
             weights for the given dataset.
 
     Returns:
-        Model: The loaded model as an `nn.Sequential` along with its config.
+        Model: The loaded model as an `nn.Sequential` along with its layers.
 
     """
     if source is None:
@@ -49,8 +49,8 @@ def model(name: str,
         path = pathlib.Path(
             __file__).parents[2] / '.zoo/models' / f'{name}-{dataset}.pth'
 
-    model = config.load(path, **kwargs)
-    return model, config
+    model, layers = config.load(path, **kwargs)
+    return model, layers, config
 
 
 def dataset(name: str,

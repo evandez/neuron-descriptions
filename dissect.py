@@ -26,13 +26,13 @@ args = parser.parse_args()
 
 device = torch.device('cuda' if args.cuda else 'cpu')
 
-model, config = zoo.model(args.model,
-                          args.dataset,
-                          map_location=device,
-                          path=args.model_file)
+model, layers, config = zoo.model(args.model,
+                                  args.dataset,
+                                  map_location=device,
+                                  path=args.model_file)
 dataset = zoo.dataset(args.dataset, path=args.dataset_dir)
 
-layers = args.layers or config.layers
+layers = args.layers or layers
 assert layers is not None, 'should always be >= 1 layer'
 
 dissect_fn = dissect.generative if config.generative else dissect.sequential

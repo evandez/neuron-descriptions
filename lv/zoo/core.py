@@ -1,7 +1,7 @@
 """Core tools for interacting with the zoo."""
 import dataclasses
 import pathlib
-from typing import Any, Callable, Iterable, Mapping, Optional, Union
+from typing import Any, Callable, Iterable, Mapping, Optional, Tuple, Union
 
 from lv.utils.typing import Layer, PathLike
 
@@ -60,7 +60,7 @@ class ModelConfig:
     def load(self,
              path: Optional[PathLike] = None,
              map_location: Optional[Union[str, torch.device]] = None,
-             **kwargs: Any) -> nn.Sequential:
+             **kwargs: Any) -> Tuple[nn.Sequential, Iterable[Layer]]:
         """Load the model from the given path.
 
         Args:
@@ -73,7 +73,7 @@ class ModelConfig:
                 device at load time. Defaults to None.
 
         Returns:
-            nn.Sequential: The loaded model.
+            Tuple[nn.Sequential, Iterable[Layer]]: The loaded model.
 
         """
         for key, default in self.defaults.items():
@@ -94,7 +94,7 @@ class ModelConfig:
         if layers is None:
             layers = [key for key, _ in model.named_children()]
 
-        return model
+        return model, layers
 
 
 ModelConfigs = Mapping[str, Mapping[str, ModelConfig]]
