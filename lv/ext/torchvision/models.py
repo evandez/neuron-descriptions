@@ -1,9 +1,13 @@
 """Extensions to the models module."""
 import collections
+import ssl
 from typing import Any
 
 from torch import nn
 from torchvision import models
+
+# Workaround for an annoying bug in torchvision...
+ssl._create_default_https_context = ssl._create_unverified_context
 
 
 def __getattr__(name: str) -> Any:

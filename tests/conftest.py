@@ -49,7 +49,7 @@ def top_image_masks():
     for _ in range(N_LAYERS):
         unit_masks = []
         for _ in range(N_UNITS_PER_LAYER):
-            masks = torch.randint(1,
+            masks = torch.randint(2,
                                   size=TOP_IMAGES_MASKS_SHAPE,
                                   dtype=torch.uint8)
             unit_masks.append(masks)
