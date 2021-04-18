@@ -4,7 +4,7 @@ import shutil
 from typing import Any, Callable, Optional
 
 from lv.ext.netdissect import imgviz
-from lv.utils.typing import Layer, PathLike, TensorPair
+from lv.utils.typing import Device, Layer, PathLike, TensorPair
 from third_party.netdissect import imgsave, nethook, pbar, renormalize, tally
 
 import numpy
@@ -170,7 +170,7 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
 
 def discriminative(model: nn.Module,
                    dataset: data.Dataset,
-                   device: Optional[torch.device] = None,
+                   device: Optional[Device] = None,
                    results_dir: Optional[PathLike] = None,
                    **kwargs: Any) -> None:
     """Run dissection on a discriminative model.
@@ -184,7 +184,7 @@ def discriminative(model: nn.Module,
         model (nn.Module): The model to dissect.
         dataset (data.Dataset): Dataset of images used to compute the
             top-activating images.
-        device (Optional[torch.device], optional): Run all computations on this
+        device (Optional[Device], optional): Run all computations on this
             device. Defaults to None.
         results_dir (PathLike, optional): Directory to write results to.
             Defaults to same as `run`.
@@ -248,7 +248,7 @@ def sequential(model: nn.Sequential,
 def generative(model: nn.Sequential,
                dataset: data.Dataset,
                layer: Layer,
-               device: Optional[torch.device] = None,
+               device: Optional[Device] = None,
                results_dir: Optional[PathLike] = None,
                **kwargs: Any) -> None:
     """Run dissection on a generative model of images.
@@ -267,7 +267,7 @@ def generative(model: nn.Sequential,
         dataset (data.Dataset): Dataset of representations used to generate
             images. The top-activating images will be taken from them.
         layer (Layer): Track unit activations for this layer.
-        device (Optional[torch.device], optional): Run all computations on this
+        device (Optional[Device], optional): Run all computations on this
             device. Defaults to None.
         results_dir (PathLike, optional): Directory to write results to.
             If set, layer name will be appended to path. Defaults to same

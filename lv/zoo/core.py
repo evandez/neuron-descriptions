@@ -3,7 +3,7 @@ import dataclasses
 import pathlib
 from typing import Any, Callable, Iterable, Mapping, Optional, Tuple, Union
 
-from lv.utils.typing import Layer, PathLike
+from lv.utils.typing import Device, Layer, PathLike
 
 import torch
 from torch import hub, nn
@@ -59,7 +59,7 @@ class ModelConfig:
 
     def load(self,
              path: Optional[PathLike] = None,
-             map_location: Optional[Union[str, torch.device]] = None,
+             map_location: Optional[Device] = None,
              **kwargs: Any) -> Tuple[nn.Sequential, Iterable[Layer]]:
         """Load the model from the given path.
 
@@ -68,9 +68,9 @@ class ModelConfig:
                 weights. If not set, model will be initialized to whatever the
                 factory function returns. If set and path does not exist but
                 URL field is set, weights will be downloaded to this path.
-            map_location (Optional[Union[str, torch.device]], optional): Passed
-                to `torch.load`, effectively sending all model weights to this
-                device at load time. Defaults to None.
+            map_location (Optional[Device], optional): Passed to `torch.load`,
+                effectively sending all model weights to this device at load
+                time. Defaults to None.
 
         Returns:
             Tuple[nn.Sequential, Iterable[Layer]]: The loaded model.
