@@ -1,6 +1,6 @@
 """Functions for loading models/datasets by name."""
 import pathlib
-from typing import Any, Mapping, Iterable, Optional, Tuple
+from typing import Any, Iterable, Mapping, Optional, Tuple
 
 from lv.utils.typing import Layer, PathLike
 from lv.zoo import configs, core
