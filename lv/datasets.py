@@ -45,7 +45,7 @@ class TopImages(NamedTuple):
         if opacity < 0 or opacity > 1:
             raise ValueError(f'opacity must be in [0, 1], got {opacity}')
         kwargs.setdefault('nrow', 5)
-        masks = self.masks
+        masks = self.masks.clone()
         masks[masks == 0] = 1 - opacity
         images = self.images * masks
         grid = utils.make_grid(images, **kwargs)
