@@ -8,6 +8,28 @@ from lv import datasets
 import numpy
 import pytest
 import torch
+from PIL import Image
+
+
+@pytest.fixture
+def top_images():
+    """Return TopImages for testing."""
+    return datasets.TopImages(
+        layer='layer',
+        unit=0,
+        images=torch.rand(conftest.N_TOP_IMAGES_PER_UNIT,
+                          *conftest.IMAGE_SHAPE),
+        masks=torch.randint(2,
+                            size=conftest.TOP_IMAGES_MASKS_SHAPE,
+                            dtype=torch.float),
+    )
+
+
+@pytest.mark.parametrize('masked', (False, True))
+def test_top_images_as_pil_image_grid(top_images, masked):
+    """Test TopImages.as_pil_image returns a PIL Image."""
+    actual = top_images.as_pil_image_grid(masked=masked)
+    assert isinstance(actual, Image.Image)
 
 
 def transform(image):
@@ -155,6 +177,19 @@ def test_top_images_dataset_len(top_images_root):
     """Test TopImagesDataset.__len__ returns correct length."""
     dataset = datasets.TopImagesDataset(top_images_root)
     assert len(dataset) == conftest.N_SAMPLES
+
+
+@pytest.fixture
+def annotated_top_images(top_images):
+    """Return AnnotatedTopImages for testing."""
+    return datasets.AnnotatedTopImages(*top_images, annotations=('foo',))
+
+
+@pytest.mark.parametrize('masked', (False, True))
+def test_annotated_top_images_as_pil_image_grid(annotated_top_images, masked):
+    """Test AnnotatedTopImages.as_pil_image_grid returns PIL image."""
+    actual = annotated_top_images.as_pil_image_grid(masked=masked)
+    assert isinstance(actual, Image.Image)
 
 
 @pytest.mark.parametrize('validate', (False, True))

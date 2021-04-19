@@ -10,7 +10,10 @@ from lv.utils.typing import PathLike
 import numpy
 import torch
 import tqdm
+from PIL import Image
 from torch.utils import data
+from torchvision import utils
+from torchvision.transforms import functional
 
 Transform = Callable[[torch.Tensor], torch.Tensor]
 
@@ -22,6 +25,26 @@ class TopImages(NamedTuple):
     unit: int
     images: torch.Tensor
     masks: torch.Tensor
+
+    def as_pil_image_grid(self,
+                          masked: bool = True,
+                          **kwargs: Any) -> Image.Image:
+        """Pack all images into a grid and return as a PIL Image.
+
+        Keyword arguments are forwarded to `torchvision.utils.make_grid`.
+
+        Args:
+            masked (bool, optional): If True, grid will contain masked images.
+                Otherwise, images will not be masked. Defaults to True.
+
+        Returns:
+            Image.Image: Image grid containing all top images.
+
+        """
+        kwargs.setdefault('nrow', 5)
+        images = self.images * self.masks if masked else self.images
+        grid = utils.make_grid(images, **kwargs)
+        return functional.to_pil_image(grid)
 
 
 class TopImagesDataset(data.Dataset[TopImages]):
@@ -171,6 +194,13 @@ class AnnotatedTopImages(NamedTuple):
     images: torch.Tensor
     masks: torch.Tensor
     annotations: Sequence[str]
+
+    def as_pil_image_grid(self, **kwargs) -> Image.Image:
+        """Show masked top images as a PIL image grid.
+
+        Keyword arguments are forwarded to `TopImages.as_pil_image_grid`.
+        """
+        return TopImages(*self[:-1]).as_pil_image_grid(**kwargs)
 
 
 class AnnotatedTopImagesDataset(data.Dataset[AnnotatedTopImages]):
