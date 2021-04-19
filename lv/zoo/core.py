@@ -92,6 +92,7 @@ class ModelConfig:
         if path is not None and self.load_weights:
             path = pathlib.Path(path)
             if not path.exists() and self.url is not None:
+                path.parent.mkdir(exist_ok=True, parents=True)
                 hub.download_url_to_file(self.url, path)
             if not path.exists():
                 raise FileNotFoundError(f'model path not found: {path}')
