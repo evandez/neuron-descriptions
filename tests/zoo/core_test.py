@@ -91,6 +91,22 @@ def test_model_config_load_no_load_weights(model_config, weights_file,
         assert not state_dict[key].allclose(weights[key], atol=1e-3)
 
 
+def test_model_config_load_transform_weights(model_config, weights_file,
+                                             weights):
+    """Test ModelConfig.load does not load weights when told not to."""
+    model_config.transform_weights = lambda state_dict:\
+        {key: torch.zeros_like(tensor) for key, tensor in state_dict.items()}
+    model, layers = model_config.load(path=weights_file,)
+
+    assert model.flag
+
+    state_dict = model.state_dict()
+    assert state_dict.keys() == weights.keys()
+
+    for key in state_dict:
+        assert state_dict[key].eq(0).all()
+
+
 def test_model_config_load_bad_weights_path(model_config, weights_file):
     """Test ModelConfig.load dies when given bad weights file."""
     weights_file.unlink()

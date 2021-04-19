@@ -1,13 +1,16 @@
 """Core tools for interacting with the zoo."""
 import dataclasses
 import pathlib
-from typing import Any, Callable, Iterable, Mapping, Optional, Tuple
+from typing import (Any, Callable, Iterable, Mapping, Optional, OrderedDict,
+                    Tuple)
 
 from lv.utils.typing import Device, Layer, PathLike
 
 import torch
 from torch import hub, nn
 from torch.utils import data
+
+TransformWeights = Callable[[Any], OrderedDict[str, torch.Tensor]]
 
 
 @dataclasses.dataclass
@@ -26,6 +29,7 @@ class ModelConfig:
                  url: Optional[str] = None,
                  generative: bool = False,
                  load_weights: bool = True,
+                 transform_weights: Optional[TransformWeights] = None,
                  **defaults: Any):
         """Initialize  the configuration.
 
@@ -47,6 +51,9 @@ class ModelConfig:
                 returned after instantiation from the factory. Set this to
                 False if the model returned by the factory has already loaded
                 pretrained weights.
+            transform_weights (Optional[TransformWeights], optional): Call
+                this function on weights loaded from disk before passing them
+                to the model.
 
         """
         self.factory = factory
@@ -56,6 +63,7 @@ class ModelConfig:
         self.generative = generative
         self.layers = layers
         self.load_weights = load_weights
+        self.transform_weights = transform_weights
 
     def load(self,
              path: Optional[PathLike] = None,
@@ -87,7 +95,11 @@ class ModelConfig:
                 hub.download_url_to_file(self.url, path)
             if not path.exists():
                 raise FileNotFoundError(f'model path not found: {path}')
+
             state_dict = torch.load(path, map_location=map_location)
+            if self.transform_weights is not None:
+                state_dict = self.transform_weights(state_dict)
+
             model.load_state_dict(state_dict)
 
         layers = self.layers
