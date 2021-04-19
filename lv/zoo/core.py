@@ -1,7 +1,7 @@
 """Core tools for interacting with the zoo."""
 import dataclasses
 import pathlib
-from typing import Any, Callable, Iterable, Mapping, Optional, Tuple, Union
+from typing import Any, Callable, Iterable, Mapping, Optional, Tuple
 
 from lv.utils.typing import Device, Layer, PathLike
 
