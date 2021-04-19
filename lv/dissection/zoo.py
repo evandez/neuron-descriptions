@@ -76,18 +76,17 @@ def dissection_datasets() -> zoo.DatasetConfigs:
     # TODO(evandez): Are these the right transforms?
     return {
         KEY_IMAGENET:
-            zoo.DatasetConfig(datasets.ImageNet,
-                              split='val',
+            zoo.DatasetConfig(datasets.ImageFolder,
                               transform=transforms.Compose([
                                   transforms.Resize(256),
                                   transforms.CenterCrop(224),
                                   transforms.ToTensor(),
                                   renormalize.NORMALIZER['imagenet']
                               ])),
+        # TODO(evandez): This uses ImageFolder to be backwards compatible,
+        # but we should probably use datasets.Places365 in the final version.
         KEY_PLACES365:
-            zoo.DatasetConfig(datasets.Places365,
-                              split='val',
-                              download=True,
+            zoo.DatasetConfig(datasets.ImageFolder,
                               transform=transforms.Compose([
                                   transforms.Resize(256),
                                   transforms.CenterCrop(224),
