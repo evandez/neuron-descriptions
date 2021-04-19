@@ -25,11 +25,18 @@ def top_images():
     )
 
 
-@pytest.mark.parametrize('masked', (False, True))
-def test_top_images_as_pil_image_grid(top_images, masked):
+@pytest.mark.parametrize('opacity', (0, .5, 1))
+def test_top_images_as_pil_image_grid(top_images, opacity):
     """Test TopImages.as_pil_image returns a PIL Image."""
-    actual = top_images.as_pil_image_grid(masked=masked)
+    actual = top_images.as_pil_image_grid(opacity=opacity)
     assert isinstance(actual, Image.Image)
+
+
+@pytest.mark.parametrize('opacity', (-1, 2))
+def test_top_images_as_pil_image_grid_bad_opacity(top_images, opacity):
+    """Test TopImages.as_pil_image dies on bad opacity."""
+    with pytest.raises(ValueError, match=f'.*{opacity}.*'):
+        top_images.as_pil_image_grid(opacity=opacity)
 
 
 def transform(image):
@@ -185,10 +192,10 @@ def annotated_top_images(top_images):
     return datasets.AnnotatedTopImages(*top_images, annotations=('foo',))
 
 
-@pytest.mark.parametrize('masked', (False, True))
-def test_annotated_top_images_as_pil_image_grid(annotated_top_images, masked):
+@pytest.mark.parametrize('opacity', (0, .5, 1))
+def test_annotated_top_images_as_pil_image_grid(annotated_top_images, opacity):
     """Test AnnotatedTopImages.as_pil_image_grid returns PIL image."""
-    actual = annotated_top_images.as_pil_image_grid(masked=masked)
+    actual = annotated_top_images.as_pil_image_grid(opacity=opacity)
     assert isinstance(actual, Image.Image)
 
 

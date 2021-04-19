@@ -27,22 +27,27 @@ class TopImages(NamedTuple):
     masks: torch.Tensor
 
     def as_pil_image_grid(self,
-                          masked: bool = True,
+                          opacity: float = .75,
                           **kwargs: Any) -> Image.Image:
         """Pack all images into a grid and return as a PIL Image.
 
         Keyword arguments are forwarded to `torchvision.utils.make_grid`.
 
         Args:
-            masked (bool, optional): If True, grid will contain masked images.
-                Otherwise, images will not be masked. Defaults to True.
+            opacity (float, optional): Opacity for mask, with 1 meaning
+                that the masked area is black, and 0 meaning that the masked
+                area is shown as normal. Defaults to .75.
 
         Returns:
             Image.Image: Image grid containing all top images.
 
         """
+        if opacity < 0 or opacity > 1:
+            raise ValueError(f'opacity must be in [0, 1], got {opacity}')
         kwargs.setdefault('nrow', 5)
-        images = self.images * self.masks if masked else self.images
+        masks = self.masks
+        masks[masks == 0] = 1 - opacity
+        images = self.images * masks
         grid = utils.make_grid(images, **kwargs)
         return functional.to_pil_image(grid)
 
