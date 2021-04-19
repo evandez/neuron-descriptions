@@ -44,4 +44,4 @@ for layer in layers:
         dataset,
         layer=layer,
         device=device,
-        results_dir=args.results_dir / args.model / args.dataset / layer)
+        results_dir=args.results_dir / args.model / args.dataset)
