@@ -1,12 +1,88 @@
-"""Models that map top images and masks to features."""
-from typing import Any, Callable, Mapping, Sequence, Tuple
+"""Models that map images and masks to features."""
+from typing import Any, Callable, Mapping, Optional, Sequence, Tuple, Union
 
 from lv.ext.torchvision import models
+from lv.utils.typing import Device
 from third_party.netdissect import nethook
 
 import torch
+import tqdm
 from torch import nn
 from torch.nn import functional
+from torch.utils import data
+
+
+class Featurizer(nn.Module):
+    """An abstract module mapping images and masks to features."""
+
+    feature_shape: Tuple[int, ...]
+
+    def forward(self, images: torch.Tensor, masks: torch.Tensor,
+                **kwargs: Any) -> torch.Tensor:
+        """Compute masked image features."""
+        raise NotImplementedError
+
+    def map(self,
+            dataset: data.Dataset,
+            image_index: Union[int, str] = -3,
+            mask_index: Union[int, str] = -2,
+            batch_size: int = 128,
+            device: Optional[Device] = None,
+            display_progress: bool = True,
+            **kwargs: Any) -> data.TensorDataset:
+        """Featurize an entire dataset.
+
+        Keyword arguments are passed to `forward`.
+
+        Args:
+            dataset (data.Dataset): The dataset to featurize. Should return
+                a sequence or mapping of values.
+            image_index (int, optional): Index of image in each dataset
+                sample. Defaults to -3 to be compatible with
+                AnnotatedTopImagesDataset.
+            mask_index (int, optional): Index of mask in each dataset
+                sample. Defaults to -2 to be compatible with
+                AnnotatedTopImagesDataset.
+            batch_size (int, optional): Featurize images in batches of this
+                size. Defaults to 128.
+            device (Optional[Device], optional): Run preprocessing on this
+                device. Defaults to None.
+            display_progress (bool, optional): Show progress bar.
+                Defaults to True.
+
+        Raises:
+            ValueError: If images or masks are not tensors.
+
+        Returns:
+            data.TensorDataset: Dataset of image features.
+
+        """
+        if device is not None:
+            self.to(device)
+
+        mapped = []
+
+        loader = data.DataLoader(dataset, batch_size=batch_size)
+        for batch in tqdm.tqdm(loader) if display_progress else loader:
+            images = batch[image_index]
+            if not isinstance(images, torch.Tensor):
+                raise ValueError(f'non-tensor images: {type(images).__name__}')
+            if device is not None:
+                images = images.to(device)
+
+            masks = batch[mask_index]
+            if not isinstance(masks, torch.Tensor):
+                raise ValueError(f'non-tensor masks: {type(masks).__name__}')
+            if device is not None:
+                masks = masks.to(device)
+
+            with torch.no_grad():
+                features = self(images, masks, **kwargs)
+
+            mapped.append(features)
+
+        return data.TensorDataset(torch.cat(mapped))
+
 
 FeaturizerFactory = Callable[..., nn.Sequential]
 FeaturizerLayers = Sequence[str]
@@ -14,7 +90,7 @@ FeatureSize = int
 FeaturizerConfig = Tuple[FeaturizerFactory, FeaturizerLayers, FeatureSize]
 
 
-class PretrainedPyramidFeaturizer(nn.Module):
+class PretrainedPyramidFeaturizer(Featurizer):
     """Map images and masks to a pyramid of masked convolutional features.
 
     Images are fed to a pretrained image classifier trained on ImageNet.
@@ -63,10 +139,10 @@ class PretrainedPyramidFeaturizer(nn.Module):
         self.featurizer.retain_layers(layers)
 
         self.layers = layers
-        self.feature_size = feature_size
+        self.feature_shape = (feature_size,)
 
-    def forward(self, images: torch.Tensor,
-                masks: torch.Tensor) -> torch.Tensor:
+    def forward(self, images: torch.Tensor, masks: torch.Tensor,
+                **_: Any) -> torch.Tensor:
         """Construct masked image features.
 
         Args:
@@ -81,7 +157,7 @@ class PretrainedPyramidFeaturizer(nn.Module):
                 the config.
 
         """
-        result = images.new_zeros(len(images), self.feature_size)
+        result = images.new_zeros(len(images), *self.feature_shape)
 
         # If any masks are all zeros, we'll end up with divide-by-zero errors
         # when we try to normalize down the road. We'll simply set the feature

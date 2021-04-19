@@ -36,7 +36,7 @@ def test_pretrained_pyramid_featurizer_forward(config, images, masks):
     featurizer = featurizers.PretrainedPyramidFeaturizer(config=config,
                                                          pretrained=False)
     actual = featurizer(images, masks)
-    assert actual.shape == (BATCH_SIZE, featurizer.feature_size)
+    assert actual.shape == (BATCH_SIZE, *featurizer.feature_shape)
     assert not torch.isnan(actual).any()
 
 
@@ -48,7 +48,7 @@ def test_pretrained_pyramid_featurizer_forward_invalid_mask(
                                                          pretrained=False)
     masks[-2:] = 0
     actual = featurizer(images, masks)
-    assert actual.shape == (BATCH_SIZE, featurizer.feature_size)
+    assert actual.shape == (BATCH_SIZE, *featurizer.feature_shape)
     assert actual[-2:].eq(0).all()
     assert not actual[:-2].eq(0).all()
     assert not torch.isnan(actual).any()
@@ -61,5 +61,5 @@ def test_pretrained_pyramid_featurizer_forward_all_invalid_masks(
     featurizer = featurizers.PretrainedPyramidFeaturizer(config=config,
                                                          pretrained=False)
     actual = featurizer(images, torch.zeros_like(masks))
-    assert actual.shape == (BATCH_SIZE, featurizer.feature_size)
+    assert actual.shape == (BATCH_SIZE, *featurizer.feature_shape)
     assert actual.eq(0).all()
