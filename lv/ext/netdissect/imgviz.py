@@ -68,10 +68,10 @@ class ImageVisualizer(imgviz.ImageVisualizer):
                                                        mask=mask,
                                                        outside_bright=.25,
                                                        thickness=0).cpu()
-                    image = self.pytorch_image(image).cpu()  # Compute last!
+                    unmasked = self.pytorch_image(image).cpu()  # Compute last!
                     result = torch.cat([
                         component.float().clamp(0, 255).byte()
-                        for component in (masked, image, mask[None])
+                        for component in (masked, unmasked, mask[None])
                     ])
                     yield ((unit, rank), result)
 
