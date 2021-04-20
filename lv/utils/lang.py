@@ -262,16 +262,13 @@ class Indexer:
             Sequence[int] or Sequence[Sequence[int]]: The indexed sequence(s).
 
         """
-        if isinstance(texts, str):
-            texts = [texts]
-        tokenized = self.tokenizer(texts)
+        tokenized = self.tokenizer(
+            [texts] if isinstance(texts, str) else texts)
 
         start = start or self.start
         stop = stop or self.stop
         pad = pad or self.pad
         length = length or self.length or max(len(toks) for toks in tokenized)
-        print([toks for toks in tokenized])
-        print([len(toks) for toks in tokenized])
 
         indexed = []
         for tokens in tokenized:
@@ -292,7 +289,12 @@ class Indexer:
             elif len(indices) > length:
                 indices = indices[:length]
 
-            indexed.append(indices)
+            indexed.append(tuple(indices))
+
+        if isinstance(texts, str):
+            indexed, = indexed
+        else:
+            indexed = tuple(indexed)
 
         return indexed
 
