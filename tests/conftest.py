@@ -36,7 +36,9 @@ def top_image_tensors():
     for _ in range(N_LAYERS):
         unit_images = []
         for _ in range(N_UNITS_PER_LAYER):
-            images = torch.rand(*TOP_IMAGES_SHAPE)
+            images = torch.randint(256,
+                                   size=TOP_IMAGES_SHAPE,
+                                   dtype=torch.uint8)
             unit_images.append(images)
         layer_images.append(torch.stack(unit_images))
     return torch.stack(layer_images)

@@ -2,10 +2,10 @@
 import collections
 import csv
 import pathlib
-from typing import (Any, Callable, Iterable, NamedTuple, Optional, Sequence,
-                    Union)
+from typing import Any, Iterable, NamedTuple, Optional, Sequence, Union
 
 from lv.utils.typing import PathLike
+from third_party.netdissect import renormalize
 
 import numpy
 import torch
@@ -14,8 +14,6 @@ from PIL import Image
 from torch.utils import data
 from torchvision import utils
 from torchvision.transforms import functional
-
-Transform = Callable[[torch.Tensor], torch.Tensor]
 
 
 class TopImages(NamedTuple):
@@ -58,7 +56,6 @@ class TopImagesDataset(data.Dataset[TopImages]):
     def __init__(self,
                  root: PathLike,
                  layers: Optional[Iterable[str]] = None,
-                 transform: Optional[Transform] = None,
                  device: Optional[Union[str, torch.device]] = None,
                  eager: bool = True,
                  display_progress: bool = True):
@@ -70,12 +67,9 @@ class TopImagesDataset(data.Dataset[TopImages]):
             layers (Optional[Iterable[str]], optional): The layers to load.
                 Layer data is assumed to be a subdirectory of the root.
                 By default, all subdirectories of root are treated as layers.
-            transform (Optional[Transform], optional): Call this function on
-                every image when it is read and use the returned result. Note
-                that this function MUST return a tensor. Defaults to None.
             device (Optional[Union[str, torch.device]], optional): Send all
                 tensors to this device.
-            eager (bool, optional): If set, eagerly transform images and send
+            eager (bool, optional): If set, eagerly renormalize images and send
                 them to the given device. Defaults to True.
             display_progress (bool, optional): Show the progress bar when
                 reading images into menu. Defaults to True.
@@ -97,9 +91,11 @@ class TopImagesDataset(data.Dataset[TopImages]):
 
         self.root = root
         self.layers = layers = tuple(sorted(layers))
-        self.transform = transform
         self.device = device
         self.eager = eager
+
+        self.renormalizer = renormalize.renormalizer(source='byte',
+                                                     target='pt')
 
         images_by_layer = {}
         masks_by_layer = {}
@@ -127,11 +123,10 @@ class TopImagesDataset(data.Dataset[TopImages]):
                                  'different height/width '
                                  f'{images.shape[3:]} vs. {masks.shape[3:]}')
 
-            if eager and transform is not None:
+            if eager:
                 shape = images.shape
-                images = images.view(-1, *shape[1:])
-                for index, image in enumerate(images):
-                    images[index] = transform(image)
+                images = images.view(-1, *shape[2:])
+                images = self.renormalizer(images.float())
                 images = images.view(*shape)
 
             if eager and device is not None:
@@ -162,10 +157,10 @@ class TopImagesDataset(data.Dataset[TopImages]):
 
         """
         sample = self.samples[index]
-        if not self.eager and self.transform is not None:
+        if not self.eager:
             sample = TopImages(layer=sample.layer,
                                unit=sample.unit,
-                               images=self.transform(sample.images),
+                               images=self.renormalizer(sample.images.float()),
                                masks=sample.masks)
         if not self.eager and self.device is not None:
             sample = TopImages(layer=sample.layer,

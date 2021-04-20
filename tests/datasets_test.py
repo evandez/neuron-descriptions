@@ -39,22 +39,23 @@ def test_top_images_as_pil_image_grid_bad_opacity(top_images, opacity):
         top_images.as_pil_image_grid(opacity=opacity)
 
 
-def transform(image):
-    """Zero the image."""
-    return torch.zeros_like(image)
-
-
-@pytest.mark.parametrize('eager', (False, True))
-def test_top_images_dataset_init(top_images_root, eager):
+def test_top_images_dataset_init_not_eager(top_images_root):
     """Test TopImagesDataset.__init__ sets state correctly."""
-    dataset = datasets.TopImagesDataset(top_images_root, eager=eager)
+    dataset = datasets.TopImagesDataset(top_images_root, eager=False)
     assert dataset.root == top_images_root
     assert dataset.layers == tuple(
         f'layer-{i}' for i in range(conftest.N_LAYERS))
-    assert dataset.transform is None
     assert dataset.device is None
-    assert dataset.eager is eager
+    assert dataset.eager is False
     assert len(dataset.samples) == conftest.N_SAMPLES
+    for sample in dataset.samples:
+        assert sample.images.dtype is torch.uint8
+        assert sample.images.min() >= 0
+        assert sample.images.max() <= 255
+
+        assert sample.masks.dtype is torch.uint8
+        assert sample.masks.min() >= 0
+        assert sample.masks.max() <= 1
 
 
 @pytest.mark.parametrize('device', ('cpu', torch.device('cpu')))
@@ -62,17 +63,21 @@ def test_top_images_dataset_init_eager(top_images_root, device):
     """Test TopImagesDataset.__init__ eagerly reads data."""
     dataset = datasets.TopImagesDataset(top_images_root,
                                         device=device,
-                                        transform=transform,
                                         eager=True)
     assert dataset.root == top_images_root
     assert dataset.layers == tuple(
         f'layer-{i}' for i in range(conftest.N_LAYERS))
-    assert dataset.transform is transform
     assert dataset.device is device
     assert dataset.eager is True
     assert len(dataset.samples) == conftest.N_SAMPLES
     for sample in dataset.samples:
-        assert sample.images.eq(0).all()
+        assert sample.images.dtype is torch.float
+        assert sample.images.min() >= 0
+        assert sample.images.max() <= 1
+
+        assert sample.masks.dtype is torch.uint8
+        assert sample.masks.min() >= 0
+        assert sample.masks.max() <= 1
 
 
 @pytest.mark.parametrize('subpath,error_pattern', (
@@ -154,28 +159,8 @@ def test_top_images_dataset_getitem(top_images_root, top_image_tensors,
             assert sample.layer == f'layer-{layer}'
             assert sample.unit == unit
             assert sample.images.dtype is torch.float
-            assert sample.images.allclose(top_image_tensors[layer][unit],
-                                          atol=1e-2)
-            assert sample.masks.dtype is torch.uint8
-            assert sample.masks.equal(top_image_masks[layer][unit])
-
-
-@pytest.mark.parametrize('eager', (False, True))
-def test_top_images_dataset_getitem_transform(top_images_root, top_image_masks,
-                                              eager):
-    """Test TopImagesDataset.__getitem__ returns samples in right order."""
-    dataset = datasets.TopImagesDataset(top_images_root,
-                                        transform=transform,
-                                        eager=eager,
-                                        device='cpu')
-    for layer in range(conftest.N_LAYERS):
-        for unit in range(conftest.N_UNITS_PER_LAYER):
-            index = layer * conftest.N_UNITS_PER_LAYER + unit
-            sample = dataset[index]
-            assert sample.layer == f'layer-{layer}'
-            assert sample.unit == unit
-            assert sample.images.dtype is torch.float
-            assert sample.images.eq(0).all()
+            assert sample.images.allclose(
+                top_image_tensors[layer][unit].float() / 255, atol=1e-3)
             assert sample.masks.dtype is torch.uint8
             assert sample.masks.equal(top_image_masks[layer][unit])
 
@@ -287,8 +272,8 @@ def test_annotated_top_images_dataset_getitem(annotated_top_images_dataset,
             assert sample.layer == conftest.layer(layer)
             assert sample.unit == unit
             assert sample.images.dtype is torch.float
-            assert sample.images.allclose(top_image_tensors[layer][unit],
-                                          atol=1e-2)
+            assert sample.images.allclose(
+                top_image_tensors[layer][unit].float() / 255, atol=1e-3)
             assert sample.masks.dtype is torch.uint8
             assert sample.masks.equal(top_image_masks[layer][unit])
             assert sample.annotations == (top_image_annotations[index][-1],)
