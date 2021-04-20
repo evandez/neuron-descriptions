@@ -76,8 +76,8 @@ class ImageVisualizer(imgviz.ImageVisualizer):
                     yield ((unit, rank), result)
 
         gt = tally.gather_topk(compute_viz, dataset, topk, **kwargs).result()
-        masked, images, mask = gt[:, :, :3], gt[:, :, 3:6], gt[:, :, 6:]
-        return masked, images, mask
+        masked, images, masks = gt[:, :, :3], gt[:, :, 3:6], gt[:, :, 6:]
+        return masked, images, masks
 
     def individual_masked_images_for_topk(
         self,
