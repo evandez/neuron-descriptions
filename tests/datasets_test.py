@@ -143,10 +143,9 @@ def test_top_images_dataset_getitem(top_images_root, top_image_tensors,
             assert sample.masks.equal(top_image_masks[layer][unit].float())
 
 
-def test_top_images_dataset_len(top_images_root):
+def test_top_images_dataset_len(top_images_dataset):
     """Test TopImagesDataset.__len__ returns correct length."""
-    dataset = datasets.TopImagesDataset(top_images_root)
-    assert len(dataset) == conftest.N_SAMPLES
+    assert len(top_images_dataset) == conftest.N_SAMPLES
 
 
 @pytest.fixture

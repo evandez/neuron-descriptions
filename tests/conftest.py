@@ -3,6 +3,8 @@ import csv
 import pathlib
 import tempfile
 
+from lv import datasets
+
 import numpy
 import pytest
 import torch
@@ -81,6 +83,12 @@ def top_images_root(top_image_tensors, top_image_masks):
             numpy.save(layer_dir / 'images.npy', layer_images.numpy())
             numpy.save(layer_dir / 'masks.npy', layer_masks.numpy())
         yield root
+
+
+@pytest.fixture
+def top_images_dataset(top_images_root):
+    """Return a TopImagesDataset for testing."""
+    return datasets.TopImagesDataset(top_images_root)
 
 
 def annotation(layer_index, unit_index):

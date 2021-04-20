@@ -1,8 +1,51 @@
 """Unit tests for lv/models/featurizers module."""
 from lv.models import featurizers
+from tests import conftest
 
 import pytest
 import torch
+
+
+class FakeFeaturizer(featurizers.Featurizer):
+    """A fake Featurizer that always returns zeros."""
+
+    def __init__(self, feature_shape):
+        """Initialize the featurizer."""
+        super().__init__()
+        self.feature_shape = feature_shape
+
+    def forward(self, images, masks, **kwargs):
+        """Assert on inputs and return zeros."""
+        assert not kwargs
+        assert images.shape[0] == masks.shape[0]
+        assert images.shape[2:] == masks.shape[2:]
+        assert images.shape[1] == 3
+        assert masks.shape[1] == 1
+        return torch.zeros(len(images), *self.feature_shape)
+
+
+FEATURE_SHAPE = (10, 10)
+
+
+@pytest.fixture
+def featurizer():
+    """Return a FakeFeaturizer for testing."""
+    return FakeFeaturizer(FEATURE_SHAPE)
+
+
+@pytest.mark.parametrize('device', (None, 'cpu', torch.device('cpu')))
+def test_featurizer_map(featurizer, top_images_dataset, device):
+    """Test Featurizer.map returns TensorDataset of right size."""
+    actual = featurizer.map(top_images_dataset,
+                            image_index=-2,
+                            mask_index=-1,
+                            display_progress=False,
+                            device=device)
+    assert len(actual) == len(top_images_dataset)
+    for (features,) in actual:
+        assert features.shape == (conftest.N_TOP_IMAGES_PER_UNIT,
+                                  *FEATURE_SHAPE)
+        assert features.eq(0).all()
 
 
 def test_pretrained_pyramid_featurizer_init_bad_config():

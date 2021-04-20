@@ -76,8 +76,15 @@ class Featurizer(nn.Module):
             if device is not None:
                 masks = masks.to(device)
 
+            # Flatten the inputs.
+            inputs = (images.view(-1, *images.shape[-3:]),
+                      masks.view(-1, *masks.shape[-3:]))
+
             with torch.no_grad():
-                features = self(images, masks, **kwargs)
+                features = self(*inputs, **kwargs)
+
+            # Unflatten the outputs.
+            features = features.view(*images.shape[:-3], *self.feature_shape)
 
             mapped.append(features)
 
