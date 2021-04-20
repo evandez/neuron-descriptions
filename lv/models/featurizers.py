@@ -3,7 +3,7 @@ from typing import Any, Callable, Mapping, Optional, Sequence, Tuple, Union
 
 from lv.ext.torchvision import models
 from lv.utils.typing import Device
-from third_party.netdissect import nethook
+from third_party.netdissect import nethook, renormalize
 
 import torch
 import tqdm
@@ -141,7 +141,15 @@ class PretrainedPyramidFeaturizer(Featurizer):
         self.layers = layers
         self.feature_shape = (feature_size,)
 
-    def forward(self, images: torch.Tensor, masks: torch.Tensor,
+        # We will manually normalize input images. This just makes life easier.
+        mean, std = renormalize.OFFSET_SCALE['imagenet']
+        self.register_buffer('mean', torch.tensor(mean).view(1, 3, 1, 1))
+        self.register_buffer('std', torch.tensor(std).view(1, 3, 1, 1))
+
+    def forward(self,
+                images: torch.Tensor,
+                masks: torch.Tensor,
+                normalize: bool = True,
                 **_: Any) -> torch.Tensor:
         """Construct masked image features.
 
@@ -150,6 +158,8 @@ class PretrainedPyramidFeaturizer(Featurizer):
                 (batch_size, 3, height, width).
             masks (torch.Tensor): The image masks. Expected shape is
                 (batch_size, 1, height, width).
+            normalize (bool, optional): If set, normalize images in the way
+                that torchvision ImageNet models expect.
 
         Returns:
             torch.Tensor: Image features. Will have shape
@@ -157,6 +167,9 @@ class PretrainedPyramidFeaturizer(Featurizer):
                 the config.
 
         """
+        if normalize:
+            images = (images - self.mean) / self.std
+
         result = images.new_zeros(len(images), *self.feature_shape)
 
         # If any masks are all zeros, we'll end up with divide-by-zero errors
