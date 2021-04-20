@@ -45,11 +45,8 @@ class Tokenizer:
                 See overloads.
 
         """
-        if isinstance(texts, str):
-            texts = [texts]
-
         tokenized = []
-        for doc in self.nlp.pipe(texts):
+        for doc in self.nlp.pipe([texts] if isinstance(texts, str) else texts):
             tokens = []
             for token in doc:
                 if self.ignore_stop and token.is_stop:
@@ -61,7 +58,7 @@ class Tokenizer:
                 tokens.append(text)
             tokenized.append(tuple(tokens))
 
-        if len(tokenized) == 1:
+        if isinstance(texts, str):
             tokenized, = tokenized
         else:
             tokenized = tuple(tokenized)
@@ -273,6 +270,8 @@ class Indexer:
         stop = stop or self.stop
         pad = pad or self.pad
         length = length or self.length or max(len(toks) for toks in tokenized)
+        print([toks for toks in tokenized])
+        print([len(toks) for toks in tokenized])
 
         indexed = []
         for tokens in tokenized:
