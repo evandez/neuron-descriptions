@@ -2,10 +2,10 @@
 import collections
 import dataclasses
 import functools
-from typing import (Any, FrozenSet, Mapping, Optional, Sequence, Type, TypeVar,
-                    Union, overload)
+from typing import (Any, Mapping, Optional, Sequence, Type, TypeVar, Union,
+                    overload)
 
-from lv.utils.typing import StrIterable, StrSequence
+from lv.utils.typing import StrIterable, StrSequence, StrSet
 
 import spacy
 from spacy.lang import en
@@ -154,7 +154,7 @@ class Vocab:
         return {token: index for index, token in enumerate(self.tokens)}
 
     @functools.cached_property
-    def unique(self) -> FrozenSet[str]:
+    def unique(self) -> StrSet:
         """Return the set of unique tokens."""
         return frozenset(self.ids)
 
@@ -214,7 +214,8 @@ class Indexer:
     tokenizer: Tokenizer
     start: bool = False
     stop: bool = False
-    pad: bool = True
+    pad: bool = False
+    unk: bool = False
     length: Optional[int] = None
 
     @property
@@ -232,12 +233,18 @@ class Indexer:
         """Return index of a (hypothetical) padding token."""
         return len(self.vocab) + 2
 
+    @property
+    def unk_index(self) -> int:
+        """Return index of a (hypothetical) unknown token."""
+        return len(self.vocab) + 3
+
     @overload
     def __call__(self,
                  texts: str,
                  start: Optional[bool] = ...,
                  stop: Optional[bool] = ...,
                  pad: Optional[bool] = ...,
+                 unk: Optional[bool] = ...,
                  length: Optional[int] = ...) -> Sequence[int]:
         ...
 
@@ -247,10 +254,17 @@ class Indexer:
                  start: Optional[bool] = ...,
                  stop: Optional[bool] = ...,
                  pad: Optional[bool] = ...,
+                 unk: Optional[bool] = ...,
                  length: Optional[int] = ...) -> Sequence[Sequence[int]]:
         ...
 
-    def __call__(self, texts, start=None, stop=None, pad=None, length=None):
+    def __call__(self,
+                 texts,
+                 start=None,
+                 stop=None,
+                 pad=None,
+                 unk=None,
+                 length=None):
         """Tokenizer the given texsts and map them to integer IDs.
 
         Args:
@@ -261,6 +275,8 @@ class Indexer:
                 Defaults to None.
             pad (Optional[bool], optional): Pad shorter sequences with padding
                 token if necessary and if possible. Defaults to None.
+            unk (Optional[bool], optional): Replace unknown tokens with the
+                UNK token. Otherwise, they are removed. Defaults to None.
             length (Optional[int], optional): Pad shorter sequences to this
                 length, if possible, and truncate longer sequences to this
                 length. Defaults to `self.length`, or if that is not set,
@@ -273,9 +289,10 @@ class Indexer:
         tokenized = self.tokenizer(
             [texts] if isinstance(texts, str) else texts)
 
-        start = start or self.start
-        stop = stop or self.stop
-        pad = pad or self.pad
+        start = self.start if start is None else start
+        stop = self.stop if stop is None else stop
+        pad = self.pad if pad is None else pad
+        unk = self.unk if unk is None else unk
         length = length or self.length or max(len(toks) for toks in tokenized)
 
         indexed = []
@@ -285,7 +302,12 @@ class Indexer:
             if start:
                 indices.append(self.start_index)
 
-            indices += [self.vocab[tok] for tok in tokens if tok in self.vocab]
+            if unk:
+                indices += [
+                    self.vocab.ids.get(tok, self.unk_index) for tok in tokens
+                ]
+            else:
+                indices += [self.vocab[tok] for tok in tokens if tok in tokens]
 
             if stop:
                 if len(indices) >= length:
