@@ -2,15 +2,13 @@
 import collections
 import dataclasses
 import functools
-from typing import (Any, FrozenSet, List, Mapping, Optional, Sequence, Tuple,
-                    Type, TypeVar, Union, overload)
+from typing import (Any, FrozenSet, Mapping, Optional, Sequence, Type, TypeVar,
+                    Union, overload)
+
+from lv.utils.typing import StrIterable, StrSequence
 
 import spacy
 from spacy.lang import en
-
-# All strings are also Sequence[str], so we have to distinguish that we
-# mean lists or tuples of strings, not other strings.
-StrSequence = Union[List[str], Tuple[str, ...]]
 
 TokenizerT = TypeVar('TokenizerT', bound='Tokenizer')
 
@@ -41,7 +39,7 @@ class Tokenizer:
                 See overloads.
 
         Returns:
-            Iterable[str] or Sequence[StrSequence]: Tokenized strings.
+            StrSequence or Sequence[StrSequence]: Tokenized strings.
                 See overloads.
 
         """
@@ -164,7 +162,8 @@ class Vocab:
     def create(cls: Type[VocabT],
                texts: StrSequence,
                tokenizer: Optional[Tokenizer] = None,
-               ignore_rarer_than: Optional[int] = None) -> VocabT:
+               ignore_rarer_than: Optional[int] = None,
+               ignore_in: Optional[StrIterable] = None) -> VocabT:
         """Create vocabulary from given texts.
 
         All texts will be tokenized. Tokens are then cleaned and filtered.
@@ -177,6 +176,8 @@ class Vocab:
                 Defaults to `Tokenizer.default()`.
             ignore_rarer_than (Optional[int], optional): Ignore tokens that
                 appear this many times or fewer. Defaults to None.
+            ignore_in (Optional[StrIterable], optional): Ignore tokens in
+                this iterable. Defaults to None.
 
         Returns:
             VocabT: The instantiated vocabulary.
@@ -184,12 +185,19 @@ class Vocab:
         """
         if tokenizer is None:
             tokenizer = Tokenizer.default()
+        if ignore_in is not None:
+            ignore_in = frozenset(ignore_in)
+
+        def ignore(token, count):
+            yn = ignore_rarer_than is not None and count <= ignore_rarer_than
+            yn |= ignore_in is not None and token in ignore_in
+            return yn
 
         tokens = [tok for toks in tokenizer(texts) for tok in toks]
         counts = collections.Counter(tokens)
         tokens = [
             token for token, count in counts.most_common()
-            if ignore_rarer_than is None or count > ignore_rarer_than
+            if not ignore(token, count)
         ]
 
         return cls(tuple(tokens))
@@ -303,6 +311,7 @@ class Indexer:
                texts: StrSequence,
                tokenizer: Optional[Tokenizer] = None,
                ignore_rarer_than: Optional[int] = None,
+               ignore_in: Optional[StrSequence] = None,
                **kwargs: Any) -> IndexerT:
         """Create an indexer whose vocab is based on the given documents.
 
@@ -314,6 +323,8 @@ class Indexer:
                 determine vocabulary. Defaults to `Tokenizer.default()`.
             ignore_rarer_than (Optional[int], optional): Forwarded to
                 `Vocab.create`. Defaults to None.
+            ignore_in (Optional[StrSequence]): Ignore all words in this list.
+                May be case/lemma sensitive depending on tokeinzer settings.
 
         Returns:
             IndexerT: The created indexer.
@@ -323,5 +334,6 @@ class Indexer:
             tokenizer = Tokenizer.default()
         vocab = Vocab.create(texts,
                              tokenizer=tokenizer,
-                             ignore_rarer_than=ignore_rarer_than)
+                             ignore_rarer_than=ignore_rarer_than,
+                             ignore_in=ignore_in)
         return cls(vocab, tokenizer, **kwargs)
