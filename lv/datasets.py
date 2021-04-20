@@ -50,7 +50,7 @@ class TopImages(NamedTuple):
         return functional.to_pil_image(grid)
 
 
-class TopImagesDataset(data.Dataset[TopImages]):
+class TopImagesDataset(data.Dataset):
     """Top-activating images for invidual units."""
 
     def __init__(self,
@@ -196,7 +196,7 @@ class AnnotatedTopImages(NamedTuple):
         return TopImages(*self[:-1]).as_pil_image_grid(**kwargs)
 
 
-class AnnotatedTopImagesDataset(data.Dataset[AnnotatedTopImages]):
+class AnnotatedTopImagesDataset(data.Dataset):
     """Same as TopImagesDataset, but each unit also has annotations."""
 
     def __init__(self,
