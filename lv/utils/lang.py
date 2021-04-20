@@ -219,25 +219,39 @@ class Indexer:
     unk: bool = False
     length: Optional[int] = None
 
-    @property
+    @functools.cached_property
     def start_index(self) -> int:
         """Return the index of a (hypothetical) start token."""
         return len(self.vocab)
 
-    @property
+    @functools.cached_property
     def stop_index(self) -> int:
         """Return the index of a (hypothetical) stop token."""
         return len(self.vocab) + 1
 
-    @property
+    @functools.cached_property
     def pad_index(self) -> int:
         """Return index of a (hypothetical) padding token."""
         return len(self.vocab) + 2
 
-    @property
+    @functools.cached_property
     def unk_index(self) -> int:
         """Return index of a (hypothetical) unknown token."""
         return len(self.vocab) + 3
+
+    @functools.cached_property
+    def specials(self) -> Mapping[int, str]:
+        """Return all special indices."""
+        return collections.OrderedDict((
+            (self.start_index, '<start>'),
+            (self.stop_index, '<stop>'),
+            (self.pad_index, '<pad>'),
+            (self.unk_index, '<unk>'),
+        ))
+
+    def __len__(self) -> int:
+        """Return the number of tokens in the vocabulary (include specials)."""
+        return len(self.vocab) + len(self.specials)
 
     @overload
     def __call__(self,
@@ -327,6 +341,68 @@ class Indexer:
             indexed = tuple(indexed)
 
         return indexed
+
+    @overload
+    def undo(self, indexed: Sequence[int]) -> StrSequence:
+        ...
+
+    @overload
+    def undo(self, indexed: Sequence[Sequence[int]]) -> Sequence[StrSequence]:
+        ...
+
+    def undo(self,
+             indexed,
+             specials: bool = True,
+             start: bool = True,
+             stop: bool = True,
+             pad: bool = True,
+             unk: bool = True):
+        """Undo indexing on the sequence.
+
+        Args:
+            indices (Sequence[int] or Sequence[Sequence[int]]): The indexed
+                sequence.
+            specials (bool, optional): Include special tokens. If False,
+                overrides all other options below. Defaults to True.
+            start (bool, optional): Include start token. Defaults to True.
+            stop (bool, optional): Include stop token. Defaults to True.
+            pad (bool, optional): Include pad token. Defaults to True.
+            unk (bool, optional): Include unk token. Defaults to True.
+
+        Raises:
+            ValueError: If sequence contains an unknown index.
+
+        Returns:
+            StrSequence or Sequence[StrSequence]: Unindexed sequence.
+
+        """
+        if not indexed:
+            return ()
+
+        unindexed = []
+        for indices in [indexed] if isinstance(indexed[0], int) else indexed:
+            tokens = []
+            for index in indices:
+                # First check if it's in the vocabulary.
+                if index < len(self.vocab):
+                    tokens.append(self.vocab[index])
+                    continue
+
+                # Then check if it's a special token.
+                for (special, token), keep in zip(self.specials.items(),
+                                                  (start, stop, pad, unk)):
+                    if index == special and specials and keep:
+                        tokens.append(token)
+                        break
+                else:
+                    raise ValueError(f'unknown index: {index}')
+
+            unindexed.append(tuple(tokens))
+
+        if isinstance(indexed[0], int):
+            return unindexed[0]
+
+        return tuple(unindexed)
 
 
 def indexer(texts: StrSequence,
