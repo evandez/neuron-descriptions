@@ -144,6 +144,7 @@ class PretrainedPyramidFeaturizer(Featurizer):
         kwargs.setdefault('pretrained', True)
         self.featurizer = nethook.InstrumentedModel(factory(**kwargs))
         self.featurizer.retain_layers(layers)
+        self.featurizer.eval()
 
         self.layers = layers
         self.feature_shape = (feature_size,)
