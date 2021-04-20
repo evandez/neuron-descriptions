@@ -43,7 +43,7 @@ class TopImages(NamedTuple):
         if opacity < 0 or opacity > 1:
             raise ValueError(f'opacity must be in [0, 1], got {opacity}')
         kwargs.setdefault('nrow', 5)
-        masks = self.masks.clone()
+        masks = self.masks.clone().float()
         masks[masks == 0] = 1 - opacity
         images = self.images * masks
         grid = utils.make_grid(images, **kwargs)
@@ -57,7 +57,6 @@ class TopImagesDataset(data.Dataset[TopImages]):
                  root: PathLike,
                  layers: Optional[Iterable[str]] = None,
                  device: Optional[Union[str, torch.device]] = None,
-                 eager: bool = True,
                  display_progress: bool = True):
         """Initialize the dataset.
 
@@ -69,8 +68,6 @@ class TopImagesDataset(data.Dataset[TopImages]):
                 By default, all subdirectories of root are treated as layers.
             device (Optional[Union[str, torch.device]], optional): Send all
                 tensors to this device.
-            eager (bool, optional): If set, eagerly renormalize images and send
-                them to the given device. Defaults to True.
             display_progress (bool, optional): Show the progress bar when
                 reading images into menu. Defaults to True.
 
@@ -92,7 +89,6 @@ class TopImagesDataset(data.Dataset[TopImages]):
         self.root = root
         self.layers = layers = tuple(sorted(layers))
         self.device = device
-        self.eager = eager
 
         self.renormalizer = renormalize.renormalizer(source='byte',
                                                      target='pt')
@@ -123,13 +119,15 @@ class TopImagesDataset(data.Dataset[TopImages]):
                                  'different height/width '
                                  f'{images.shape[3:]} vs. {masks.shape[3:]}')
 
-            if eager:
-                shape = images.shape
-                images = images.view(-1, *shape[2:])
-                images = self.renormalizer(images.float())
-                images = images.view(*shape)
+            images = images.float()
+            masks = masks.float()
 
-            if eager and device is not None:
+            shape = images.shape
+            images = images.view(-1, *shape[2:])
+            images = self.renormalizer(images)
+            images = images.view(*shape)
+
+            if device is not None:
                 images = images.to(device)
                 masks = masks.to(device)
 
@@ -157,12 +155,7 @@ class TopImagesDataset(data.Dataset[TopImages]):
 
         """
         sample = self.samples[index]
-        if not self.eager:
-            sample = TopImages(layer=sample.layer,
-                               unit=sample.unit,
-                               images=self.renormalizer(sample.images.float()),
-                               masks=sample.masks)
-        if not self.eager and self.device is not None:
+        if self.device is not None:
             sample = TopImages(layer=sample.layer,
                                unit=sample.unit,
                                images=sample.images.to(self.device),
