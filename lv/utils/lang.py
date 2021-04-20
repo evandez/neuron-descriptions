@@ -2,15 +2,12 @@
 import collections
 import dataclasses
 import functools
-from typing import (Any, Mapping, Optional, Sequence, Type, TypeVar, Union,
-                    overload)
+from typing import Any, Mapping, Optional, Sequence, Union, overload
 
 from lv.utils.typing import StrIterable, StrSequence, StrSet
 
 import spacy
 from spacy.lang import en
-
-TokenizerT = TypeVar('TokenizerT', bound='Tokenizer')
 
 
 @dataclasses.dataclass(frozen=True)
@@ -63,19 +60,27 @@ class Tokenizer:
 
         return tokenized
 
-    @classmethod
-    def default(cls: Type[TokenizerT],
-                lemmatize: bool = True,
-                **kwargs: Any) -> TokenizerT:
-        """Return a tokenizer based on a stripped spacy en_core_web_sm."""
+
+def tokenizer(nlp: Optional[en.English] = None,
+              lemmatize: bool = True,
+              **kwargs: Any) -> Tokenizer:
+    """Create a tokenizer based on a stripped spacy en_core_web_sm.
+
+    Keyword arguments are forwarded to Tokenizer constructor.
+
+    Args:
+        nlp (Optional[en.English], optional): Spacy instance to use.
+            Defaults to a stripped version of en_core_web_sm if not set.
+        lemmatize (bool, optional): Whether to lemmatize tokens.
+            Defaults to True.
+
+    """
+    if nlp is None:
         nlp = spacy.load('en_core_web_sm')
         nlp.select_pipes(disable=('tok2vec', 'ner'))
         if not lemmatize:
             nlp.disable_pipe('lemmatizer')
-        return cls(nlp, lemmatize=lemmatize, **kwargs)
-
-
-VocabT = TypeVar('VocabT', bound='Vocab')
+    return Tokenizer(nlp, lemmatize=lemmatize, **kwargs)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -158,52 +163,48 @@ class Vocab:
         """Return the set of unique tokens."""
         return frozenset(self.ids)
 
-    @classmethod
-    def create(cls: Type[VocabT],
-               texts: StrSequence,
-               tokenizer: Optional[Tokenizer] = None,
-               ignore_rarer_than: Optional[int] = None,
-               ignore_in: Optional[StrIterable] = None) -> VocabT:
-        """Create vocabulary from given texts.
 
-        All texts will be tokenized. Tokens are then cleaned and filtered.
-        Remaining tokens are passed to vocabulary in order of frequency, from
-        most common to least common.
+def vocab(texts: StrSequence,
+          tokenize: Optional[Tokenizer] = None,
+          ignore_rarer_than: Optional[int] = None,
+          ignore_in: Optional[StrIterable] = None) -> Vocab:
+    """Create vocabulary from given texts.
 
-        Args:
-            texts (StrSequence): Texts to parse vocabulary from.
-            tokenizer (Optional[Tokenizer], optional): Tokenizer to use.
-                Defaults to `Tokenizer.default()`.
-            ignore_rarer_than (Optional[int], optional): Ignore tokens that
-                appear this many times or fewer. Defaults to None.
-            ignore_in (Optional[StrIterable], optional): Ignore tokens in
-                this iterable. Defaults to None.
+    All texts will be tokenized. Tokens are then cleaned and filtered.
+    Remaining tokens are passed to vocabulary in order of frequency, from
+    most common to least common.
 
-        Returns:
-            VocabT: The instantiated vocabulary.
+    Args:
+        texts (StrSequence): Texts to parse vocabulary from.
+        tokenize (Optional[Tokenizer], optional): Tokenizer to use.
+            Defaults to `Tokenizer.default()`.
+        ignore_rarer_than (Optional[int], optional): Ignore tokens that
+            appear this many times or fewer. Defaults to None.
+        ignore_in (Optional[StrIterable], optional): Ignore tokens in
+            this iterable. Defaults to None.
 
-        """
-        if tokenizer is None:
-            tokenizer = Tokenizer.default()
-        if ignore_in is not None:
-            ignore_in = frozenset(ignore_in)
+    Returns:
+        Vocab: The instantiated vocabulary.
 
-        def ignore(token, count):
-            yn = ignore_rarer_than is not None and count <= ignore_rarer_than
-            yn |= ignore_in is not None and token in ignore_in
-            return yn
+    """
+    if tokenize is None:
+        tokenize = tokenizer()
+    if ignore_in is not None:
+        ignore_in = frozenset(ignore_in)
 
-        tokens = [tok for toks in tokenizer(texts) for tok in toks]
-        counts = collections.Counter(tokens)
-        tokens = [
-            token for token, count in counts.most_common()
-            if not ignore(token, count)
-        ]
+    def ignore(token, count):
+        yn = ignore_rarer_than is not None and count <= ignore_rarer_than
+        yn |= ignore_in is not None and token in ignore_in
+        return yn
 
-        return cls(tuple(tokens))
+    tokens = [tok for toks in tokenize(texts) for tok in toks]
+    counts = collections.Counter(tokens)
+    tokens = [
+        token for token, count in counts.most_common()
+        if not ignore(token, count)
+    ]
 
-
-IndexerT = TypeVar('IndexerT', bound='Indexer')
+    return Vocab(tuple(tokens))
 
 
 @dataclasses.dataclass(frozen=True)
@@ -211,7 +212,7 @@ class Indexer:
     """Maps string text to integer ID sequences."""
 
     vocab: Vocab
-    tokenizer: Tokenizer
+    tokenize: Tokenizer
     start: bool = False
     stop: bool = False
     pad: bool = False
@@ -286,8 +287,7 @@ class Indexer:
             Sequence[int] or Sequence[Sequence[int]]: The indexed sequence(s).
 
         """
-        tokenized = self.tokenizer(
-            [texts] if isinstance(texts, str) else texts)
+        tokenized = self.tokenize([texts] if isinstance(texts, str) else texts)
 
         start = self.start if start is None else start
         stop = self.stop if stop is None else stop
@@ -328,34 +328,33 @@ class Indexer:
 
         return indexed
 
-    @classmethod
-    def create(cls: Type[IndexerT],
-               texts: StrSequence,
-               tokenizer: Optional[Tokenizer] = None,
-               ignore_rarer_than: Optional[int] = None,
-               ignore_in: Optional[StrSequence] = None,
-               **kwargs: Any) -> IndexerT:
-        """Create an indexer whose vocab is based on the given documents.
 
-        Keyword arguments are passed to constructor.
+def indexer(texts: StrSequence,
+            tokenize: Optional[Tokenizer] = None,
+            ignore_rarer_than: Optional[int] = None,
+            ignore_in: Optional[StrSequence] = None,
+            **kwargs: Any) -> Indexer:
+    """Create an indexer whose vocab is based on the given documents.
 
-        Args:
-            texts (StrSequence): Texts to extract vocab from.
-            tokenizer (Optional[Tokenizer], optional): Tokenizer to use to
-                determine vocabulary. Defaults to `Tokenizer.default()`.
-            ignore_rarer_than (Optional[int], optional): Forwarded to
-                `Vocab.create`. Defaults to None.
-            ignore_in (Optional[StrSequence]): Ignore all words in this list.
-                May be case/lemma sensitive depending on tokeinzer settings.
+    Keyword arguments are passed to Indexer constructor.
 
-        Returns:
-            IndexerT: The created indexer.
+    Args:
+        texts (StrSequence): Texts to extract vocab from.
+        tokenize (Optional[Tokenizer], optional): Tokenizer to use to
+            determine vocabulary. Defaults to `Tokenizer.default()`.
+        ignore_rarer_than (Optional[int], optional): Forwarded to
+            `Vocab.create`. Defaults to None.
+        ignore_in (Optional[StrSequence]): Ignore all words in this list.
+            May be case/lemma sensitive depending on tokeinzer settings.
 
-        """
-        if tokenizer is None:
-            tokenizer = Tokenizer.default()
-        vocab = Vocab.create(texts,
-                             tokenizer=tokenizer,
-                             ignore_rarer_than=ignore_rarer_than,
-                             ignore_in=ignore_in)
-        return cls(vocab, tokenizer, **kwargs)
+    Returns:
+        Indexer: The created indexer.
+
+    """
+    if tokenize is None:
+        tokenize = tokenizer()
+    vocabulary = vocab(texts,
+                       tokenize=tokenize,
+                       ignore_rarer_than=ignore_rarer_than,
+                       ignore_in=ignore_in)
+    return Indexer(vocabulary, tokenize, **kwargs)
