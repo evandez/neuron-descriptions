@@ -136,6 +136,7 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
         dataset,
         topk,
         k=k,
+        batch_size=batch_size,
         num_workers=num_workers,
         pin_memory=True,
         cachefile=masks_cache_file)
