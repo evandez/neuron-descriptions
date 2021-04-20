@@ -321,7 +321,9 @@ class Indexer:
                     self.vocab.ids.get(tok, self.unk_index) for tok in tokens
                 ]
             else:
-                indices += [self.vocab[tok] for tok in tokens if tok in tokens]
+                indices += [
+                    self.vocab[tok] for tok in tokens if tok in self.vocab
+                ]
 
             if stop:
                 if len(indices) >= length:
