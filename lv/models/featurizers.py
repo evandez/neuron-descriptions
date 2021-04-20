@@ -177,18 +177,6 @@ class PretrainedPyramidFeaturizer(Featurizer):
         if normalize:
             images = (images - self.mean) / self.std
 
-        result = images.new_zeros(len(images), *self.feature_shape)
-
-        # If any masks are all zeros, we'll end up with divide-by-zero errors
-        # when we try to normalize down the road. We'll simply set the feature
-        # vectors for those images to 0.
-        valid = ~masks.eq(0).all(dim=-1).all(dim=-1).view(-1)
-        if not valid.any():
-            return result
-        indices = valid.nonzero().squeeze()
-        images = images[indices]
-        masks = masks[indices].float()
-
         # Feed images to featurizer, letting nethook record layer activations.
         self.featurizer(images)
         features = self.featurizer.retained_features(clear=True).values()
@@ -200,12 +188,16 @@ class PretrainedPyramidFeaturizer(Featurizer):
                                         size=fs.shape[-2:],
                                         mode='bilinear',
                                         align_corners=False)
-            ms /= ms.sum(dim=(-1, -2), keepdim=True)
+
+            # Normalize the masks so they look more like attention. If any
+            # of them are all zeros, we'll end up with divide-by-zero errors.
+            zeros = torch.zeros_like(ms)
+            valid = ~ms.isclose(zeros).all(dim=-1).all(dim=-1).view(-1)
+            indices = valid.nonzero().squeeze()
+            ms[indices] /= ms[indices].sum(dim=(-1, -2), keepdim=True)
+
+            # Pool features and move on.
             mfs = fs.mul(ms).sum(dim=(-1, -2))
             masked.append(mfs)
 
-        # All images with non-trivial masks will get real feature vectors.
-        # The rest will be zero.
-        result[indices] = torch.cat(masked, dim=-1)
-
-        return result
+        return torch.cat(masked, dim=-1)

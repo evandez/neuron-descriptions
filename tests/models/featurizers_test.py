@@ -70,7 +70,7 @@ def images():
 @pytest.fixture
 def masks():
     """Return fake masks for testing."""
-    return torch.randint(2, size=(BATCH_SIZE, *MASK_SHAPE))
+    return torch.randint(2, size=(BATCH_SIZE, *MASK_SHAPE), dtype=torch.float)
 
 
 @pytest.mark.parametrize('config', ('resnet18', 'alexnet'))
