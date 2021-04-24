@@ -204,6 +204,12 @@ def vocab(texts: StrSequence,
     return Vocab(tuple(tokens))
 
 
+START_TOKEN = '<start>'
+STOP_TOKEN = '<stop>'
+PAD_TOKEN = '<pad>'
+UNK_TOKEN = '<unk>'
+
+
 @dataclasses.dataclass(frozen=True)
 class Indexer:
     """Maps string text to integer ID sequences."""
@@ -240,15 +246,95 @@ class Indexer:
     def specials(self) -> Mapping[int, str]:
         """Return all special indices."""
         return collections.OrderedDict((
-            (self.start_index, '<start>'),
-            (self.stop_index, '<stop>'),
-            (self.pad_index, '<pad>'),
-            (self.unk_index, '<unk>'),
+            (self.start_index, START_TOKEN),
+            (self.stop_index, STOP_TOKEN),
+            (self.pad_index, PAD_TOKEN),
+            (self.unk_index, UNK_TOKEN),
         ))
+
+    @functools.cached_property
+    def tokens(self) -> Sequence[str]:
+        """Return all tokens known by the indexer."""
+        tokens = list(self.vocab.tokens)
+        tokens += self.specials.values()
+        return tuple(tokens)
+
+    @functools.cached_property
+    def ids(self) -> Mapping[str, int]:
+        """Return a mapping from token string to ID."""
+        ids = dict(self.vocab.ids)
+        for index, token in self.specials.items():
+            ids[token] = index
+        return ids
+
+    @functools.cached_property
+    def unique(self) -> StrSet:
+        """Return the set of unique tokens."""
+        return frozenset(self.ids.keys())
+
+    @overload
+    def __getitem__(self, token: int) -> str:
+        """Get token string for token ID.
+
+        Args:
+            token (int): The token ID.
+
+        Returns:
+            str: The token.
+
+        """
+        ...
+
+    @overload
+    def __getitem__(self, token: slice) -> StrSequence:
+        """Get token strings for ID slice.
+
+        Args:
+            token (slice): The ID slice.
+
+        Returns:
+            StrSequence: The token strings.
+
+        """
+        ...
+
+    @overload
+    def __getitem__(self, token: str) -> int:
+        """Get token ID for token string.
+
+        Args:
+            token (str): The token string.
+
+        Returns:
+            int: The token ID.
+
+        """
+        ...
+
+    def __getitem__(self, token):
+        """Get the ID/string for the given token."""
+        if isinstance(token, (int, slice)):
+            return self.tokens[token]
+        assert isinstance(token, str)
+        return self.ids[token]
 
     def __len__(self) -> int:
         """Return the number of tokens in the vocabulary (include specials)."""
         return len(self.vocab) + len(self.specials)
+
+    def __contains__(self, token: Union[int, str]) -> bool:
+        """Check whether indexer contains token or token ID.
+
+        Args:
+            token (Union[int, str]): The token or token ID.
+
+        Returns:
+            bool: True if the vocabulary contains the token.
+
+        """
+        if isinstance(token, int):
+            return token >= 0 and token < len(self)
+        return token in self.unique
 
     @overload
     def __call__(self,
