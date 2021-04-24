@@ -77,9 +77,6 @@ def tokenizer(nlp: Optional[en.English] = None,
     """
     if nlp is None:
         nlp = spacy.load('en_core_web_sm')
-        nlp.select_pipes(disable=('tok2vec', 'ner'))
-        if not lemmatize:
-            nlp.disable_pipe('lemmatizer')
     return Tokenizer(nlp, lemmatize=lemmatize, **kwargs)
 
 
