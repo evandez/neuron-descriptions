@@ -340,3 +340,86 @@ def test_indexer_call(vocab, tokenizer, init_kwargs, call_kwargs, texts,
     indexer = lang.Indexer(vocab, tokenizer, **init_kwargs)
     actual = indexer(texts, **call_kwargs)
     assert actual == expected
+
+
+@pytest.mark.parametrize(
+    'kwargs,indexed,expected',
+    (
+        # Basic cases.
+        ({}, (0, 1), ('foo', 'bar')),
+        ({}, ((0, 1), (1, 2)), (('foo', 'bar'), ('bar', 'baz'))),
+        (
+            {},
+            ((3, 0, 1, 2, 4), (0, 0, 6, 4, 5)),
+            (
+                ('<start>', 'foo', 'bar', 'baz', '<stop>'),
+                ('foo', 'foo', '<unk>', '<stop>', '<pad>'),
+            ),
+        ),
+
+        # Overrides.
+        (
+            dict(specials=False),
+            ((3, 0, 1, 2, 4), (0, 0, 6, 4, 5)),
+            (
+                ('foo', 'bar', 'baz'),
+                ('foo', 'foo'),
+            ),
+        ),
+        (
+            dict(start=False),
+            ((3, 0, 1, 2, 4), (0, 0, 6, 4, 5)),
+            (
+                ('foo', 'bar', 'baz', '<stop>'),
+                ('foo', 'foo', '<unk>', '<stop>', '<pad>'),
+            ),
+        ),
+        (
+            dict(stop=False),
+            ((3, 0, 1, 2, 4), (0, 0, 6, 4, 5)),
+            (
+                ('<start>', 'foo', 'bar', 'baz'),
+                ('foo', 'foo', '<unk>', '<pad>'),
+            ),
+        ),
+        (
+            dict(pad=False),
+            ((3, 0, 1, 2, 4), (0, 0, 6, 4, 5)),
+            (
+                ('<start>', 'foo', 'bar', 'baz', '<stop>'),
+                ('foo', 'foo', '<unk>', '<stop>'),
+            ),
+        ),
+        (
+            dict(unk=False),
+            ((3, 0, 1, 2, 4), (0, 0, 6, 4, 5)),
+            (
+                ('<start>', 'foo', 'bar', 'baz', '<stop>'),
+                ('foo', 'foo', '<stop>', '<pad>'),
+            ),
+        ),
+    ))
+def test_indexer_undo(indexer, kwargs, indexed, expected):
+    """Test Indexer.undo correctly unindexes."""
+    actual = indexer.undo(indexed, **kwargs)
+    assert actual == expected
+
+
+def test_indexer_undo_bad_index(indexer):
+    """Test Indexer.undo dies when given bad index."""
+    bad = 100
+    with pytest.raises(ValueError, match=f'.*{bad}.*'):
+        indexer.undo((0, bad))
+
+
+def test_indexer():
+    """Test indexer factory sets defaults correctly."""
+    indexer = lang.indexer(TOKENS)
+    assert len(indexer) == len(TOKENS) + 4
+
+
+def test_indexer_defaults(tokenizer):
+    """Test indexer factory sets defaults correctly."""
+    indexer = lang.indexer(TOKENS, tokenize=tokenizer)
+    assert len(indexer) == len(TOKENS) + 4
+    assert indexer.tokenize is tokenizer

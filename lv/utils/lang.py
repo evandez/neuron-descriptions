@@ -480,8 +480,9 @@ class Indexer:
                 # Then check if it's a special token.
                 for (special, token), keep in zip(self.specials.items(),
                                                   (start, stop, pad, unk)):
-                    if index == special and specials and keep:
-                        tokens.append(token)
+                    if index == special:
+                        if specials and keep:
+                            tokens.append(token)
                         break
                 else:
                     raise ValueError(f'unknown index: {index}')
