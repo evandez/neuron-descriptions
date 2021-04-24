@@ -270,7 +270,7 @@ class Indexer:
     @functools.cached_property
     def unique(self) -> StrSet:
         """Return the set of unique tokens."""
-        return frozenset(self.ids.keys())
+        return frozenset(self.ids)
 
     @overload
     def __getitem__(self, token: int) -> str:
@@ -377,8 +377,9 @@ class Indexer:
                 UNK token. Otherwise, they are removed. Defaults to None.
             length (Optional[int], optional): Pad shorter sequences to this
                 length, if possible, and truncate longer sequences to this
-                length. Defaults to `self.length`, or if that is not set,
-                defaults to None.
+                length. This does NOT count the start and stop tokens. Defaults
+                to `self.length`, or if that is not set, defaults to the length
+                of the longest input sequence.
 
         Returns:
             Sequence[int] or Sequence[Sequence[int]]: The indexed sequence(s).
@@ -391,6 +392,9 @@ class Indexer:
         pad = self.pad if pad is None else pad
         unk = self.unk if unk is None else unk
         length = length or self.length or max(len(toks) for toks in tokenized)
+        for special in (start, stop):
+            if special:
+                length += 1
 
         indexed = []
         for tokens in tokenized:

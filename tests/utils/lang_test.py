@@ -249,3 +249,94 @@ def test_indexer_contains(indexer, token, expected):
     """Test Indexer.__contains__ returns True if it knows about token."""
     actual = token in indexer
     assert actual is expected
+
+
+@pytest.mark.parametrize(
+    'init_kwargs,call_kwargs,texts,expected',
+    (
+        # Basic use cases.
+        ({}, {}, 'baz bar foo', (2, 1, 0)),
+        ({}, {}, ('baz bar foo',), ((2, 1, 0),)),
+        ({}, {}, ('baz bar foo', 'baz'), ((2, 1, 0), (2,))),
+        ({}, {}, ('baz bar foo', 'baz bad'), ((2, 1, 0), (2,))),
+
+        # Configuration at init time.
+        (dict(start=True), {}, 'baz bar foo', (3, 2, 1, 0)),
+        (dict(stop=True), {}, 'baz bar foo', (2, 1, 0, 4)),
+        (dict(pad=True), {}, 'baz bar foo', (2, 1, 0)),
+        (dict(pad=True), {}, ('baz bar foo', 'baz'), ((2, 1, 0), (2, 5, 5))),
+        (dict(unk=True), {}, 'baz bar foo', (2, 1, 0)),
+        (dict(unk=True), {}, 'baz bad foo', (2, 6, 0)),
+        (dict(length=2), {}, ('baz bar foo', 'baz'), ((2, 1), (2,))),
+        (
+            dict(length=2, pad=True),
+            {},
+            ('baz bar foo', 'baz'),
+            ((2, 1), (2, 5)),
+        ),
+        (
+            dict(start=True, stop=True, pad=True, unk=True, length=2),
+            {},
+            ('baz bad foo', 'baz'),
+            ((3, 2, 6, 4), (3, 2, 4, 5)),
+        ),
+
+        # Configuration at call time.
+        ({}, dict(start=True), 'baz bar foo', (3, 2, 1, 0)),
+        ({}, dict(stop=True), 'baz bar foo', (2, 1, 0, 4)),
+        ({}, dict(pad=True), 'baz bar foo', (2, 1, 0)),
+        ({}, dict(pad=True), ('baz bar foo', 'baz'), ((2, 1, 0), (2, 5, 5))),
+        ({}, dict(unk=True), 'baz bar foo', (2, 1, 0)),
+        ({}, dict(unk=True), 'baz bad foo', (2, 6, 0)),
+        ({}, dict(length=2), ('baz bar foo', 'baz'), ((2, 1), (2,))),
+        (
+            {},
+            dict(length=2, pad=True),
+            ('baz bar foo', 'baz'),
+            ((2, 1), (2, 5)),
+        ),
+        (
+            {},
+            dict(start=True, stop=True, pad=True, unk=True, length=2),
+            ('baz bad foo', 'baz'),
+            ((3, 2, 6, 4), (3, 2, 4, 5)),
+        ),
+
+        # Override init configuration.
+        (
+            dict(start=True),
+            dict(start=False),
+            'baz bar foo',
+            (2, 1, 0),
+        ),
+        (
+            dict(stop=True),
+            dict(stop=False),
+            'baz bar foo',
+            (2, 1, 0),
+        ),
+        (
+            dict(pad=True),
+            dict(pad=False),
+            ('baz bar foo', 'baz'),
+            ((2, 1, 0), (2,)),
+        ),
+        (
+            dict(unk=True),
+            dict(unk=False),
+            'baz bad foo',
+            (2, 0),
+        ),
+        (
+            dict(length=2),
+            dict(length=3),
+            ('baz bar foo', 'baz'),
+            ((2, 1, 0), (2,)),
+        ),
+    ))
+def test_indexer_call(vocab, tokenizer, init_kwargs, call_kwargs, texts,
+                      expected):
+    """Test Indexer.__call__ correctly indexes inputs."""
+    indexer = lang.Indexer(vocab, tokenizer, **init_kwargs)
+    actual = indexer(texts, **call_kwargs)
+    assert actual == expected
