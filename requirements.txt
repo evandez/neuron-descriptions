@@ -1,6 +1,7 @@
 attrs==20.3.0
 blis==0.7.4
-botocore==1.20.43
+boto3==1.17.57
+botocore==1.20.57
 catalogue==2.0.3
 certifi==2020.12.5
 chardet==4.0.0
@@ -42,7 +43,7 @@ python-dateutil==2.8.1
 pytz==2021.1
 PyYAML==5.4.1
 requests==2.25.1
-s3transfer==0.3.6
+s3transfer==0.4.2
 scikit-learn==0.24.1
 scipy==1.6.2
 six==1.15.0
