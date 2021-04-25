@@ -177,7 +177,9 @@ def test_parse_yaml_config_bad_config(yaml_file, yaml_config, error_pattern):
     with yaml_file.open('w') as handle:
         handle.write(yaml_config)
     with pytest.raises(ValueError, match=error_pattern):
-        qualification.parse_yaml_config(yaml_file, validate_urls=False)
+        qualification.parse_yaml_config(yaml_file,
+                                        validate_urls=False,
+                                        display_progress=False)
 
 
 QUESTIONS_XML = f'''\

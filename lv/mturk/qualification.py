@@ -9,6 +9,7 @@ import pathlib
 from typing import Sequence
 from urllib import request
 
+import tqdm
 import yaml
 
 QUESTION_FORM_XMLNS = (
@@ -38,7 +39,8 @@ class Config:
 
 
 def parse_yaml_config(yaml_file: pathlib.Path,
-                      validate_urls: bool = True) -> Config:
+                      validate_urls: bool = True,
+                      display_progress: bool = True) -> Config:
     """Parse questions from a YAML file.
 
     The format of file is as follows:
@@ -67,6 +69,8 @@ def parse_yaml_config(yaml_file: pathlib.Path,
         yaml_file (pathlib.Path): Path to YAML config file.
         validate_urls (bool, optional): If set, make sure all image URLs
             actually open.
+        display_progress (bool, optional): If set, show progress bar while
+            loading configs.
 
     Raises:
         ValueError: If config is incorrectly formatted.
@@ -90,8 +94,13 @@ def parse_yaml_config(yaml_file: pathlib.Path,
     if not question_configs or not isinstance(question_configs, list):
         raise ValueError('must add >= 1 questions in list')
 
+    question_configs = question_configs or []
+    if display_progress:
+        question_configs = tqdm.tqdm(question_configs,
+                                     desc='validating questions')
+
     questions = []
-    for question_config in question_configs or []:
+    for question_config in question_configs:
         question_id = question_config.get('id')
         if question_id is None or not isinstance(question_id, str):
             raise ValueError('question "id" required as str')
