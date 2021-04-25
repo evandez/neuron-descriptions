@@ -225,18 +225,6 @@ def test_annotated_top_images_init_validate_top_image_annotatation_counts(
             (conftest.annotation(0, 0), annotation))
 
 
-@pytest.fixture
-def annotated_top_images_dataset(top_images_root,
-                                 top_images_annotations_csv_file):
-    """Return an AnnotatedTopImagesDataset for testing."""
-    return datasets.AnnotatedTopImagesDataset(
-        top_images_root,
-        annotations_csv_file=top_images_annotations_csv_file,
-        layer_column=conftest.LAYER_COLUMN,
-        unit_column=conftest.UNIT_COLUMN,
-        annotation_column=conftest.ANNOTATION_COLUMN)
-
-
 def test_annotated_top_images_dataset_getitem(annotated_top_images_dataset,
                                               top_image_tensors,
                                               top_image_masks,

@@ -124,3 +124,15 @@ def top_images_annotations_csv_file(top_images_root, top_image_annotations):
         writer.writerows(rows)
 
     return annotations_csv_file
+
+
+@pytest.fixture
+def annotated_top_images_dataset(top_images_root,
+                                 top_images_annotations_csv_file):
+    """Return an AnnotatedTopImagesDataset for testing."""
+    return datasets.AnnotatedTopImagesDataset(
+        top_images_root,
+        annotations_csv_file=top_images_annotations_csv_file,
+        layer_column=LAYER_COLUMN,
+        unit_column=UNIT_COLUMN,
+        annotation_column=ANNOTATION_COLUMN)
