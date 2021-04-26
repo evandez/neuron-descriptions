@@ -158,7 +158,9 @@ class WordAnnotator(nn.Module):
             if isinstance(s_indices, int):
                 s_indices = [s_indices]
 
-            s_indices = sorted(s_indices, key=lambda index: s_ps[index].item())
+            s_indices = sorted(s_indices,
+                               key=lambda index: s_ps[index].item(),
+                               reverse=True)
             s_words = self.indexer.undo(s_indices)
             words.append(s_words)
             indices.append(s_indices)
