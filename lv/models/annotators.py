@@ -198,7 +198,7 @@ class WordAnnotator(nn.Module):
         for index in range(len(y_pred)):
             annotation = dataset[index][annotation_index]
             annotation = lang.join(annotation)
-            annotations += annotation
+            annotations.append(annotation)
 
         y_true = numpy.zeros((len(y_pred), len(self.indexer.vocab)))
         for index, annotation in enumerate(annotations):
