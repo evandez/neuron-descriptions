@@ -337,9 +337,18 @@ class WordAnnotator(nn.Module):
         annotations = []
         for index in range(len(features)):
             annotation = dataset[index][annotation_index]
-            if isinstance(annotation, str):
-                annotation = [annotation]
-            annotations += annotation
+
+            # If the annotation is a known collection, try to join it.
+            if isinstance(annotation, (list, tuple, set, frozenset)):
+                annotation = ' '.join(annotation)
+
+            # If we still don't know what it is, give up.
+            if not isinstance(annotation, str):
+                raise ValueError('unknown annotation type: '
+                                 f'{type(annotation).__name__}')
+
+            annotations.append(annotation)
+
         indexer = lang.indexer(annotations, **indexer_kwargs)
 
         targets = torch.zeros(len(features), len(indexer.vocab), device=device)
