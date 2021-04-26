@@ -355,7 +355,8 @@ class WordAnnotator(nn.Module):
 
         feature_size = numpy.prod(featurizer.feature_shape).item()
         vocab_size = len(indexer.vocab)
-        classifier = WordClassifierHead(feature_size, vocab_size).to(device)
+        model = WordClassifierHead(feature_size, vocab_size).to(device)
+        classifier = model.classifier
 
         optimizer = optimizer_t(classifier.parameters(), **optimizer_kwargs)
 
@@ -375,6 +376,8 @@ class WordAnnotator(nn.Module):
             train_loss = 0.
             for (inputs,), (targets,) in zip(features_loader, targets_loader):
                 inputs = inputs.view(*inputs.shape[:2], feature_size)
+                targets = targets[:, None, :].expand(-1, inputs.shape[1], -1)
+
                 predictions = classifier(inputs)
                 loss = criterion(predictions, targets)
                 loss.backward()
@@ -390,4 +393,4 @@ class WordAnnotator(nn.Module):
             if stopper(train_loss):
                 break
 
-        return cls(indexer, featurizer, classifier)
+        return cls(indexer, featurizer, model)
