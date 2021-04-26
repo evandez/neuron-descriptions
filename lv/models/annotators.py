@@ -339,6 +339,9 @@ class WordAnnotator(nn.Module):
             annotation = lang.join(annotation)
             annotations.append(annotation)
 
+        # Useful default: ignore tokens that appear 1 time or less.
+        indexer_kwargs = dict(indexer_kwargs)
+        indexer_kwargs.setdefault('ignore_rarer_than', 1)
         indexer = lang.indexer(annotations, **indexer_kwargs)
 
         targets = torch.zeros(len(features), len(indexer.vocab), device=device)
