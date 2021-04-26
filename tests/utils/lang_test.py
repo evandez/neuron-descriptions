@@ -423,3 +423,22 @@ def test_indexer_defaults(tokenizer):
     indexer = lang.indexer(TOKENS, tokenize=tokenizer)
     assert len(indexer) == len(TOKENS) + 4
     assert indexer.tokenize is tokenizer
+
+
+@pytest.mark.parametrize('texts,expected', (
+    (['foo', 'bar'], 'foo bar'),
+    (('annotation 1', 'annotation 2'), ('annotation 1 annotation 2')),
+    ({'a', 'text'}, 'a text'),
+    (frozenset({'foo', 'bar'}), 'bar foo'),
+    ('this is a test', 'this is a test'),
+))
+def test_join(texts, expected):
+    """Test join correctly joins texts."""
+    actual = lang.join(texts)
+    assert actual == expected
+
+
+def test_join_bad_input():
+    """Test join dies when not given string or iterable of strings."""
+    with pytest.raises(ValueError, match='.*dict.*'):
+        lang.join({'foo': 'bar'})

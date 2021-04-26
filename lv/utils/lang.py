@@ -524,3 +524,25 @@ def indexer(texts: StrSequence,
                        ignore_rarer_than=ignore_rarer_than,
                        ignore_in=ignore_in)
     return Indexer(vocabulary, tokenize, **kwargs)
+
+
+def join(texts: Any, delimiter: str = ' ') -> str:
+    """Check if the texts are joinable.
+
+    Args:
+        texts (Any): A string or iterable of strings. Anything else, and
+            this function will explode!
+        delimiter (str, optional): If texts is iterable of strings, join
+            them with this token. Defaults to ' '.
+
+    Returns:
+        str: The joined string, if possible.
+
+    """
+    if isinstance(texts, (set, frozenset)):
+        texts = tuple(sorted(texts))
+    if isinstance(texts, (list, tuple)):
+        texts = delimiter.join(texts)
+    if not isinstance(texts, str):
+        raise ValueError(f'unknown annotation type: {type(texts).__name__}')
+    return texts
