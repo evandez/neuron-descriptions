@@ -277,8 +277,8 @@ class WordAnnotator(nn.Module):
             image_index: int = 2,
             mask_index: int = 3,
             annotation_index: int = 4,
-            batch_size: int = 16,
-            max_epochs: int = 100,
+            batch_size: int = 64,
+            max_epochs: int = 1000,
             patience: int = 4,
             optimizer_t: Type[optim.Optimizer] = optim.Adam,
             optimizer_kwargs: Optional[Mapping[str, Any]] = None,
@@ -299,9 +299,9 @@ class WordAnnotator(nn.Module):
                 dataset samples. Defaults to 4 to be compatible with
                 AnnotatedTopImagesDataset.
             batch_size (int, optional): Number of samples to train on at once.
-                Defaults to 16.
+                Defaults to 64.
             max_epochs (int, optional): Maximum number of epochs to train for.
-                Defaults to 100.
+                Defaults to 1000.
             patience (int, optional): If loss does not improve for this many
                 epochs, stop training. Defaults to 4.
             optimizer_t (Type[optim.Optimizer], optional): Optimizer to use.
