@@ -51,6 +51,7 @@ def dissection_models() -> zoo.ModelConfigs:
             KEY_PLACES365:
                 zoo.ModelConfig(
                     models.resnet18_seq,
+                    num_classes=365,
                     url=f'{MODEL_HOST}/resnet18/places/{MODEL_FILE_PLACES}',
                     transform_weights=lambda weights: weights['state_dict'],
                     layers=CONV_LAYER_RESNET18),
@@ -64,6 +65,7 @@ def dissection_models() -> zoo.ModelConfigs:
             KEY_PLACES365:
                 zoo.ModelConfig(
                     models.vgg16_seq,
+                    num_classes=365,
                     url=f'{MODEL_HOST}/vgg16/places/{MODEL_FILE_PLACES}',
                     transform_weights=lambda weights: weights['state_dict'],
                     layers=CONV_LAYERS_VGG16),
