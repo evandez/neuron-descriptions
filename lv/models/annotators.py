@@ -9,10 +9,10 @@ from lv.utils.typing import Device
 
 import numpy
 import torch
-import tqdm
 from sklearn import metrics
 from torch import nn, optim
 from torch.utils import data
+from tqdm.auto import tqdm
 
 
 class WordClassifierHead(nn.Module):
@@ -259,7 +259,7 @@ class WordAnnotator(nn.Module):
         loader = data.DataLoader(features, batch_size=batch_size)
 
         predictions = []
-        for (inputs,) in tqdm.tqdm(loader) if display_progress else loader:
+        for (inputs,) in tqdm(loader) if display_progress else loader:
             outputs = self(inputs, **kwargs)
             predictions.append(outputs)
 
@@ -372,7 +372,7 @@ class WordAnnotator(nn.Module):
 
         progress = range(max_epochs)
         if display_progress:
-            progress = tqdm.tqdm(progress)
+            progress = tqdm(progress)
 
         for _ in progress:
             train_loss = 0.

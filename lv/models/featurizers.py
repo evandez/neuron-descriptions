@@ -6,10 +6,10 @@ from lv.utils.typing import Device
 from third_party.netdissect import nethook, renormalize
 
 import torch
-import tqdm
 from torch import nn
 from torch.nn import functional
 from torch.utils import data
+from tqdm.auto import tqdm
 
 
 class Featurizer(nn.Module):
@@ -63,7 +63,7 @@ class Featurizer(nn.Module):
         mapped = []
 
         loader = data.DataLoader(dataset, batch_size=batch_size)
-        for batch in tqdm.tqdm(loader) if display_progress else loader:
+        for batch in tqdm(loader) if display_progress else loader:
             images = batch[image_index]
             if not isinstance(images, torch.Tensor):
                 raise ValueError(f'non-tensor images: {type(images).__name__}')

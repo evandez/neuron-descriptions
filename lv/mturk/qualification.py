@@ -9,8 +9,8 @@ import pathlib
 from typing import Sequence
 from urllib import request
 
-import tqdm
 import yaml
+from tqdm.auto import tqdm
 
 QUESTION_FORM_XMLNS = (
     'http://mechanicalturk.amazonaws.com/'
@@ -96,8 +96,7 @@ def parse_yaml_config(yaml_file: pathlib.Path,
 
     question_configs = question_configs or []
     if display_progress:
-        question_configs = tqdm.tqdm(question_configs,
-                                     desc='validating questions')
+        question_configs = tqdm(question_configs, desc='validate questions')
 
     questions = []
     for question_config in question_configs:

@@ -7,7 +7,7 @@ from urllib import request
 from lv import datasets
 from lv.utils.typing import PathLike
 
-import tqdm
+from tqdm.auto import tqdm
 
 
 def generate_hits_csv(dataset: datasets.TopImagesDataset,
@@ -61,7 +61,7 @@ def generate_hits_csv(dataset: datasets.TopImagesDataset,
 
     samples = dataset.samples
     if display_progress:
-        samples = tqdm.tqdm(samples, desc=f'processing {len(samples)} samples')
+        samples = tqdm(samples, desc='process samples')
 
     rows = [header]
     for layer, unit, *_ in samples:
