@@ -5,7 +5,10 @@ If you're looking for the original models--whose neurons we've annotated as
 part of this project--you are at the wrong zoo. You want to look at the configs
 in lv/dissection/zoo.py instead.
 """
+import lv.datasets
 from lv.zoo import core
+
+HOST = 'http://wednesday.csail.mit.edu/dez/latent-vocabulary'
 
 
 def models() -> core.ModelConfigs:
@@ -15,4 +18,11 @@ def models() -> core.ModelConfigs:
 
 def datasets() -> core.DatasetConfigs:
     """Return all dataset configs."""
-    return {}
+    return {
+        'alexnet-imagenet':
+            core.DatasetConfig(lv.datasets.AnnotatedTopImagesDataset,
+                               url=f'{HOST}/data/alexnet-imagenet.zip'),
+        'alexnet-places365':
+            core.DatasetConfig(lv.datasets.AnnotatedTopImagesDataset,
+                               url=f'{HOST}/data/alexnet-places365.zip'),
+    }
