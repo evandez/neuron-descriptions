@@ -81,9 +81,9 @@ def dataset(name: str,
         raise KeyError(f'no such dataset in zoo: {name}')
     config = source[name]
 
-    if path is None:
+    if path is None and config.requires_path:
         path = pathlib.Path(__file__).parents[2] / '.zoo/datasets' / name
 
-    dataset = config.load(path, **kwargs)
+    dataset = config.load(path=path, **kwargs)
 
     return dataset

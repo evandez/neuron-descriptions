@@ -125,9 +125,10 @@ def test_model_bad_keys(model, model_key, dataset_key):
 class FakeDatasetConfig:
     """A fake dataset config object."""
 
-    def __init__(self, dataset, *args, **kwargs):
+    def __init__(self, dataset, *args, requires_path=True, **kwargs):
         """Initialize the dataset config."""
         self.dataset = dataset
+        self.requires_path = requires_path
         self.args = args
         self.kwargs = kwargs
 
@@ -162,7 +163,7 @@ def dataset_path(tensors):
 
 def test_dataset(dataset, dataset_path):
     """Test dataset correctly reads config."""
-    expected = FakeDatasetConfig(dataset, dataset_path, flag=True)
+    expected = FakeDatasetConfig(dataset, path=dataset_path, flag=True)
     source = {DATASET: expected, 'bad': DangerConfig()}
     actual = loaders.dataset(DATASET,
                              path=dataset_path,
@@ -172,10 +173,21 @@ def test_dataset(dataset, dataset_path):
 
 
 def test_dataset_no_path(dataset):
-    """Test dataset correctly reads config."""
+    """Test dataset correctly reads config when no path provided."""
     expected = FakeDatasetConfig(dataset,
-                                 pathlib.Path(__file__).parents[2] /
+                                 path=pathlib.Path(__file__).parents[2] /
                                  f'.zoo/datasets/{DATASET}',
+                                 flag=True)
+    source = {DATASET: expected, 'bad': DangerConfig()}
+    actual = loaders.dataset(DATASET, source=source, flag=True)
+    assert actual is dataset
+
+
+def test_dataset_no_path_no_requires_path(dataset):
+    """Test dataset correctly reads config when requires_path=False."""
+    expected = FakeDatasetConfig(dataset,
+                                 requires_path=False,
+                                 path=None,
                                  flag=True)
     source = {DATASET: expected, 'bad': DangerConfig()}
     actual = loaders.dataset(DATASET, source=source, flag=True)

@@ -159,7 +159,7 @@ def dataset_config():
 
 def test_dataset_config_load(dataset_config, dataset_file, tensors):
     """Test DatasetConfig.load correctly instantiates dataset."""
-    actual = dataset_config.load(dataset_file)
+    actual = dataset_config.load(path=dataset_file)
     assert torch.cat(actual.dataset.tensors).allclose(tensors, atol=1e-3)
     assert actual.flag
 
@@ -167,6 +167,29 @@ def test_dataset_config_load(dataset_config, dataset_file, tensors):
 def test_dataset_config_load_overwrite_defaults(dataset_config, dataset_file,
                                                 tensors):
     """Test DatasetConfig.load correctly overwrites defaults."""
-    actual = dataset_config.load(dataset_file, flag=False)
+    actual = dataset_config.load(path=dataset_file, flag=False)
     assert torch.cat(actual.dataset.tensors).allclose(tensors, atol=1e-3)
     assert not actual.flag
+
+
+def test_dataset_config_load_no_path_when_not_required(dataset_file, tensors):
+    """Test DatasetConfig.load does not die when no (optional) path provided."""
+    dataset_config = core.DatasetConfig(factory=Dataset,
+                                        path=dataset_file,
+                                        requires_path=False)
+    actual = dataset_config.load()
+    assert torch.cat(actual.dataset.tensors).allclose(tensors, atol=1e-3)
+    assert not actual.flag
+
+
+def test_dataset_config_load_no_path_when_required(dataset_config):
+    """Test DatasetConfig.load dies when no (required) path provided."""
+    with pytest.raises(ValueError, match='.*dataset requires path.*'):
+        dataset_config.load()
+
+
+def test_dataset_config_path_does_not_exist(dataset_config, dataset_file):
+    """Test DatasetConfig.load dies when path does not exist."""
+    dataset_file.unlink()
+    with pytest.raises(FileNotFoundError, match=f'.*{dataset_file}.*'):
+        dataset_config.load(path=dataset_file)
