@@ -2,8 +2,9 @@
 import collections
 import dataclasses
 import functools
-from typing import Any, Mapping, Optional, Sequence, Union, overload
+from typing import Any, Mapping, Optional, Sequence, Union, cast, overload
 
+from lv.utils import serialize
 from lv.utils.typing import StrIterable, StrSequence, StrSet
 
 import spacy
@@ -11,7 +12,7 @@ from spacy.lang import en
 
 
 @dataclasses.dataclass(frozen=True)
-class Tokenizer:
+class Tokenizer(serialize.Serializable):
     """A wrapper around the spacy English tokenizer supporting defaults."""
 
     nlp: en.English
@@ -76,12 +77,12 @@ def tokenizer(nlp: Optional[en.English] = None,
 
     """
     if nlp is None:
-        nlp = spacy.load('en_core_web_sm')
+        nlp = cast(en.English, spacy.load('en_core_web_sm'))
     return Tokenizer(nlp, lemmatize=lemmatize, **kwargs)
 
 
 @dataclasses.dataclass(frozen=True)
-class Vocab:
+class Vocab(serialize.Serializable):
     """A data class that stores tokens and a corresponding tokenizer."""
 
     tokens: Sequence[str]
@@ -211,7 +212,7 @@ UNK_TOKEN = '<unk>'
 
 
 @dataclasses.dataclass(frozen=True)
-class Indexer:
+class Indexer(serialize.Serializable):
     """Maps string text to integer ID sequences."""
 
     vocab: Vocab
@@ -493,6 +494,11 @@ class Indexer:
             return unindexed[0]
 
         return tuple(unindexed)
+
+    @classmethod
+    def recurse(cls):
+        """Override `Serializable.recurse`."""
+        return {'vocab': Vocab, 'tokenize': Tokenizer}
 
 
 def indexer(texts: StrSequence,

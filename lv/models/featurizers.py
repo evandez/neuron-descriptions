@@ -2,6 +2,7 @@
 from typing import Any, Callable, Mapping, Optional, Sequence, Tuple, Union
 
 from lv.ext.torchvision import models
+from lv.utils import serialize
 from lv.utils.typing import Device
 from third_party.netdissect import nethook, renormalize
 
@@ -97,29 +98,13 @@ FeatureSize = int
 FeaturizerConfig = Tuple[FeaturizerFactory, FeaturizerLayers, FeatureSize]
 
 
-class PretrainedPyramidFeaturizer(Featurizer):
+class PretrainedPyramidFeaturizer(Featurizer, serialize.SerializableModule):
     """Map images and masks to a pyramid of masked convolutional features.
 
     Images are fed to a pretrained image classifier trained on ImageNet.
     The convolutional features from each layer are then masked using the
     downsampled mask, pooled, and stacked to create a feature vector.
     """
-
-    @staticmethod
-    def configs() -> Mapping[str, FeaturizerConfig]:
-        """Return the support configs mapped to their names."""
-        return {
-            'alexnet': (
-                models.alexnet_seq,
-                ('conv1', 'conv2', 'conv3', 'conv4', 'conv5'),
-                1152,
-            ),
-            'resnet18': (
-                models.resnet18_seq,
-                ('conv1', 'layer1', 'layer2', 'layer3', 'layer4'),
-                1024,
-            ),
-        }
 
     def __init__(self, config: str = 'resnet18', **kwargs: Any):
         """Initialize the featurizer.
@@ -139,10 +124,12 @@ class PretrainedPyramidFeaturizer(Featurizer):
         if config not in configs:
             raise ValueError(f'featurizer not supported: {config}')
 
-        factory, layers, feature_size = configs[config]
+        self.config = config
+        self.kwargs = kwargs
+        self.kwargs.setdefault('pretrained', True)
 
-        kwargs.setdefault('pretrained', True)
-        self.featurizer = nethook.InstrumentedModel(factory(**kwargs))
+        factory, layers, feature_size = configs[config]
+        self.featurizer = nethook.InstrumentedModel(factory(**self.kwargs))
         self.featurizer.retain_layers(layers)
         self.featurizer.eval()
 
@@ -202,3 +189,42 @@ class PretrainedPyramidFeaturizer(Featurizer):
             masked.append(mfs)
 
         return torch.cat(masked, dim=-1)
+
+    def properties(self,
+                   state_dict: bool = False,
+                   **kwargs: Any) -> Mapping[str, Any]:
+        """Return serializable values for the module.
+
+        Usually, we do not need to save module parameters because the
+        featurizer is pretrained. Hence `state_dict` defaults to False.
+
+        Keyword arguments are forwarded to `torch.nn.Module.state_dict`.
+
+        Args:
+            state_dict (bool, optional): If set, include state_dict in
+                properties. Defaults to False.
+
+        Returns:
+            Mapping[str, Any]: Model properties.
+
+        """
+        assert 'state_dict' not in self.kwargs, 'state_dict parameter?'
+        properties = dict(super().properties(state_dict=state_dict, **kwargs))
+        properties.update({'config': self.config, **self.kwargs})
+        return properties
+
+    @staticmethod
+    def configs() -> Mapping[str, FeaturizerConfig]:
+        """Return the support configs mapped to their names."""
+        return {
+            'alexnet': (
+                models.alexnet_seq,
+                ('conv1', 'conv2', 'conv3', 'conv4', 'conv5'),
+                1152,
+            ),
+            'resnet18': (
+                models.resnet18_seq,
+                ('conv1', 'layer1', 'layer2', 'layer3', 'layer4'),
+                1024,
+            ),
+        }

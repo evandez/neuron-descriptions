@@ -4,7 +4,7 @@ from typing import (Any, Mapping, Optional, Sequence, Tuple, Type, TypeVar,
                     overload)
 
 from lv.models import featurizers
-from lv.utils import lang, training
+from lv.utils import lang, serialize, training
 from lv.utils.typing import Device
 
 import numpy
@@ -73,22 +73,29 @@ class WordAnnotations:
 WordAnnotatorT = TypeVar('WordAnnotatorT', bound='WordAnnotator')
 
 
-class WordAnnotator(nn.Module):
+class WordAnnotator(serialize.SerializableModule):
     """Predicts words that would appear in the caption of masked images."""
 
-    def __init__(self, indexer: lang.Indexer,
+    def __init__(self,
+                 indexer: lang.Indexer,
                  featurizer: featurizers.Featurizer,
-                 classifier: WordClassifierHead):
+                 classifier: Optional[WordClassifierHead] = None):
         """Initialize the model.
 
         Args:
             featurizer (featurizers.Featurizer): Model mapping images and masks
                 to visual features.
             indexer (lang.Indexer): Indexer mapping words to indices.
-            classifier (WordClassifierHead): The classification head.
+            classifier (Optional[WordClassifierHead], optional): The
+                classification head. If not specified, new one is initialized.
 
         """
         super().__init__()
+
+        if classifier is None:
+            feature_size = numpy.prod(featurizer.feature_shape).item()
+            vocab_size = len(indexer.vocab)
+            classifier = WordClassifierHead(feature_size, vocab_size)
 
         self.indexer = indexer
         self.featurizer = featurizer
@@ -271,6 +278,37 @@ class WordAnnotator(nn.Module):
             indices.extend(prediction.indices)
 
         return WordAnnotations(probabilities, tuple(words), tuple(indices))
+
+    def properties(self, **kwargs):
+        """Override `Serializable.properties`."""
+        properties = super().properties(**kwargs)
+        properties['indexer'] = self.indexer
+
+        # If the featurizer is serializable, remove its parameters from the
+        # state dict and serialize instead. We only have one Serializable
+        # featurizer type, so just check for that.
+        featurizer = self.featurizer
+        if isinstance(featurizer, featurizers.PretrainedPyramidFeaturizer):
+            state_dict = properties.get('state_dict', {})
+            for key in state_dict:
+                if key.startswith('featurizer.'):
+                    del state_dict[key]
+            assert isinstance(featurizer, serialize.Serializable)
+            properties['featurizer'] = featurizer
+
+        return properties
+
+    @classmethod
+    def recurse(cls):
+        """Override `Serializable.recurse`."""
+        return {
+            'indexer': lang.Indexer,
+            # This class will only support deserializing
+            # PretrainedPyramidFeaturizer. This is a limitation of our
+            # serialization method: each class can only be deserialized in
+            # one way.
+            'featurizer': featurizers.PretrainedPyramidFeaturizer,
+        }
 
     @classmethod
     def fit(cls: Type[WordAnnotatorT],
