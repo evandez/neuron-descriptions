@@ -393,10 +393,8 @@ class WordAnnotator(serialize.SerializableModule):
         targets_loader = data.DataLoader(data.TensorDataset(targets),
                                          batch_size=batch_size)
 
-        feature_size = numpy.prod(featurizer.feature_shape).item()
-        vocab_size = len(indexer.vocab)
-        model = WordClassifierHead(feature_size, vocab_size).to(device)
-        classifier = model.classifier
+        model = cls(indexer, featurizer).to(device)
+        classifier = model.classifier.classifier
 
         optimizer = optimizer_t(classifier.parameters(), **optimizer_kwargs)
 
@@ -415,7 +413,7 @@ class WordAnnotator(serialize.SerializableModule):
         for _ in progress:
             train_loss = 0.
             for (inputs,), (targets,) in zip(features_loader, targets_loader):
-                inputs = inputs.view(*inputs.shape[:2], feature_size)
+                inputs = inputs.view(*inputs.shape[:2], -1)
                 targets = targets[:, None, :].expand(-1, inputs.shape[1], -1)
 
                 predictions = classifier(inputs)
@@ -433,4 +431,4 @@ class WordAnnotator(serialize.SerializableModule):
             if stopper(train_loss):
                 break
 
-        return cls(indexer, featurizer, model)
+        return model
