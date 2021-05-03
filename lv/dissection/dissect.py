@@ -3,6 +3,7 @@ import pathlib
 import shutil
 from typing import Any, Callable, Optional
 
+from lv.dissection import transforms
 from lv.ext.netdissect import imgviz
 from lv.utils.typing import Device, Layer, PathLike, TensorPair
 from third_party.netdissect import imgsave, nethook, pbar, renormalize, tally
@@ -169,11 +170,14 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
         shutil.copy(lightbox_file, unit_lightbox_file)
 
 
-def discriminative(model: nn.Module,
-                   dataset: data.Dataset,
-                   device: Optional[Device] = None,
-                   results_dir: Optional[PathLike] = None,
-                   **kwargs: Any) -> None:
+def discriminative(
+        model: nn.Module,
+        dataset: data.Dataset,
+        device: Optional[Device] = None,
+        results_dir: Optional[PathLike] = None,
+        transform_inputs: transforms.TransformToTuple = transforms.first,
+        transform_outputs: transforms.TransformToTensor = transforms.identity,
+        **kwargs: Any) -> None:
     """Run dissection on a discriminative model.
 
     That is, a model for which image goes in, prediction comes out. Its outputs
@@ -189,21 +193,32 @@ def discriminative(model: nn.Module,
             device. Defaults to None.
         results_dir (PathLike, optional): Directory to write results to.
             Defaults to same as `run`.
+        transform_inputs (transforms.TransformToTuple, optional): Pass batch
+            as *args to this function and use output as *args to model.
+            Defaults to identity, i.e. entire batch is passed to model.
+        transform_outputs (transforms.TransformToTensor, optional): Pass output
+            of entire model, i.e. the activations, to this function and hand
+            result to netdissect. Defaults to identity function, i.e. the raw
+            data will be tracked by netdissect.
 
     """
     model.to(device)
 
-    def compute_topk_and_quantile(images: torch.Tensor, *_: Any) -> TensorPair:
+    def compute_topk_and_quantile(*inputs: Any) -> TensorPair:
+        inputs = transforms.map_location(transform_inputs(*inputs), device)
         with torch.no_grad():
-            outputs = model(images.to(device))
+            outputs = model(*inputs)
+        outputs = transform_outputs(outputs)
         batch_size, channels, *_ = outputs.shape
         activations = outputs.permute(0, 2, 3, 1).reshape(-1, channels)
         pooled, _ = outputs.view(batch_size, channels, -1).max(dim=2)
         return pooled, activations
 
-    def compute_activations(images: torch.Tensor, *_: Any) -> torch.Tensor:
+    def compute_activations(*inputs: Any) -> torch.Tensor:
+        inputs = transform_inputs(*inputs)
         with torch.no_grad():
-            outputs = model(images.to(device))
+            outputs = model(*inputs)
+        outputs = transform_outputs(outputs)
         return outputs
 
     run(compute_topk_and_quantile,
@@ -246,12 +261,16 @@ def sequential(model: nn.Sequential,
     discriminative(model, dataset, results_dir=results_dir, **kwargs)
 
 
-def generative(model: nn.Sequential,
-               dataset: data.Dataset,
-               layer: Layer,
-               device: Optional[Device] = None,
-               results_dir: Optional[PathLike] = None,
-               **kwargs: Any) -> None:
+def generative(
+        model: nn.Sequential,
+        dataset: data.Dataset,
+        layer: Layer,
+        device: Optional[Device] = None,
+        results_dir: Optional[PathLike] = None,
+        transform_inputs: transforms.TransformToTuple = transforms.identities,
+        transform_hiddens: transforms.TransformToTensor = transforms.identity,
+        transform_outputs: transforms.TransformToTensor = transforms.identity,
+        **kwargs: Any) -> None:
     """Run dissection on a generative model of images.
 
     That is, a model for which representation goes in, image comes out.
@@ -273,6 +292,19 @@ def generative(model: nn.Sequential,
         results_dir (PathLike, optional): Directory to write results to.
             If set, layer name will be appended to path. Defaults to same
             as `run`.
+        transform_inputs (transforms.TransformToTuple, optional): Pass batch
+            as *args to this function and use output as *args to model.
+            Defaults to identity, i.e. entire batch is passed to model.
+        transform_hiddens (transforms.TransformToTensor, optional): Pass output
+            of intermediate layer to this function and hand the result to
+            netdissect. This is useful if e.g. your model passes info between
+            layers as a dictionary or other non-Tensor data type.
+            Defaults to the identity function, i.e. the raw data will be
+            tracked by netdissect.
+        transform_outputs (transforms.TransformToTensor, optional): Pass output
+            of entire model, i.e. generated images, to this function and hand
+            result to netdissect. Defaults to identity function, i.e. the raw
+            data will be tracked by netdissect.
 
     """
     if results_dir is not None:
@@ -282,19 +314,23 @@ def generative(model: nn.Sequential,
     with nethook.InstrumentedModel(model) as instrumented:
         instrumented.retain_layer(layer)
 
-        def compute_topk_and_quantile(zs: torch.Tensor, *_: Any) -> TensorPair:
+        def compute_topk_and_quantile(*inputs: Any) -> TensorPair:
+            inputs = transforms.map_location(transform_inputs(*inputs), device)
             with torch.no_grad():
-                model(zs.to(device))
-            output = instrumented.retained_layer(layer)
-            batch_size, channels, *_ = output.shape
-            activations = output.permute(0, 2, 3, 1).reshape(-1, channels)
-            pooled, _ = output.view(batch_size, channels, -1).max(dim=2)
+                model(*inputs)
+            hiddens = transform_hiddens(instrumented.retained_layer(layer))
+            batch_size, channels, *_ = hiddens.shape
+            activations = hiddens.permute(0, 2, 3, 1).reshape(-1, channels)
+            pooled, _ = hiddens.view(batch_size, channels, -1).max(dim=2)
             return pooled, activations
 
-        def compute_activations(zs: torch.Tensor, *_: Any) -> TensorPair:
+        def compute_activations(*inputs: Any) -> TensorPair:
+            inputs = transform_inputs(*inputs)
             with torch.no_grad():
-                images = model(zs.to(device))
-            return instrumented.retained_layer(layer), images
+                images = model(*inputs)
+            hiddens = transform_hiddens(instrumented.retained_layer(layer))
+            images = transform_outputs(images)
+            return hiddens, images
 
         run(compute_topk_and_quantile,
             compute_activations,
