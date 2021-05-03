@@ -3,7 +3,8 @@ import dataclasses
 from typing import Any, Iterable, Mapping, Optional, Tuple
 
 from lv import zoo
-from lv.dissection import transforms as lvtf
+from lv.dissection import datasets as lv_datasets
+from lv.dissection import transforms as lv_transforms
 from lv.ext.pretorched.gans import biggan
 from lv.ext.torchvision import models
 from lv.utils.typing import Layer
@@ -24,6 +25,7 @@ KEY_BIGGAN = 'biggan'
 
 KEY_IMAGENET = 'imagenet'
 KEY_PLACES365 = 'places365'
+KEY_BIGGAN_ZS = 'biggan-zs'
 
 LAYERS_ALEXNET = ('conv1', 'conv2', 'conv3', 'conv4', 'conv5')
 LAYERS_RESNET18 = ('conv1', 'layer1', 'layer2', 'layer3', 'layer4')
@@ -38,9 +40,9 @@ class ModelDissectionConfig:
     """Dissection configuration for a model."""
 
     generative: bool = False
-    transform_inputs: Optional[lvtf.TransformToTuple] = None
-    transform_hiddens: Optional[lvtf.TransformToTensor] = None
-    transform_outputs: Optional[lvtf.TransformToTensor] = None
+    transform_inputs: Optional[lv_transforms.TransformToTuple] = None
+    transform_hiddens: Optional[lv_transforms.TransformToTensor] = None
+    transform_outputs: Optional[lv_transforms.TransformToTensor] = None
 
     def __post_init__(self) -> None:
         """Validate the config."""
@@ -173,6 +175,8 @@ def dissection_datasets() -> zoo.DatasetConfigs:
                                   transforms.CenterCrop(224),
                                   transforms.ToTensor()
                               ])),
+        KEY_BIGGAN_ZS:
+            zoo.DatasetConfig(lv_datasets.TensorDatasetOnDisk),
     }
 
 
