@@ -16,8 +16,8 @@ def __getattr__(name):
 
 
 @dataclasses.dataclass(frozen=True)
-class GInitDataBag:
-    """Wraps inputs for SeqGInit."""
+class GInputs:
+    """Wraps inputs for sequential BigGAN."""
 
     # Follow naming conventions from pretorched.
     z: torch.Tensor
@@ -34,8 +34,8 @@ class GBlockDataBag:
     ys: Sequence[torch.Tensor]
 
 
-class SeqGInit(nn.Module):
-    """Module that wraps all initialization steps of BigGAN."""
+class SeqGPreprocess(nn.Module):
+    """Module that wraps all preprocessing steps of BigGAN."""
 
     def __init__(self, generator: biggan.Generator):
         """Wrap the preprocessing steps of the given generator.
@@ -47,15 +47,15 @@ class SeqGInit(nn.Module):
         super().__init__()
         self.generator = generator
 
-    def forward(self, inputs: GInitDataBag) -> GBlockDataBag:
+    def forward(self, inputs: GInputs) -> GBlockDataBag:
         """Perform initialization steps for BigGAN generator.
 
         This includes preprocessing z/ys before handing them to GBlock modules.
         Mostly just copied from pretorched.
 
         Args:
-            inputs (GInitDataBag): Generator inputs, i.e. z and y, plus some
-                other options.
+            inputs (GInputs): Generator inputs, i.e. z and y, plus
+                some other options.
 
         Returns:
             GBlockDataBag: Inputs for the first GBlock.
@@ -108,12 +108,38 @@ class SeqGBlock(nn.Module):
         return GBlockDataBag(h, ys)
 
 
+class SeqGOutput(nn.Module):
+    """Wraps the output layer of BigGAN."""
+
+    def __init__(self, generator: biggan.Generator):
+        """Wrap the given BigGAN generator.
+
+        Args:
+            generator (biggan.Generator): BigGAN generator.
+
+        """
+        super().__init__()
+        self.generator = generator
+
+    def forward(self, inputs: GBlockDataBag) -> torch.Tensor:
+        """Transform the block outputs into images.
+
+        Args:
+            inputs (GBlockDataBag): Outputs from the last GBlock.
+
+        Returns:
+            torch.Tensor: The generated images.
+
+        """
+        return torch.tanh(self.generator.output_layer(inputs.h))
+
+
 def SeqBigGAN(*args: Any, **kwargs: Any) -> nn.Sequential:
     """Return BigGAN as a sequential."""
     generator = biggan.BigGAN(*args, **kwargs)
 
     modules: List[Tuple[str, nn.Module]] = [
-        ('preprocess', SeqGInit(generator)),
+        ('preprocess', SeqGPreprocess(generator)),
     ]
     for index, blocks in enumerate(generator.blocks):
         assert len(blocks) <= 2, 'should never be more than 2 blocks'
@@ -125,5 +151,6 @@ def SeqBigGAN(*args: Any, **kwargs: Any) -> nn.Sequential:
                 key = 'attn'
             key += str(index)
             modules.append((key, SeqGBlock(block, index)))
+    modules.append(('output', SeqGOutput(generator)))
 
     return nn.Sequential(collections.OrderedDict(modules))
