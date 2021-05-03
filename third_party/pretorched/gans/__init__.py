@@ -9,7 +9,7 @@ from .biggan_deep import BigGANDeep
 
 try:
     from .stylegan2 import stylegan2
-except RuntimeError:
+except EnvironmentError:
     stylegan2 = None
     print('Warning: could not compile cuda code for stylegan2')
     print('Ensure $CUDA_HOME/bin/nvcc exists!')
