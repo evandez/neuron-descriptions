@@ -4,6 +4,7 @@ from typing import Any, Iterable, Mapping, Optional, Tuple
 
 from lv import zoo
 from lv.dissection import transforms as lvtf
+from lv.ext.pretorched.gans import biggan
 from lv.ext.torchvision import models
 from lv.utils.typing import Layer
 from third_party import alexnet
@@ -19,15 +20,17 @@ MODEL_FILE_PLACES = 'iter_131072_weights.pth'
 KEY_ALEXNET = 'alexnet'
 KEY_RESNET18 = 'resnet18'
 KEY_VGG_16 = 'vgg16'
+KEY_BIGGAN = 'biggan'
 
 KEY_IMAGENET = 'imagenet'
 KEY_PLACES365 = 'places365'
 
-CONV_LAYERS_ALEXNET = ('conv1', 'conv2', 'conv3', 'conv4', 'conv5')
-CONV_LAYER_RESNET18 = ('conv1', 'layer1', 'layer2', 'layer3', 'layer4')
-CONV_LAYERS_VGG16 = ('conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv3_1',
-                     'conv3_2', 'conv3_3', 'conv4_1', 'conv4_2', 'conv4_3',
-                     'conv5_1', 'conv5_2', 'conv5_3')
+LAYERS_ALEXNET = ('conv1', 'conv2', 'conv3', 'conv4', 'conv5')
+LAYERS_RESNET18 = ('conv1', 'layer1', 'layer2', 'layer3', 'layer4')
+LAYERS_VGG16 = ('conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv3_1',
+                'conv3_2', 'conv3_3', 'conv4_1', 'conv4_2', 'conv4_3',
+                'conv5_1', 'conv5_2', 'conv5_3')
+LAYERS_BIGGAN = ('layer0', 'layer1', 'layer2', 'layer3', 'layer4', 'layer5')
 
 
 @dataclasses.dataclass(frozen=True)
@@ -38,6 +41,11 @@ class ModelDissectionConfig:
     transform_inputs: Optional[lvtf.TransformToTuple] = None
     transform_hiddens: Optional[lvtf.TransformToTensor] = None
     transform_outputs: Optional[lvtf.TransformToTensor] = None
+
+    def __post_init__(self) -> None:
+        """Validate the config."""
+        if not self.generative and self.transform_hiddens is not None:
+            raise ValueError('can only set transform_hiddens if generative')
 
     @property
     def kwargs(self) -> Mapping[str, Any]:
@@ -79,42 +87,68 @@ def dissection_models() -> ModelConfigs:
                 ModelConfig(models.alexnet_seq,
                             pretrained=True,
                             load_weights=False,
-                            layers=CONV_LAYERS_ALEXNET),
+                            layers=LAYERS_ALEXNET),
             KEY_PLACES365:
                 ModelConfig(
                     alexnet.AlexNet,
                     url=f'{MODEL_HOST}/alexnet/places/{MODEL_FILE_PLACES}',
                     transform_weights=lambda weights: weights['state_dict'],
-                    layers=CONV_LAYERS_ALEXNET)
+                    layers=LAYERS_ALEXNET)
         },
         KEY_RESNET18: {
             KEY_IMAGENET:
                 ModelConfig(models.resnet18_seq,
                             pretrained=True,
                             load_weights=False,
-                            layers=CONV_LAYER_RESNET18),
+                            layers=LAYERS_RESNET18),
             KEY_PLACES365:
                 ModelConfig(
                     models.resnet18_seq,
                     num_classes=365,
                     url=f'{MODEL_HOST}/resnet18/places/{MODEL_FILE_PLACES}',
                     transform_weights=lambda weights: weights['state_dict'],
-                    layers=CONV_LAYER_RESNET18),
+                    layers=LAYERS_RESNET18),
         },
         KEY_VGG_16: {
             KEY_IMAGENET:
                 ModelConfig(models.vgg16_seq,
                             pretrained=True,
                             load_weights=False,
-                            layers=CONV_LAYERS_VGG16),
+                            layers=LAYERS_VGG16),
             KEY_PLACES365:
                 ModelConfig(
                     models.vgg16_seq,
                     num_classes=365,
                     url=f'{MODEL_HOST}/vgg16/places/{MODEL_FILE_PLACES}',
                     transform_weights=lambda weights: weights['state_dict'],
-                    layers=CONV_LAYERS_VGG16),
+                    layers=LAYERS_VGG16),
         },
+        KEY_BIGGAN: {
+            KEY_IMAGENET:
+                ModelConfig(
+                    biggan.SeqBigGAN,
+                    pretrained='imagenet',
+                    load_weights=False,
+                    layers=LAYERS_BIGGAN,
+                    dissection=ModelDissectionConfig(
+                        generative=True,
+                        transform_inputs=lambda *xs: (biggan.GInputs(*xs),),
+                        transform_hiddens=lambda hiddens: hiddens.h,
+                    ),
+                ),
+            KEY_PLACES365:
+                ModelConfig(
+                    biggan.SeqBigGAN,
+                    pretrained='places365',
+                    load_weights=False,
+                    layers=LAYERS_BIGGAN,
+                    dissection=ModelDissectionConfig(
+                        generative=True,
+                        transform_inputs=lambda *xs: (biggan.GInputs(*xs),),
+                        transform_hiddens=lambda hiddens: hiddens.h,
+                    ),
+                ),
+        }
     }
 
 

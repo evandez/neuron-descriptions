@@ -632,7 +632,7 @@ model_urls = {
 }
 
 
-def BigGAN(resolution=256, pretrained='imagenet', load_ema=True, tfhub=True, ch=128):
+def BigGAN(resolution=256, pretrained='imagenet', load_ema=True, tfhub=True, ch=128, device=None):
 
     if resolution == 128:
         # Set default for now.
@@ -662,7 +662,7 @@ def BigGAN(resolution=256, pretrained='imagenet', load_ema=True, tfhub=True, ch=
 
     if tfhub and pretrained == 'imagenet':
         url = tfhub_urls[pretrained][resolution]
-        weights = torch.hub.load_state_dict_from_url(url)
+        weights = torch.hub.load_state_dict_from_url(url, map_location=device)
         G = Generator(**config)
         G.load_state_dict(weights, strict=False)
         G.eval()
@@ -670,8 +670,8 @@ def BigGAN(resolution=256, pretrained='imagenet', load_ema=True, tfhub=True, ch=
     elif pretrained is not None:
         url = model_urls[pretrained][resolution][ch][version]
         sd_url = model_urls[pretrained][resolution][ch]['state_dict']
-        weights = torch.hub.load_state_dict_from_url(url)
-        state_dict = torch.hub.load_state_dict_from_url(sd_url)
+        weights = torch.hub.load_state_dict_from_url(url, map_location=device)
+        state_dict = torch.hub.load_state_dict_from_url(sd_url, map_location=device)
         G = Generator(**state_dict['config'])
         G.load_state_dict(weights, strict=False)
         G.eval()
