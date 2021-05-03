@@ -101,6 +101,16 @@ class WordAnnotator(serialize.SerializableModule):
         self.featurizer = featurizer
         self.classifier = classifier
 
+    @property
+    def feature_size(self) -> int:
+        """Return feature size."""
+        return self.classifier.classifier.in_features
+
+    @property
+    def vocab_size(self) -> int:
+        """Return vocab size."""
+        return self.classifier.classifier.out_features
+
     @overload
     def forward(self,
                 images: torch.Tensor,

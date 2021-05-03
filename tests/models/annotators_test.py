@@ -55,6 +55,16 @@ def word_annotator(indexer, featurizer, word_classifier_head):
     return annotators.WordAnnotator(indexer, featurizer, word_classifier_head)
 
 
+def test_word_annotator_feature_size(word_annotator):
+    """Test WordAnnotator.feature_size returns correct size."""
+    assert word_annotator.feature_size == local.FEATURE_SIZE
+
+
+def test_word_annotator_vocab_size(word_annotator):
+    """Test WordAnnotator.vocab_size returns correct size."""
+    assert word_annotator.vocab_size == len(VOCAB)
+
+
 @pytest.fixture
 def images(top_image_tensors):
     """Return fake images for testing."""
