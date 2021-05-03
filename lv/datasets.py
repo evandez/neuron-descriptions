@@ -90,11 +90,9 @@ class TopImagesDataset(data.Dataset):
         self.layers = layers = tuple(sorted(layers))
         self.device = device
 
-        self.renormalizer = renormalize.renormalizer(source='byte',
-                                                     target='pt')
-
-        images_by_layer = {}
-        masks_by_layer = {}
+        self.images_by_layer = images_by_layer = {}
+        self.masks_by_layer = masks_by_layer = {}
+        renormalizer = renormalize.renormalizer(source='byte', target='pt')
         for layer in tqdm.tqdm(layers) if display_progress else layers:
             images_file = root / layer / 'images.npy'
             masks_file = root / layer / 'masks.npy'
@@ -124,15 +122,15 @@ class TopImagesDataset(data.Dataset):
 
             shape = images.shape
             images = images.view(-1, *shape[2:])
-            images = self.renormalizer(images)
+            images = renormalizer(images)
             images = images.view(*shape)
 
             if device is not None:
                 images = images.to(device)
                 masks = masks.to(device)
 
-            images_by_layer[layer] = images
-            masks_by_layer[layer] = masks
+            self.images_by_layer[layer] = images
+            self.masks_by_layer[layer] = masks
 
         self.samples = []
         for layer in layers:
@@ -154,17 +152,31 @@ class TopImagesDataset(data.Dataset):
             TopImages: The sample.
 
         """
-        sample = self.samples[index]
-        if self.device is not None:
-            sample = TopImages(layer=sample.layer,
-                               unit=sample.unit,
-                               images=sample.images.to(self.device),
-                               masks=sample.masks.to(self.device))
-        return sample
+        return self.samples[index]
 
     def __len__(self) -> int:
         """Return the number of samples in the dataset."""
         return len(self.samples)
+
+    def lookup(self, layer: str, unit: int) -> TopImages:
+        """Lookup top images for given layer and unit.
+
+        Args:
+            layer (str): The layer name.
+            unit (int): The unit number.
+
+        Returns:
+            TopImages: The top images.
+
+        """
+        if layer not in self.images_by_layer:
+            raise KeyError(f'layer "{layer}" does not exist')
+        if unit >= len(self.images_by_layer[layer]):
+            raise KeyError(f'layer "{layer}" has no unit {unit}')
+        return TopImages(layer=layer,
+                         unit=unit,
+                         images=self.images_by_layer[layer][unit],
+                         masks=self.masks_by_layer[layer][unit])
 
     @property
     def k(self) -> int:

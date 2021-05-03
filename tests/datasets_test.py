@@ -147,6 +147,37 @@ def test_top_images_dataset_len(top_images_dataset):
     assert len(top_images_dataset) == conftest.N_SAMPLES
 
 
+def test_top_images_dataset_lookup(top_images_dataset, top_image_tensors,
+                                   top_image_masks):
+    """Test TopImagesDataset.lookup finds correct layer and unit."""
+    for layer_index in range(conftest.N_LAYERS):
+        layer = conftest.layer(layer_index)
+        for unit in range(conftest.N_UNITS_PER_LAYER):
+            actual = top_images_dataset.lookup(layer, unit)
+            assert actual.layer == layer
+            assert actual.unit == unit
+            assert actual.images.allclose(
+                top_image_tensors[layer_index][unit] / 255, atol=1e-3)
+            assert actual.masks.equal(
+                top_image_masks[layer_index][unit].float())
+
+
+@pytest.mark.parametrize('layer,unit,error_pattern', (
+    ('layer-10000', 0, '.*"layer-10000" does not exist.*'),
+    ('layer-0', 100000, '.*unit 100000.*'),
+))
+def test_top_images_dataset_lookup_bad_key(top_images_dataset, layer, unit,
+                                           error_pattern):
+    """Test TopImagesDataset.lookup dies when given a bad key."""
+    with pytest.raises(KeyError, match=error_pattern):
+        top_images_dataset.lookup(layer, unit)
+
+
+def test_top_images_dataset_k(top_images_dataset):
+    """Test TopImagesDataset.k returns number of top images."""
+    assert top_images_dataset.k == conftest.N_TOP_IMAGES_PER_UNIT
+
+
 @pytest.fixture
 def annotated_top_images(top_images):
     """Return AnnotatedTopImages for testing."""
