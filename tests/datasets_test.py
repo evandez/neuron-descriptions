@@ -1,5 +1,4 @@
 """Unit tests for the lv/datasets module."""
-import csv
 import shutil
 
 from tests import conftest
@@ -159,70 +158,6 @@ def test_annotated_top_images_as_pil_image_grid(annotated_top_images, opacity):
     """Test AnnotatedTopImages.as_pil_image_grid returns PIL image."""
     actual = annotated_top_images.as_pil_image_grid(opacity=opacity)
     assert isinstance(actual, Image.Image)
-
-
-@pytest.mark.parametrize('validate', (False, True))
-def test_annotated_top_images_init_validate_top_image_annotated(
-        top_images_root, top_images_annotations_csv_file, validate):
-    """Test AnnotatedTopImagesDataset.__init__ validates correctly."""
-    with top_images_annotations_csv_file.open('r') as handle:
-        rows = list(csv.reader(handle))
-    with top_images_annotations_csv_file.open('w') as handle:
-        writer = csv.writer(handle)
-        writer.writerows(rows[:-1])
-
-    if validate:
-        with pytest.raises(ValueError, match='validate_top_image_annotated'):
-            datasets.AnnotatedTopImagesDataset(
-                top_images_root,
-                annotations_csv_file=top_images_annotations_csv_file,
-                layer_column=conftest.LAYER_COLUMN,
-                unit_column=conftest.UNIT_COLUMN,
-                annotation_column=conftest.ANNOTATION_COLUMN,
-                validate_top_image_annotated=True)
-    else:
-        dataset = datasets.AnnotatedTopImagesDataset(
-            top_images_root,
-            annotations_csv_file=top_images_annotations_csv_file,
-            layer_column=conftest.LAYER_COLUMN,
-            unit_column=conftest.UNIT_COLUMN,
-            annotation_column=conftest.ANNOTATION_COLUMN,
-            validate_top_image_annotated=False)
-        assert dataset[-1].annotations == ()
-
-
-@pytest.mark.parametrize('validate', (False, True))
-def test_annotated_top_images_init_validate_top_image_annotatation_counts(
-        top_images_root, top_images_annotations_csv_file, validate):
-    """Test AnnotatedTopImagesDataset.__init__ validates correctly."""
-    with top_images_annotations_csv_file.open('r') as handle:
-        rows = list(csv.reader(handle))
-    annotation = 'another annotation!'
-    rows.append([conftest.layer(0), 0, annotation])
-    with top_images_annotations_csv_file.open('w') as handle:
-        writer = csv.writer(handle)
-        writer.writerows(rows)
-
-    if validate:
-        with pytest.raises(ValueError,
-                           match='validate_top_image_annotation_counts'):
-            datasets.AnnotatedTopImagesDataset(
-                top_images_root,
-                annotations_csv_file=top_images_annotations_csv_file,
-                layer_column=conftest.LAYER_COLUMN,
-                unit_column=conftest.UNIT_COLUMN,
-                annotation_column=conftest.ANNOTATION_COLUMN,
-                validate_top_image_annotation_counts=True)
-    else:
-        dataset = datasets.AnnotatedTopImagesDataset(
-            top_images_root,
-            annotations_csv_file=top_images_annotations_csv_file,
-            layer_column=conftest.LAYER_COLUMN,
-            unit_column=conftest.UNIT_COLUMN,
-            annotation_column=conftest.ANNOTATION_COLUMN,
-            validate_top_image_annotation_counts=False)
-        assert sorted(dataset[0].annotations) == sorted(
-            (conftest.annotation(0, 0), annotation))
 
 
 def test_annotated_top_images_dataset_getitem(annotated_top_images_dataset,

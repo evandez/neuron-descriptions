@@ -206,8 +206,6 @@ class AnnotatedTopImagesDataset(data.Dataset):
                  layer_column: str = DEFAULT_LAYER_COLUMN,
                  unit_column: str = DEFAULT_UNIT_COLUMN,
                  annotation_column: str = DEFAULT_ANNOTATION_COLUMN,
-                 validate_top_image_annotated: bool = True,
-                 validate_top_image_annotation_counts: bool = True,
                  **kwargs: Any):
         """Initialize the dataset.
 
@@ -223,11 +221,6 @@ class AnnotatedTopImagesDataset(data.Dataset):
                 Defaults to `DEFAULT_UNIT_COLUMN`.
             annotation_column (str, optional): CSV column containing
                 annotation. Defaults to `DEFAULT_ANNOTATION_COLUMN`.
-            validate_top_image_annotated (bool, optional): If set, validate all
-                units have at least one annotation. Defaults to True.
-            validate_top_image_annotation_counts (bool, optional): If set,
-                validate all annotated units have the same number of
-                annotations. Defaults to True.
 
         Raises:
             FileNotFoundError: If annotations CSV file is not found.
@@ -263,23 +256,6 @@ class AnnotatedTopImagesDataset(data.Dataset):
             annotation = row[annotation_column]
             annotations[layer, unit].append(annotation)
         self.annotations = {k: tuple(vs) for k, vs in annotations.items()}
-
-        if validate_top_image_annotated:
-            n_annotated_units = len(self.annotations)
-            n_units = len(self.top_images_dataset)
-            if n_annotated_units != n_units:
-                raise ValueError(f'only {n_annotated_units} of {n_units} '
-                                 'have annotations; set '
-                                 'validate_top_image_annotated=False '
-                                 'to ignore')
-
-        if validate_top_image_annotation_counts:
-            counts = {len(vs) for vs in self.annotations.values()}
-            if len(counts) != 1:
-                raise ValueError(
-                    f'differing annotation counts: {counts}; '
-                    'set validate_top_image_annotation_counts=False '
-                    'to ignore')
 
     def __getitem__(self, index: int) -> AnnotatedTopImages:
         """Return the annotated top images.
