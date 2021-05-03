@@ -3,7 +3,6 @@ import argparse
 import pathlib
 
 from lv.dissection import dissect, zoo
-from third_party.netdissect import pbar
 
 import torch
 
@@ -35,13 +34,22 @@ dataset = zoo.dataset(args.dataset, path=args.dataset_dir)
 layers = args.layers or layers
 assert layers is not None, 'should always be >= 1 layer'
 
-dissect_fn = dissect.generative if config.generative else dissect.sequential
+generative = config.dissection.generative
+kwargs = config.dissection.kwargs
 
 for layer in layers:
-    pbar.post(layer=layer)
-    dissect_fn(  # type: ignore
-        model,
-        dataset,
-        layer=layer,
-        device=device,
-        results_dir=args.results_dir / args.model / args.dataset)
+    results_dir = args.results_dir / args.model / args.dataset
+    if generative:
+        dissect.generative(model,
+                           dataset,
+                           layer=layer,
+                           results_dir=results_dir,
+                           device=device,
+                           **kwargs)
+    else:
+        dissect.sequential(model,
+                           dataset,
+                           layer=layer,
+                           results_dir=results_dir,
+                           device=device,
+                           **kwargs)

@@ -28,7 +28,6 @@ class ModelConfig:
                  factory: Callable[..., nn.Sequential],
                  layers: Optional[Iterable[Layer]] = None,
                  url: Optional[str] = None,
-                 generative: bool = False,
                  load_weights: bool = True,
                  transform_weights: Optional[TransformWeights] = None,
                  **defaults: Any):
@@ -45,8 +44,6 @@ class ModelConfig:
             url (Optional[str], optional): URL hosting pretrained weights.
                 If set and path provided to `load` does not exist, weights
                 will be downloaded. Defaults to None.
-            generative (bool, optional): Set to True if this is a generative
-                model of images. Defaults to False.
             load_weights (bool, optional): If True, attempt to load
                 pretrained weights. Otherwise, model will be immediately
                 returned after instantiation from the factory. Set this to
@@ -61,7 +58,6 @@ class ModelConfig:
         self.defaults = defaults
 
         self.url = url
-        self.generative = generative
         self.layers = layers
         self.load_weights = load_weights
         self.transform_weights = transform_weights
