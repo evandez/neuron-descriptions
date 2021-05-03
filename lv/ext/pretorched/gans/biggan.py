@@ -1,7 +1,6 @@
 """Extensions for pretorched/gans/biggan module."""
 import collections
-import dataclasses
-from typing import Any, List, Sequence, Tuple
+from typing import Any, List, NamedTuple, Sequence, Tuple
 
 from third_party.pretorched.gans import biggan
 from third_party.pretorched import layers
@@ -15,18 +14,15 @@ def __getattr__(name):
     return getattr(biggan, name)
 
 
-@dataclasses.dataclass(frozen=True)
-class GInputs:
+class GInputs(NamedTuple):
     """Wraps inputs for sequential BigGAN."""
 
     # Follow naming conventions from pretorched.
     z: torch.Tensor
     y: torch.Tensor
-    embed: bool = True
 
 
-@dataclasses.dataclass(frozen=True)
-class GBlockDataBag:
+class GBlockDataBag(NamedTuple):
     """Wraps outputs of a single GBlock."""
 
     # Follow naming conventions from pretorched.
@@ -61,12 +57,14 @@ class SeqGPreprocess(nn.Module):
             GBlockDataBag: Inputs for the first GBlock.
 
         """
-        z, y, embed = inputs.z, inputs.y, inputs.embed
-        if embed:
-            if y.ndim > 1:
-                y = y @ self.generator.shared.weight
-            else:
-                y = self.generator.shared(y)
+        z, y = inputs
+
+        # Here's the only difference between this and the original code:
+        # We always embed.
+        if y.ndim > 1:
+            y = y @ self.generator.shared.weight
+        else:
+            y = self.generator.shared(y)
 
         # If hierarchical, concatenate zs and ys
         if self.generator.hier:
