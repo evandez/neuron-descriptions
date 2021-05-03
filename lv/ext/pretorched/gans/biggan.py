@@ -22,7 +22,7 @@ class GInitDataBag:
     # Follow naming conventions from pretorched.
     z: torch.Tensor
     y: torch.Tensor
-    embed: bool = False
+    embed: bool = True
 
 
 @dataclasses.dataclass(frozen=True)
