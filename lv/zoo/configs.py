@@ -21,14 +21,14 @@ def datasets() -> core.DatasetConfigs:
     return {
         'alexnet-imagenet':
             core.DatasetConfig(lv.datasets.TopImagesDataset,
-                               url=f'{HOST}/data/alexnet-imagenet.zip'),
+                               url=f'{HOST}/datasets/alexnet-imagenet.zip'),
         'alexnet-imagenet-annotations':
             core.DatasetConfig(lv.datasets.AnnotatedTopImagesDataset,
-                               url=f'{HOST}/data/alexnet-imagenet.zip'),
+                               url=f'{HOST}/datasets/alexnet-imagenet.zip'),
         'alexnet-places365':
             core.DatasetConfig(lv.datasets.TopImagesDataset,
-                               url=f'{HOST}/data/alexnet-places365.zip'),
+                               url=f'{HOST}/datasets/alexnet-places365.zip'),
         'alexnet-places365-annotations':
             core.DatasetConfig(lv.datasets.AnnotatedTopImagesDataset,
-                               url=f'{HOST}/data/alexnet-places365.zip'),
+                               url=f'{HOST}/datasets/alexnet-places365.zip'),
     }

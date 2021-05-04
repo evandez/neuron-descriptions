@@ -15,7 +15,9 @@ from torch import nn
 from torch.utils import data
 from torchvision import datasets, transforms
 
-LV_HOST = 'https://unitname.csail.mit.edu/dissect/models'
+# TODO(evandez): Migrate to the host below.
+# LV_HOST = 'https://unitname.csail.mit.edu/dissect/models'
+LV_HOST = 'http://wednesday.csail.mit.edu/dez/latent-vocabulary/dissect/models'
 DISSECT_HOST = 'https://dissect.csail.mit.edu/models'
 
 KEY_ALEXNET = 'alexnet'
@@ -26,7 +28,8 @@ KEY_BIGGAN = 'biggan'
 
 KEY_IMAGENET = 'imagenet'
 KEY_PLACES365 = 'places365'
-KEY_BIGGAN_ZS = 'biggan-zs'
+KEY_BIGGAN_ZS_IMAGENET = 'biggan-zs-imagenet'
+KEY_BIGGAN_ZS_PLACES365 = 'biggan-zs-places365'
 
 LAYERS_ALEXNET = ('conv1', 'conv2', 'conv3', 'conv4', 'conv5')
 LAYERS_RESNET18 = ('conv1', 'layer1', 'layer2', 'layer3', 'layer4')
@@ -97,7 +100,7 @@ def dissection_models() -> ModelConfigs:
             KEY_PLACES365:
                 ModelConfig(
                     alexnet.AlexNet,
-                    url=f'{LV_HOST}/iter_131072_weights.pth',
+                    url=f'{LV_HOST}/alexnet-places365.pth',
                     transform_weights=lambda weights: weights['state_dict'],
                     layers=LAYERS_ALEXNET)
         },
@@ -111,7 +114,7 @@ def dissection_models() -> ModelConfigs:
                 ModelConfig(
                     models.resnet18_seq,
                     num_classes=365,
-                    url=f'{LV_HOST}/iter_131072_weights.pth',
+                    url=f'{LV_HOST}/resnet18-places365.pth',
                     transform_weights=lambda weights: weights['state_dict'],
                     layers=LAYERS_RESNET18),
         },
@@ -185,8 +188,12 @@ def dissection_datasets() -> zoo.DatasetConfigs:
                                   transforms.CenterCrop(224),
                                   transforms.ToTensor()
                               ])),
-        KEY_BIGGAN_ZS:
-            zoo.DatasetConfig(lv_datasets.TensorDatasetOnDisk),
+        KEY_BIGGAN_ZS_IMAGENET:
+            zoo.DatasetConfig(lv_datasets.TensorDatasetOnDisk,
+                              url=f'{LV_HOST}/{KEY_BIGGAN_ZS_IMAGENET}.pth'),
+        KEY_BIGGAN_ZS_PLACES365:
+            zoo.DatasetConfig(lv_datasets.TensorDatasetOnDisk,
+                              url=f'{LV_HOST}/{KEY_BIGGAN_ZS_PLACES365}.pth'),
     }
 
 
