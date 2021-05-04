@@ -66,6 +66,25 @@ def resnet18_seq(**kwargs: Any) -> nn.Sequential:
         ]))
 
 
+def resnet152_seq(**kwargs: Any):
+    """Return sequentialized ResNet-152 model from torchvision."""
+    model = models.resnet152(**kwargs)
+    return nn.Sequential(
+        collections.OrderedDict([
+            ('conv1', model.conv1),
+            ('bn1', model.bn1),
+            ('relu', model.relu),
+            ('maxpool', model.maxpool),
+            ('layer1', model.layer1),
+            ('layer2', model.layer2),
+            ('layer3', model.layer3),
+            ('layer4', model.layer4),
+            ('avgpool', model.avgpool),
+            ('flatten', nn.Flatten()),
+            ('fc', model.fc),
+        ]))
+
+
 def vgg16_seq(**kwargs: Any) -> nn.Sequential:
     """Return sequentialized VGG 16-layer."""
     model = models.vgg16(**kwargs)

@@ -30,6 +30,8 @@ KEY_BIGGAN_ZS = 'biggan-zs'
 
 LAYERS_ALEXNET = ('conv1', 'conv2', 'conv3', 'conv4', 'conv5')
 LAYERS_RESNET18 = ('conv1', 'layer1', 'layer2', 'layer3', 'layer4')
+# The ResNet152 layers are integers to be compatible with the Places365
+# version, which does not name its layers.
 LAYERS_RESNET152 = (0, 4, 5, 6, 7)
 LAYERS_VGG16 = ('conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv3_1',
                 'conv3_2', 'conv3_3', 'conv4_1', 'conv4_2', 'conv4_3',
@@ -114,6 +116,11 @@ def dissection_models() -> ModelConfigs:
                     layers=LAYERS_RESNET18),
         },
         KEY_RESNET152: {
+            KEY_IMAGENET:
+                ModelConfig(models.resnet152_seq,
+                            pretrained=True,
+                            load_weights=False,
+                            layers=LAYERS_RESNET152),
             KEY_PLACES365:
                 ModelConfig(
                     resnet152.OldResNet152,
@@ -126,11 +133,6 @@ def dissection_models() -> ModelConfigs:
                 ModelConfig(models.vgg16_seq,
                             pretrained=True,
                             load_weights=False,
-                            layers=LAYERS_VGG16),
-            KEY_PLACES365:
-                ModelConfig(models.vgg16_seq,
-                            num_classes=365,
-                            url=f'{DISSECT_HOST}/vgg16_places365-0bafbc55.pth',
                             layers=LAYERS_VGG16),
         },
         KEY_BIGGAN: {
