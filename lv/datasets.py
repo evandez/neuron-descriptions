@@ -4,7 +4,7 @@ import csv
 import pathlib
 from typing import Any, Iterable, NamedTuple, Optional, Sequence, Union
 
-from lv.utils.typing import PathLike
+from lv.utils.typing import Layer, PathLike
 from third_party.netdissect import renormalize
 
 import numpy
@@ -19,7 +19,7 @@ from torchvision.transforms import functional
 class TopImages(NamedTuple):
     """Top images for a unit."""
 
-    layer: str
+    layer: Layer
     unit: int
     images: torch.Tensor
     masks: torch.Tensor
@@ -55,7 +55,7 @@ class TopImagesDataset(data.Dataset):
 
     def __init__(self,
                  root: PathLike,
-                 layers: Optional[Iterable[str]] = None,
+                 layers: Optional[Iterable[Layer]] = None,
                  device: Optional[Union[str, torch.device]] = None,
                  display_progress: bool = True):
         """Initialize the dataset.
@@ -63,7 +63,7 @@ class TopImagesDataset(data.Dataset):
         Args:
             root (PathLike): Root directory for the dataset. See
                 `dissection.dissect` function for expected format.
-            layers (Optional[Iterable[str]], optional): The layers to load.
+            layers (Optional[Iterable[Layer]], optional): The layers to load.
                 Layer data is assumed to be a subdirectory of the root.
                 By default, all subdirectories of root are treated as layers.
             device (Optional[Union[str, torch.device]], optional): Send all
@@ -82,7 +82,11 @@ class TopImagesDataset(data.Dataset):
         if not root.is_dir():
             raise FileNotFoundError(f'root directory not found: {root}')
         if layers is None:
-            layers = [str(f.name) for f in root.iterdir() if f.is_dir()]
+            layers = [
+                int(f.name) if f.name.isdigit() else f.name
+                for f in root.iterdir()
+                if f.is_dir()
+            ]
         if not layers:
             raise ValueError('no layers given and root has no subdirectories')
 
@@ -94,14 +98,14 @@ class TopImagesDataset(data.Dataset):
         self.masks_by_layer = {}
         renormalizer = renormalize.renormalizer(source='byte', target='pt')
         for layer in tqdm.tqdm(layers) if display_progress else layers:
-            images_file = root / layer / 'images.npy'
-            masks_file = root / layer / 'masks.npy'
+            images_file = root / str(layer) / 'images.npy'
+            masks_file = root / str(layer) / 'masks.npy'
             for file in (images_file, masks_file):
                 if not file.exists():
                     raise FileNotFoundError(f'{layer} is missing {file.name}')
 
-            images = torch.from_numpy(numpy.load(root / layer / 'images.npy'))
-            masks = torch.from_numpy(numpy.load(root / layer / 'masks.npy'))
+            images = torch.from_numpy(numpy.load(images_file))
+            masks = torch.from_numpy(numpy.load(masks_file))
 
             for name, tensor in (('images', images), ('masks', masks)):
                 if tensor.ndimension() != 5:
@@ -159,11 +163,11 @@ class TopImagesDataset(data.Dataset):
         """Return the number of samples in the dataset."""
         return len(self.samples)
 
-    def lookup(self, layer: str, unit: int) -> TopImages:
+    def lookup(self, layer: Layer, unit: int) -> TopImages:
         """Lookup top images for given layer and unit.
 
         Args:
-            layer (str): The layer name.
+            layer (Layer): The layer name.
             unit (int): The unit number.
 
         Raises:
@@ -198,7 +202,7 @@ DEFAULT_ANNOTATIONS_FILE_NAME = 'annotations.csv'
 class AnnotatedTopImages(NamedTuple):
     """Top images and annotation for a unit."""
 
-    layer: str
+    layer: Layer
     unit: int
     images: torch.Tensor
     masks: torch.Tensor
@@ -269,7 +273,8 @@ class AnnotatedTopImagesDataset(data.Dataset):
 
         annotations = collections.defaultdict(list)
         for row in rows:
-            layer = row[layer_column]
+            layer_str = row[layer_column]
+            layer: Layer = int(layer_str) if layer_str.isdigit() else layer_str
             unit = int(row[unit_column])
             annotation = row[annotation_column]
             annotations[layer, unit].append(annotation)
@@ -315,11 +320,11 @@ class AnnotatedTopImagesDataset(data.Dataset):
         """Return the number of samples in the dataset."""
         return len(self.samples)
 
-    def lookup(self, layer: str, unit: int) -> AnnotatedTopImages:
+    def lookup(self, layer: Layer, unit: int) -> AnnotatedTopImages:
         """Lookup annotated top images for given layer and unit.
 
         Args:
-            layer (str): The layer name.
+            layer (Layer): The layer name.
             unit (int): The unit number.
 
         Raises:

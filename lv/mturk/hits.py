@@ -6,20 +6,22 @@ from typing import Callable, Optional, Sequence
 from urllib import request
 
 from lv import datasets
-from lv.utils.typing import PathLike
+from lv.utils.typing import Layer, PathLike
 
 from tqdm.auto import tqdm
 
 
-def generate_hits_csv(dataset: datasets.TopImagesDataset,
-                      csv_file: PathLike,
-                      generate_urls: Callable[[str, int, int], Sequence[str]],
-                      validate_urls: bool = True,
-                      limit: Optional[int] = None,
-                      layer_column: str = 'layer',
-                      unit_column: str = 'unit',
-                      image_url_column_prefix: str = 'image_url_',
-                      display_progress: bool = True) -> None:
+def generate_hits_csv(
+    dataset: datasets.TopImagesDataset,
+    csv_file: PathLike,
+    generate_urls: Callable[[Layer, int, int], Sequence[str]],
+    validate_urls: bool = True,
+    limit: Optional[int] = None,
+    layer_column: str = 'layer',
+    unit_column: str = 'unit',
+    image_url_column_prefix: str = 'image_url_',
+    display_progress: bool = True,
+) -> None:
     """Generate MTurk hits CSV file for the given dataset.
 
     Each (layer, unit) gets its own hit. The CSV will have the format:
@@ -82,7 +84,7 @@ def generate_hits_csv(dataset: datasets.TopImagesDataset,
                 if code != 200:
                     raise ValueError(f'bad url (code {code}): {url}')
 
-        row = [layer, str(unit)]
+        row = [str(layer), str(unit)]
         row += urls
         if len(row) < dataset.k + 2:
             row += [''] * (dataset.k + 2 - len(row))
