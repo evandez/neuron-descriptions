@@ -20,9 +20,15 @@ def datasets() -> core.DatasetConfigs:
     """Return all dataset configs."""
     return {
         'alexnet-imagenet':
+            core.DatasetConfig(lv.datasets.TopImagesDataset,
+                               url=f'{HOST}/data/alexnet-imagenet.zip'),
+        'alexnet-imagenet-annotations':
             core.DatasetConfig(lv.datasets.AnnotatedTopImagesDataset,
                                url=f'{HOST}/data/alexnet-imagenet.zip'),
         'alexnet-places365':
+            core.DatasetConfig(lv.datasets.TopImagesDataset,
+                               url=f'{HOST}/data/alexnet-places365.zip'),
+        'alexnet-places365-annotations':
             core.DatasetConfig(lv.datasets.AnnotatedTopImagesDataset,
                                url=f'{HOST}/data/alexnet-places365.zip'),
     }
