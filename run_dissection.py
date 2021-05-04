@@ -17,9 +17,9 @@ parser.add_argument('--results-dir',
 parser.add_argument('--model-file',
                     type=pathlib.Path,
                     help='path to model weights')
-parser.add_argument('--dataset-dir',
+parser.add_argument('--dataset-path',
                     type=pathlib.Path,
-                    help='path to dataset root')
+                    help='path to dataset')
 parser.add_argument('--cuda', action='store_true', help='use cuda')
 args = parser.parse_args()
 
@@ -35,7 +35,7 @@ kwargs = config.dissection.kwargs
 # TODO(evandez): Yuck, think of a better way to do this.
 dataset = zoo.dataset(
     f'{args.model}-zs-{args.dataset}' if generative else args.dataset,
-    path=args.dataset_dir)
+    path=args.dataset_path)
 
 layers = args.layers or layers
 assert layers is not None, 'should always be >= 1 layer'
