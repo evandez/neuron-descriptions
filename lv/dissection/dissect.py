@@ -314,7 +314,7 @@ def generative(
 
     model.to(device)
     with nethook.InstrumentedModel(model) as instrumented:
-        instrumented.retain_layer(layer)
+        instrumented.retain_layer(layer, detach=False)
 
         def compute_topk_and_quantile(*inputs: Any) -> TensorPair:
             inputs = transform_inputs(*transforms.map_location(inputs, device))
