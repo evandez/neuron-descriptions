@@ -257,7 +257,9 @@ def sequential(model: nn.Sequential,
         results_dir = pathlib.Path(results_dir)
         results_dir /= str(layer) if layer is not None else 'outputs'
     if layer is not None:
-        model = nethook.subsequence(model, last_layer=layer)
+        model = nethook.subsequence(model,
+                                    last_layer=layer,
+                                    share_weights=True)
     discriminative(model, dataset, results_dir=results_dir, **kwargs)
 
 
