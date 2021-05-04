@@ -14,26 +14,31 @@ class Serializable:
     """Mixin that makes an object (loosely) serializable.
 
     Here, serialization means mapping an object to an equivalent dictionary.
-    The object should be reconstructable from that dictionary alone, but it
-    need not be the same as doing `vars(obj)` even though that is the default
-    behavior for this mixin. The object is deserialized by passing them all as
-    keyword arguments to the constructor. Subclasses should override the
-    `properties` method if they want to change what kwargs are passed to the
+    The object should be reconstructable from that dictionary alone, but the
+    serialization procedure need not be the same as doing `vars(obj)` even
+    though that is the default behavior for this mixin.
+
+    The object will be deserialized by passing the entire dictionary as keyword
+    arguments to the constructor. Subclasses should override the `properties`
+    method so that the properties exactly reflect the kwargs required by the
     constructor.
 
     This mixin does recursively serialize some common objects, most notably
-    spacy `Language` objects. It also automaticall serializes `Serializable`
-    fields. IMPORTANTLY: it does *not* automatically deserialize other
-    Serializable objects. For recursive deserialization, you must specify
-    the child types by overriding `Serializable.recurse`. This allows us to not
-    save the type itself with the payload, as that is path-sensitive.
+    spacy `Language` objects. It also automatically serializes any field that
+    inherits from `Serializable`. HOWEVER, it does *not* automatically
+    deserialize other Serializable objects. For recursive deserialization, you
+    must specify the child types by overriding `Serializable.recurse`. By doing
+    it this way, we can avoid saving the type information with the payload,
+    supporting better cross-codebase transfer of the data.
 
-    The use case for this mixin is to prevent saving large objects (built in
-    torch models, spacy pipelines, etc.) and instead save only the information
-    necessary to reconstruct them in a source-agnostic way. In other words,
-    unlike the built in `__getstate__` and `__setstate__` protocols, this
-    tool allows objects to be deserialized even if there path is different from
-    when they are serialized. A useful property when distributing e.g. models!
+    If you don't like this, tough luck. Go use pickle, why don't ya? The use
+    case for this mixin is to get the general serialization behavior of pickle
+    without tying the payloads to this codebase: you can open the payloads
+    anywhere, as they're just dictionaries, and inspect the data yourself or
+    even deserialize the object yourself. This is especially useful for
+    distributing research models, which will be used across many different
+    codebases in settings where the source is heavily, frequently, and
+    indiscriminately modified.
     """
 
     def __init__(self, **_):
@@ -137,7 +142,7 @@ SerializableModuleT = TypeVar('SerializableModuleT',
 class SerializableModule(Serializable, nn.Module):
     """A serializable torch module.
 
-    This superclass provides `save` and `load` functions in addition to the
+    This class provides `save` and `load` functions in addition to the
     `serialize` and `deserialize` functions provided by `Serializable`.
     Additionally, if one of the properties is named `state_dict`, this class
     will call `load_state_dict` on it.
