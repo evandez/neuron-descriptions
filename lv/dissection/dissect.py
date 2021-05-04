@@ -215,7 +215,7 @@ def discriminative(
         return pooled, activations
 
     def compute_activations(*inputs: Any) -> torch.Tensor:
-        inputs = transform_inputs(*inputs)
+        inputs = transforms.map_location(transform_inputs(*inputs), device)
         with torch.no_grad():
             outputs = model(*inputs)
         outputs = transform_outputs(outputs)
@@ -327,7 +327,7 @@ def generative(
             return pooled, activations
 
         def compute_activations(*inputs: Any) -> TensorPair:
-            inputs = transform_inputs(*inputs)
+            inputs = transforms.map_location(transform_inputs(*inputs), device)
             with torch.no_grad():
                 images = model(*inputs)
             hiddens = transform_hiddens(instrumented.retained_layer(layer))
