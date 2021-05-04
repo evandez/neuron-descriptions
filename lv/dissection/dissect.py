@@ -4,9 +4,9 @@ import shutil
 from typing import Any, Callable, Optional
 
 from lv.dissection import transforms
-from lv.ext.netdissect import imgviz, nethook
+from lv.ext.netdissect import imgviz
 from lv.utils.typing import Device, Layer, PathLike, TensorPair
-from third_party.netdissect import imgsave, pbar, renormalize, tally
+from third_party.netdissect import imgsave, nethook, pbar, renormalize, tally
 
 import numpy
 import torch
@@ -258,7 +258,7 @@ def sequential(model: nn.Sequential,
         results_dir /= str(layer) if layer is not None else 'outputs'
     if layer is not None:
         model = nethook.subsequence(model,
-                                    last_layer=layer,
+                                    last_layer=str(layer),
                                     share_weights=True)
     discriminative(model, dataset, results_dir=results_dir, **kwargs)
 
