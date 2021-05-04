@@ -59,6 +59,22 @@ def test_generate_hits_csv(top_images_dataset, csv_file):
     assert actual == expected
 
 
+def test_generate_hits_csv_limit(top_images_dataset, csv_file):
+    """Test generate_hits_csv can limit number of generated HITS."""
+    hits.generate_hits_csv(top_images_dataset,
+                           csv_file,
+                           generate_urls,
+                           limit=2,
+                           display_progress=False,
+                           validate_urls=False)
+
+    with csv_file.open('r') as handle:
+        actuals = list(csv.reader(handle))
+    assert len(actuals) == 3
+    keys = {tuple(actual[:2]) for actual in actuals[1:]}
+    assert len(keys) == 2
+
+
 def test_generate_hits_csv_too_few_urls(top_images_dataset, csv_file):
     """Test generate_hits_csv handles when fewer URLs are returned."""
     urls = ['a', 'b']

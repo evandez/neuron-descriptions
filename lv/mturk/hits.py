@@ -1,6 +1,7 @@
 """Tools for generating MTurk HITS."""
 import csv
 import pathlib
+import random
 from typing import Callable, Optional, Sequence
 from urllib import request
 
@@ -14,6 +15,7 @@ def generate_hits_csv(dataset: datasets.TopImagesDataset,
                       csv_file: PathLike,
                       generate_urls: Callable[[str, int, int], Sequence[str]],
                       validate_urls: bool = True,
+                      limit: Optional[int] = None,
                       layer_column: str = 'layer',
                       unit_column: str = 'unit',
                       image_url_column_prefix: str = 'image_url_',
@@ -36,6 +38,8 @@ def generate_hits_csv(dataset: datasets.TopImagesDataset,
             all URLs.
         validate_urls (bool, optional): If set, make sure all image URLs
             actually open. Defaults to True.
+        limit (Optional[int], optional): Maximum number of units to generate
+            HITS for. Will be sampled at random if set. Defaults to None.
         layer_column (str, optional): Layer column in generated CSV.
             Defaults to 'layer'.
         unit_column (str, optional): Unit column in generated CSV.
@@ -60,6 +64,8 @@ def generate_hits_csv(dataset: datasets.TopImagesDataset,
     ]
 
     samples = dataset.samples
+    if limit is not None and len(samples) > limit:
+        samples = random.sample(samples, k=limit)
     if display_progress:
         samples = tqdm(samples, desc='process samples')
 
