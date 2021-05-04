@@ -205,7 +205,7 @@ def discriminative(
     model.to(device)
 
     def compute_topk_and_quantile(*inputs: Any) -> TensorPair:
-        inputs = transforms.map_location(transform_inputs(*inputs), device)
+        inputs = transform_inputs(*transforms.map_location(inputs, device))
         with torch.no_grad():
             outputs = model(*inputs)
         outputs = transform_outputs(outputs)
@@ -215,7 +215,7 @@ def discriminative(
         return pooled, activations
 
     def compute_activations(*inputs: Any) -> torch.Tensor:
-        inputs = transforms.map_location(transform_inputs(*inputs), device)
+        inputs = transform_inputs(*transforms.map_location(inputs, device))
         with torch.no_grad():
             outputs = model(*inputs)
         outputs = transform_outputs(outputs)
@@ -317,7 +317,7 @@ def generative(
         instrumented.retain_layer(layer)
 
         def compute_topk_and_quantile(*inputs: Any) -> TensorPair:
-            inputs = transforms.map_location(transform_inputs(*inputs), device)
+            inputs = transform_inputs(*transforms.map_location(inputs, device))
             with torch.no_grad():
                 model(*inputs)
             hiddens = transform_hiddens(instrumented.retained_layer(layer))
@@ -327,7 +327,7 @@ def generative(
             return pooled, activations
 
         def compute_activations(*inputs: Any) -> TensorPair:
-            inputs = transforms.map_location(transform_inputs(*inputs), device)
+            inputs = transform_inputs(*transforms.map_location(inputs, device))
             with torch.no_grad():
                 images = model(*inputs)
             hiddens = transform_hiddens(instrumented.retained_layer(layer))
