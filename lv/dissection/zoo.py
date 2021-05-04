@@ -5,11 +5,10 @@ from typing import Any, Iterable, Mapping, Optional, Tuple
 from lv import zoo
 from lv.dissection import datasets as lv_datasets
 from lv.dissection import transforms as lv_transforms
-from lv.ext import resnet152
 from lv.ext.pretorched.gans import biggan
 from lv.ext.torchvision import models
 from lv.utils.typing import Layer
-from third_party import alexnet
+from third_party import alexnet, resnet152
 from third_party.netdissect import renormalize
 
 from torch import nn
@@ -127,7 +126,7 @@ def dissection_models() -> ModelConfigs:
                 ModelConfig(
                     resnet152.OldResNet152,
                     url=f'{DISSECT_HOST}/resnet152_places365-f928166e5c.pth',
-                    layers=LAYERS_RESNET152,
+                    layers=(0, 4, 5, 6, 7),
                 ),
         },
         KEY_VGG_16: {
