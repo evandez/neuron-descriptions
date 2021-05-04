@@ -29,13 +29,13 @@ model, layers, config = zoo.model(args.model,
                                   args.dataset,
                                   map_location=device,
                                   path=args.model_file)
-generative = config.dissection.generative
-kwargs = config.dissection.kwargs
 
-# TODO(evandez): Yuck, think of a better way to do this.
-dataset = zoo.dataset(
-    f'{args.model}-zs-{args.dataset}' if generative else args.dataset,
-    path=args.dataset_path)
+dataset, generative = args.dataset, False
+if isinstance(config.dissection, zoo.GenerativeModelDissectionConfig):
+    dataset = config.dissection.dataset
+    generative = True
+
+dataset = zoo.dataset(dataset, path=args.dataset_path)
 
 layers = args.layers or layers
 assert layers is not None, 'should always be >= 1 layer'
@@ -48,11 +48,11 @@ for layer in layers:
                            layer=layer,
                            results_dir=results_dir,
                            device=device,
-                           **kwargs)
+                           **config.dissection.kwargs)
     else:
         dissect.sequential(model,
                            dataset,
                            layer=layer,
                            results_dir=results_dir,
                            device=device,
-                           **kwargs)
+                           **config.dissection.kwargs)

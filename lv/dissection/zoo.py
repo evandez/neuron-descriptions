@@ -42,25 +42,56 @@ LAYERS_BIGGAN = ('layer0', 'layer1', 'layer2', 'layer3', 'layer4', 'layer5')
 
 @dataclasses.dataclass(frozen=True)
 class ModelDissectionConfig:
-    """Dissection configuration for a model."""
+    """Generic dissection configuration."""
 
-    generative: bool = False
-    transform_inputs: Optional[lv_transforms.TransformToTuple] = None
-    transform_hiddens: Optional[lv_transforms.TransformToTensor] = None
-    transform_outputs: Optional[lv_transforms.TransformToTensor] = None
-
-    def __post_init__(self) -> None:
-        """Validate the config."""
-        if not self.generative and self.transform_hiddens is not None:
-            raise ValueError('can only set transform_hiddens if generative')
+    k: Optional[int] = None
+    quantile: Optional[float] = None
+    output_size: Optional[int] = None
+    batch_size: Optional[int] = None
+    image_size: Optional[int] = None
+    renormalizer: Optional[renormalize.Renormalizer] = None
 
     @property
     def kwargs(self) -> Mapping[str, Any]:
         """Convert the config to kwargs."""
         kwargs = {}
         for key, value in vars(self).items():
-            if key.startswith('transform') and value is not None:
+            if value is not None:
                 kwargs[key] = value
+        return kwargs
+
+
+@dataclasses.dataclass(frozen=True)
+class DiscriminativeModelDissectionConfig(ModelDissectionConfig):
+    """Dissection configuration for a discriminative model."""
+
+    transform_inputs: Optional[lv_transforms.TransformToTuple] = None
+    transform_outputs: Optional[lv_transforms.TransformToTensor] = None
+
+
+@dataclasses.dataclass(frozen=True)
+class GenerativeModelDissectionConfig(ModelDissectionConfig):
+    """Dissection configuration for a model."""
+
+    transform_inputs: Optional[lv_transforms.TransformToTuple] = None
+    transform_hiddens: Optional[lv_transforms.TransformToTensor] = None
+    transform_outputs: Optional[lv_transforms.TransformToTensor] = None
+
+    # Special property: generative models want a dataset of representations,
+    # not the dataset of images they were trained on. This is required.
+    dataset: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        """Validate the config."""
+        if self.dataset is None:
+            raise ValueError('GenerativeModelDissectionConfig requires '
+                             'dataset to be set')
+
+    @property
+    def kwargs(self) -> Mapping[str, Any]:
+        """Convert the config to kwargs."""
+        kwargs = dict(super().kwargs)
+        kwargs.pop('dataset', default=None)
         return kwargs
 
 
@@ -143,10 +174,12 @@ def dissection_models() -> ModelConfigs:
                     pretrained='imagenet',
                     load_weights=False,
                     layers=LAYERS_BIGGAN,
-                    dissection=ModelDissectionConfig(
-                        generative=True,
+                    dissection=GenerativeModelDissectionConfig(
                         transform_inputs=lambda *xs: (biggan.GInputs(*xs),),
                         transform_hiddens=lambda hiddens: hiddens.h,
+                        renormalizer=renormalize.renormalizer(target='byte'),
+                        image_size=256,
+                        dataset=KEY_BIGGAN_ZS_IMAGENET,
                     ),
                 ),
             KEY_PLACES365:
@@ -155,10 +188,12 @@ def dissection_models() -> ModelConfigs:
                     pretrained='places365',
                     load_weights=False,
                     layers=LAYERS_BIGGAN,
-                    dissection=ModelDissectionConfig(
-                        generative=True,
+                    dissection=GenerativeModelDissectionConfig(
                         transform_inputs=lambda *xs: (biggan.GInputs(*xs),),
                         transform_hiddens=lambda hiddens: hiddens.h,
+                        renormalizer=renormalize.renormalizer(target='byte'),
+                        image_size=256,
+                        dataset=KEY_BIGGAN_ZS_PLACES365,
                     ),
                 ),
         }
