@@ -1,4 +1,5 @@
 """Unit tests for the lv/datasets module."""
+import csv
 import shutil
 
 from tests import conftest
@@ -191,6 +192,48 @@ def test_annotated_top_images_as_pil_image_grid(annotated_top_images, opacity):
     assert isinstance(actual, Image.Image)
 
 
+@pytest.mark.parametrize('keep_unannotated_samples', (False, True))
+def test_annotated_top_images_dataset_init_no_keep_unannotated_samples(
+        top_images_root, top_images_annotations_csv_file,
+        top_image_annotations, keep_unannotated_samples):
+    """Test AnnotatedTopImagesDataset.__init__, not keeping unannotated."""
+    banned = conftest.layer(0)
+    rows = [conftest.HEADER]
+    rows += [anno for anno in top_image_annotations if anno[0] != banned]
+    with top_images_annotations_csv_file.open('w') as handle:
+        writer = csv.writer(handle)
+        writer.writerows(rows)
+
+    annotated_top_images_dataset = datasets.AnnotatedTopImagesDataset(
+        top_images_root,
+        annotations_csv_file=top_images_annotations_csv_file,
+        layer_column=conftest.LAYER_COLUMN,
+        unit_column=conftest.UNIT_COLUMN,
+        annotation_column=conftest.ANNOTATION_COLUMN,
+        keep_unannotated_samples=keep_unannotated_samples)
+
+    # Yeah, yeah, yeah, this is bad practice, I know...
+    if keep_unannotated_samples:
+        assert len(annotated_top_images_dataset.samples) == conftest.N_SAMPLES
+
+        actuals = [
+            sample for sample in annotated_top_images_dataset.samples
+            if sample.layer == banned
+        ]
+        assert len(actuals) == conftest.N_UNITS_PER_LAYER
+        for actual in actuals:
+            assert actual.annotations == ()
+    else:
+        actual = len(annotated_top_images_dataset.samples)
+        expected = (conftest.N_LAYERS - 1) * conftest.N_UNITS_PER_LAYER
+        assert actual == expected
+
+        layers = {
+            sample.layer for sample in annotated_top_images_dataset.samples
+        }
+        assert banned not in layers
+
+
 def test_annotated_top_images_dataset_getitem(annotated_top_images_dataset,
                                               top_image_tensors,
                                               top_image_masks,
@@ -213,3 +256,35 @@ def test_annotated_top_images_dataset_getitem(annotated_top_images_dataset,
 def test_annotated_top_images_dataset_len(annotated_top_images_dataset):
     """Test AnnotatedTopImagesDataset.__len__ returns correct length."""
     assert len(annotated_top_images_dataset) == conftest.N_SAMPLES
+
+
+def test_annotated_top_images_dataset_lookup(annotated_top_images_dataset,
+                                             top_image_tensors,
+                                             top_image_masks,
+                                             top_image_annotations):
+    """Test AnnotatedTopImagesDataset.lookup finds correct sample."""
+    for layer_index in range(conftest.N_LAYERS):
+        layer = conftest.layer(layer_index)
+        for unit in range(conftest.N_UNITS_PER_LAYER):
+            actual = annotated_top_images_dataset.lookup(layer, unit)
+            assert actual.layer == layer
+            assert actual.unit == unit
+            assert actual.images.allclose(
+                top_image_tensors[layer_index][unit] / 255, atol=1e-3)
+            assert actual.masks.equal(
+                top_image_masks[layer_index][unit].float())
+            index = layer_index * conftest.N_UNITS_PER_LAYER + unit
+            assert actual.annotations == (top_image_annotations[index][-1],)
+
+
+def test_annotated_top_images_dataset_lookup_bad_key(
+        annotated_top_images_dataset):
+    """Test AnnotatedTopImagesDataset.lookup dies on bad key."""
+    bad = ('layer-10000', 0)
+    with pytest.raises(KeyError, match=f'.*{bad}.*'):
+        annotated_top_images_dataset.lookup(*bad)
+
+
+def test_annotated_top_images_dataset_k(annotated_top_images_dataset):
+    """Test AnnotatedTopImagesDataset.k returns correct value."""
+    assert annotated_top_images_dataset.k == conftest.N_TOP_IMAGES_PER_UNIT

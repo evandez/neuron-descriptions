@@ -90,8 +90,8 @@ class TopImagesDataset(data.Dataset):
         self.layers = layers = tuple(sorted(layers))
         self.device = device
 
-        self.images_by_layer = images_by_layer = {}
-        self.masks_by_layer = masks_by_layer = {}
+        self.images_by_layer = {}
+        self.masks_by_layer = {}
         renormalizer = renormalize.renormalizer(source='byte', target='pt')
         for layer in tqdm.tqdm(layers) if display_progress else layers:
             images_file = root / layer / 'images.npy'
@@ -134,7 +134,8 @@ class TopImagesDataset(data.Dataset):
 
         self.samples = []
         for layer in layers:
-            units = zip(images_by_layer[layer], masks_by_layer[layer])
+            units = zip(self.images_by_layer[layer],
+                        self.masks_by_layer[layer])
             for unit, (images, masks) in enumerate(units):
                 sample = TopImages(layer=layer,
                                    unit=unit,
@@ -164,6 +165,9 @@ class TopImagesDataset(data.Dataset):
         Args:
             layer (str): The layer name.
             unit (int): The unit number.
+
+        Raises:
+            KeyError: If no top images for given layer and unit.
 
         Returns:
             TopImages: The top images.
@@ -218,6 +222,7 @@ class AnnotatedTopImagesDataset(data.Dataset):
                  layer_column: str = DEFAULT_LAYER_COLUMN,
                  unit_column: str = DEFAULT_UNIT_COLUMN,
                  annotation_column: str = DEFAULT_ANNOTATION_COLUMN,
+                 keep_unannotated_samples: bool = False,
                  **kwargs: Any):
         """Initialize the dataset.
 
@@ -233,6 +238,9 @@ class AnnotatedTopImagesDataset(data.Dataset):
                 Defaults to `DEFAULT_UNIT_COLUMN`.
             annotation_column (str, optional): CSV column containing
                 annotation. Defaults to `DEFAULT_ANNOTATION_COLUMN`.
+            keep_unannotated_samples (bool, optional): Keep top images for
+                units with no annotations. Otherwise, do not include them
+                in the dataset. Defaults to False.
 
         Raises:
             FileNotFoundError: If annotations CSV file is not found.
@@ -248,8 +256,6 @@ class AnnotatedTopImagesDataset(data.Dataset):
         if not annotations_csv_file.is_file():
             raise FileNotFoundError(
                 f'annotations_csv_file not found: {annotations_csv_file}')
-
-        self.top_images_dataset = TopImagesDataset(root, *args, **kwargs)
 
         with annotations_csv_file.open('r') as handle:
             reader = csv.DictReader(handle)
@@ -267,7 +273,31 @@ class AnnotatedTopImagesDataset(data.Dataset):
             unit = int(row[unit_column])
             annotation = row[annotation_column]
             annotations[layer, unit].append(annotation)
-        self.annotations = {k: tuple(vs) for k, vs in annotations.items()}
+
+        samples = []
+        top_images_dataset = TopImagesDataset(root, *args, **kwargs)
+        if keep_unannotated_samples:
+            for top_images in top_images_dataset.samples:
+                layer, unit = top_images.layer, top_images.unit
+                annotated_top_images = AnnotatedTopImages(
+                    layer=top_images.layer,
+                    unit=top_images.unit,
+                    images=top_images.images,
+                    masks=top_images.masks,
+                    annotations=tuple(annotations[layer, unit]))
+                samples.append(annotated_top_images)
+        else:
+            for layer, unit in annotations.keys():
+                top_images = top_images_dataset.lookup(layer, unit)
+                annotated_top_images = AnnotatedTopImages(
+                    layer=top_images.layer,
+                    unit=top_images.unit,
+                    images=top_images.images,
+                    masks=top_images.masks,
+                    annotations=tuple(annotations[layer, unit]))
+                samples.append(annotated_top_images)
+        self.samples = tuple(samples)
+        self.samples_by_layer_unit = {(s.layer, s.unit): s for s in samples}
 
     def __getitem__(self, index: int) -> AnnotatedTopImages:
         """Return the annotated top images.
@@ -279,16 +309,34 @@ class AnnotatedTopImagesDataset(data.Dataset):
             AnnotatedTopImages: The sample.
 
         """
-        top_images = self.top_images_dataset[index]
-        layer = top_images.layer
-        unit = top_images.unit
-        annotations = self.annotations.get((layer, unit), ())
-        return AnnotatedTopImages(layer=top_images.layer,
-                                  unit=top_images.unit,
-                                  images=top_images.images,
-                                  masks=top_images.masks,
-                                  annotations=annotations)
+        return self.samples[index]
 
     def __len__(self) -> int:
         """Return the number of samples in the dataset."""
-        return len(self.top_images_dataset)
+        return len(self.samples)
+
+    def lookup(self, layer: str, unit: int) -> AnnotatedTopImages:
+        """Lookup annotated top images for given layer and unit.
+
+        Args:
+            layer (str): The layer name.
+            unit (int): The unit number.
+
+        Raises:
+            KeyError: If no top images for given layer and unit.
+
+        Returns:
+            AnnotatedTopImages: The annotated top images.
+
+        """
+        key = (layer, unit)
+        if key not in self.samples_by_layer_unit:
+            raise KeyError(f'no annotated top images for: {key}')
+        sample = self.samples_by_layer_unit[key]
+        return sample
+
+    @property
+    def k(self) -> int:
+        """Return the "k" in "top-k images"."""
+        assert len(self) > 0, 'empty dataset?'
+        return self.samples[0].images.shape[0]

@@ -110,12 +110,13 @@ def top_image_annotations():
 LAYER_COLUMN = 'the_layer'
 UNIT_COLUMN = 'the_unit'
 ANNOTATION_COLUMN = 'the_annotation'
+HEADER = (LAYER_COLUMN, UNIT_COLUMN, ANNOTATION_COLUMN)
 
 
 @pytest.fixture
 def top_images_annotations_csv_file(top_images_root, top_image_annotations):
     """Return a fake annotations CSV file for testing."""
-    rows = [[LAYER_COLUMN, UNIT_COLUMN, ANNOTATION_COLUMN]]
+    rows = [HEADER]
     rows += top_image_annotations
 
     annotations_csv_file = top_images_root / 'annotations.csv'
