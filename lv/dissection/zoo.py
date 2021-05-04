@@ -5,10 +5,11 @@ from typing import Any, Iterable, Mapping, Optional, Tuple
 from lv import zoo
 from lv.dissection import datasets as lv_datasets
 from lv.dissection import transforms as lv_transforms
+from lv.ext import resnet152
 from lv.ext.pretorched.gans import biggan
 from lv.ext.torchvision import models
 from lv.utils.typing import Layer
-from third_party import alexnet, resnet152
+from third_party import alexnet
 from third_party.netdissect import renormalize
 
 from torch import nn
@@ -33,9 +34,7 @@ KEY_BIGGAN_ZS_PLACES365 = 'biggan-zs-places365'
 
 LAYERS_ALEXNET = ('conv1', 'conv2', 'conv3', 'conv4', 'conv5')
 LAYERS_RESNET18 = ('conv1', 'layer1', 'layer2', 'layer3', 'layer4')
-# The ResNet152 layers are integers to be compatible with the Places365
-# version, which does not name its layers.
-LAYERS_RESNET152 = (0, 4, 5, 6, 7)
+LAYERS_RESNET152 = LAYERS_RESNET18
 LAYERS_VGG16 = ('conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv3_1',
                 'conv3_2', 'conv3_3', 'conv4_1', 'conv4_2', 'conv4_3',
                 'conv5_1', 'conv5_2', 'conv5_3')
