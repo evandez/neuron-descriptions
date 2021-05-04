@@ -21,8 +21,8 @@ args = parser.parse_args()
 
 model = biggan.BigGAN(pretrained=args.dataset, device='cpu')
 n_classes = 1000 if args.dataset == 'imagenet' else 365
-zs, y_dist = utils.prepare_z_y(args.n, model.dim_z, n_classes, device='cpu')
-ys = y_dist.sample(args.n)
+zs, _ = utils.prepare_z_y(args.n, model.dim_z, n_classes, device='cpu')
+ys = torch.randint(n_classes, size=(args.n,))
 
 args.path.parent.mkdir(exist_ok=True, parents=True)
 torch.save((zs, ys), args.path)
