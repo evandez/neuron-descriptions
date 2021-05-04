@@ -91,7 +91,7 @@ class GenerativeModelDissectionConfig(ModelDissectionConfig):
     def kwargs(self) -> Mapping[str, Any]:
         """Convert the config to kwargs."""
         kwargs = dict(super().kwargs)
-        kwargs.pop('dataset', default=None)
+        kwargs.pop('dataset', None)
         return kwargs
 
 
