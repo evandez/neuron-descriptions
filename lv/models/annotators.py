@@ -178,7 +178,7 @@ class WordAnnotator(serialize.SerializableModule):
             s_indices = sorted(s_indices,
                                key=lambda index: s_ps[index].item(),
                                reverse=True)
-            s_words = self.indexer.undo(s_indices)
+            s_words = self.indexer.unindex(s_indices)
             words.append(s_words)
             indices.append(s_indices)
 

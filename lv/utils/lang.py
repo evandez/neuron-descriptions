@@ -338,36 +338,50 @@ class Indexer(serialize.Serializable):
         return token in self.unique
 
     @overload
-    def __call__(self,
-                 texts: str,
-                 start: Optional[bool] = ...,
-                 stop: Optional[bool] = ...,
-                 pad: Optional[bool] = ...,
-                 unk: Optional[bool] = ...,
-                 length: Optional[int] = ...) -> Sequence[int]:
+    def __call__(self, texts: str, **kwargs: Any) -> Sequence[int]:
+        """Tokenize and index the given text.
+
+        Args:
+            texts (str): The text.
+
+        Returns:
+            Sequence[int]: Indexed tokens from text.
+
+        """
         ...
 
     @overload
-    def __call__(self,
-                 texts: StrSequence,
-                 start: Optional[bool] = ...,
-                 stop: Optional[bool] = ...,
-                 pad: Optional[bool] = ...,
-                 unk: Optional[bool] = ...,
-                 length: Optional[int] = ...) -> Sequence[Sequence[int]]:
-        ...
-
-    def __call__(self,
-                 texts,
-                 start=None,
-                 stop=None,
-                 pad=None,
-                 unk=None,
-                 length=None):
-        """Tokenizer the given texsts and map them to integer IDs.
+    def __call__(self, texts: StrSequence,
+                 **kwargs: Any) -> Sequence[Sequence[int]]:
+        """Tokenize and index all given text.
 
         Args:
-            texts (str or StrSequence): One or more texts.
+            texts (StrSequence): The text.
+
+        Returns:
+            Sequence[Sequence[int]]: Indexed tokens from all texts.
+
+        """
+        ...
+
+    def __call__(self, texts, **kwargs):
+        """Implement all overloads."""
+        tokenized = self.tokenize(texts)
+        indexed = self.index(tokenized, **kwargs)
+        return indexed
+
+    @overload
+    def index(self,
+              tokens: StrSequence,
+              start: Optional[bool] = ...,
+              stop: Optional[bool] = ...,
+              pad: Optional[bool] = ...,
+              unk: Optional[bool] = ...,
+              length: Optional[int] = ...) -> Sequence[int]:
+        """Map the tokens to integer IDs.
+
+        Args:
+            tokenized (StrSequence): Tokens to index.
             start (Optional[bool], optional): Prepend start token if possible.
                 Defaults to None.
             stop (Optional[bool], optional): Prepend stop token if possible.
@@ -383,11 +397,55 @@ class Indexer(serialize.Serializable):
                 of the longest input sequence.
 
         Returns:
-            Sequence[int] or Sequence[Sequence[int]]: The indexed sequence(s).
+            Sequence[int]: The indexed sequence(s).
 
         """
-        tokenized = self.tokenize([texts] if isinstance(texts, str) else texts)
+        ...
 
+    @overload
+    def index(self,
+              tokens: Sequence[StrSequence],
+              start: Optional[bool] = ...,
+              stop: Optional[bool] = ...,
+              pad: Optional[bool] = ...,
+              unk: Optional[bool] = ...,
+              length: Optional[int] = ...) -> Sequence[Sequence[int]]:
+        """Tokenize the given texts and map them to integer IDs.
+
+        Args:
+            tokenized (Sequence[StrSequence]): Tokens to index.
+            start (Optional[bool], optional): Prepend start token if possible.
+                Defaults to None.
+            stop (Optional[bool], optional): Prepend stop token if possible.
+                Defaults to None.
+            pad (Optional[bool], optional): Pad shorter sequences with padding
+                token if necessary and if possible. Defaults to None.
+            unk (Optional[bool], optional): Replace unknown tokens with the
+                UNK token. Otherwise, they are removed. Defaults to None.
+            length (Optional[int], optional): Pad shorter sequences to this
+                length, if possible, and truncate longer sequences to this
+                length. This does NOT count the start and stop tokens. Defaults
+                to `self.length`, or if that is not set, defaults to the length
+                of the longest input sequence.
+
+        Returns:
+            Sequence[Sequence[int]]: The indexed sequences.
+
+        """
+        ...
+
+    def index(self,
+              tokenized,
+              start=None,
+              stop=None,
+              pad=None,
+              unk=None,
+              length=None):
+        """Implement all overloads."""
+        if not tokenized:
+            return ()
+
+        singleton = isinstance(tokenized[0], str)
         start = self.start if start is None else start
         stop = self.stop if stop is None else stop
         pad = self.pad if pad is None else pad
@@ -398,7 +456,7 @@ class Indexer(serialize.Serializable):
                 length += 1
 
         indexed = []
-        for tokens in tokenized:
+        for tokens in [tokenized] if singleton else tokenized:
             indices = []
 
             if start:
@@ -425,7 +483,7 @@ class Indexer(serialize.Serializable):
 
             indexed.append(tuple(indices))
 
-        if isinstance(texts, str):
+        if singleton:
             indexed, = indexed
         else:
             indexed = tuple(indexed)
@@ -433,20 +491,68 @@ class Indexer(serialize.Serializable):
         return indexed
 
     @overload
-    def undo(self, indexed: Sequence[int]) -> StrSequence:
+    def unindex(self,
+                indexed: Sequence[int],
+                specials: bool = ...,
+                start: bool = ...,
+                stop: bool = ...,
+                pad: bool = ...,
+                unk: bool = ...) -> StrSequence:
+        """Undo indexing on the sequence.
+
+        Args:
+            indices (Sequence[int]): The indexed sequence.
+            specials (bool, optional): Include special tokens. If False,
+                overrides all other options below. Defaults to True.
+            start (bool, optional): Include start token. Defaults to True.
+            stop (bool, optional): Include stop token. Defaults to True.
+            pad (bool, optional): Include pad token. Defaults to True.
+            unk (bool, optional): Include unk token. Defaults to True.
+
+        Raises:
+            ValueError: If sequence contains an unknown index.
+
+        Returns:
+            StrSequence: Unindexed sequence.
+
+        """
         ...
 
     @overload
-    def undo(self, indexed: Sequence[Sequence[int]]) -> Sequence[StrSequence]:
+    def unindex(self,
+                indexed: Sequence[Sequence[int]],
+                specials: bool = ...,
+                start: bool = ...,
+                stop: bool = ...,
+                pad: bool = ...,
+                unk: bool = ...) -> Sequence[StrSequence]:
+        """Undo indexing on the sequence.
+
+        Args:
+            indices (Sequence[Sequence[int]]): The indexed sequences.
+            specials (bool, optional): Include special tokens. If False,
+                overrides all other options below. Defaults to True.
+            start (bool, optional): Include start token. Defaults to True.
+            stop (bool, optional): Include stop token. Defaults to True.
+            pad (bool, optional): Include pad token. Defaults to True.
+            unk (bool, optional): Include unk token. Defaults to True.
+
+        Raises:
+            ValueError: If sequence contains an unknown index.
+
+        Returns:
+            Sequence[StrSequence]: Unindexed sequences.
+
+        """
         ...
 
-    def undo(self,
-             indexed,
-             specials: bool = True,
-             start: bool = True,
-             stop: bool = True,
-             pad: bool = True,
-             unk: bool = True):
+    def unindex(self,
+                indexed,
+                specials: bool = True,
+                start: bool = True,
+                stop: bool = True,
+                pad: bool = True,
+                unk: bool = True):
         """Undo indexing on the sequence.
 
         Args:
@@ -469,8 +575,10 @@ class Indexer(serialize.Serializable):
         if not indexed:
             return ()
 
+        singleton = isinstance(indexed[0], int)
+
         unindexed = []
-        for indices in [indexed] if isinstance(indexed[0], int) else indexed:
+        for indices in [indexed] if singleton else indexed:
             tokens = []
             for index in indices:
                 # First check if it's in the vocabulary.
@@ -490,7 +598,7 @@ class Indexer(serialize.Serializable):
 
             unindexed.append(tuple(tokens))
 
-        if isinstance(indexed[0], int):
+        if singleton:
             return unindexed[0]
 
         return tuple(unindexed)

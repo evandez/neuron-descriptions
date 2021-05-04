@@ -336,10 +336,18 @@ def test_indexer_contains(indexer, token, expected):
     ))
 def test_indexer_call(vocab, tokenizer, init_kwargs, call_kwargs, texts,
                       expected):
-    """Test Indexer.__call__ correctly indexes inputs."""
+    """Test Indexer.__call__ correctly indexes inputs.
+
+    This function also tests `Indexer.index` implicitly.
+    """
     indexer = lang.Indexer(vocab, tokenizer, **init_kwargs)
     actual = indexer(texts, **call_kwargs)
     assert actual == expected
+
+
+def test_indexer_index_empty(indexer):
+    """Test Indexer.index handles empty inputs."""
+    assert indexer.index(()) == ()
 
 
 @pytest.mark.parametrize(
@@ -399,17 +407,22 @@ def test_indexer_call(vocab, tokenizer, init_kwargs, call_kwargs, texts,
             ),
         ),
     ))
-def test_indexer_undo(indexer, kwargs, indexed, expected):
-    """Test Indexer.undo correctly unindexes."""
-    actual = indexer.undo(indexed, **kwargs)
+def test_indexer_unindex(indexer, kwargs, indexed, expected):
+    """Test Indexer.unindex correctly unindexes."""
+    actual = indexer.unindex(indexed, **kwargs)
     assert actual == expected
 
 
-def test_indexer_undo_bad_index(indexer):
+def test_indexer_unindex_empty(indexer):
+    """Test Indexer.unindex handles empty inputs."""
+    assert indexer.unindex(()) == ()
+
+
+def test_indexer_unindex_bad_index(indexer):
     """Test Indexer.undo dies when given bad index."""
     bad = 100
     with pytest.raises(ValueError, match=f'.*{bad}.*'):
-        indexer.undo((0, bad))
+        indexer.unindex((0, bad))
 
 
 def test_indexer():
