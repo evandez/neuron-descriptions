@@ -8,18 +8,19 @@ from lv.dissection import transforms as lv_transforms
 from lv.ext.pretorched.gans import biggan
 from lv.ext.torchvision import models
 from lv.utils.typing import Layer
-from third_party import alexnet
+from third_party import alexnet, resnet152
 from third_party.netdissect import renormalize
 
 from torch import nn
 from torch.utils import data
 from torchvision import datasets, transforms
 
-MODEL_HOST = 'http://wednesday.csail.mit.edu/dez/vocabulary/models'
-MODEL_FILE_PLACES = 'iter_131072_weights.pth'
+LV_HOST = 'https://unitname.csail.mit.edu/dissect/models'
+DISSECT_HOST = 'https://dissect.csail.mit.edu/models'
 
 KEY_ALEXNET = 'alexnet'
 KEY_RESNET18 = 'resnet18'
+KEY_RESNET152 = 'resnet152'
 KEY_VGG_16 = 'vgg16'
 KEY_BIGGAN = 'biggan'
 
@@ -29,6 +30,7 @@ KEY_BIGGAN_ZS = 'biggan-zs'
 
 LAYERS_ALEXNET = ('conv1', 'conv2', 'conv3', 'conv4', 'conv5')
 LAYERS_RESNET18 = ('conv1', 'layer1', 'layer2', 'layer3', 'layer4')
+LAYERS_RESNET152 = (0, 4, 5, 6, 7)
 LAYERS_VGG16 = ('conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv3_1',
                 'conv3_2', 'conv3_3', 'conv4_1', 'conv4_2', 'conv4_3',
                 'conv5_1', 'conv5_2', 'conv5_3')
@@ -93,7 +95,7 @@ def dissection_models() -> ModelConfigs:
             KEY_PLACES365:
                 ModelConfig(
                     alexnet.AlexNet,
-                    url=f'{MODEL_HOST}/alexnet/places/{MODEL_FILE_PLACES}',
+                    url=f'{LV_HOST}/iter_131072_weights.pth',
                     transform_weights=lambda weights: weights['state_dict'],
                     layers=LAYERS_ALEXNET)
         },
@@ -107,9 +109,17 @@ def dissection_models() -> ModelConfigs:
                 ModelConfig(
                     models.resnet18_seq,
                     num_classes=365,
-                    url=f'{MODEL_HOST}/resnet18/places/{MODEL_FILE_PLACES}',
+                    url=f'{LV_HOST}/iter_131072_weights.pth',
                     transform_weights=lambda weights: weights['state_dict'],
                     layers=LAYERS_RESNET18),
+        },
+        KEY_RESNET152: {
+            KEY_PLACES365:
+                ModelConfig(
+                    resnet152.OldResNet152,
+                    url=f'{DISSECT_HOST}/resnet152_places365-f928166e5c.pth',
+                    layers=LAYERS_RESNET152,
+                ),
         },
         KEY_VGG_16: {
             KEY_IMAGENET:
@@ -118,12 +128,10 @@ def dissection_models() -> ModelConfigs:
                             load_weights=False,
                             layers=LAYERS_VGG16),
             KEY_PLACES365:
-                ModelConfig(
-                    models.vgg16_seq,
-                    num_classes=365,
-                    url=f'{MODEL_HOST}/vgg16/places/{MODEL_FILE_PLACES}',
-                    transform_weights=lambda weights: weights['state_dict'],
-                    layers=LAYERS_VGG16),
+                ModelConfig(models.vgg16_seq,
+                            num_classes=365,
+                            url=f'{DISSECT_HOST}/vgg16_places365-0bafbc55.pth',
+                            layers=LAYERS_VGG16),
         },
         KEY_BIGGAN: {
             KEY_IMAGENET:
