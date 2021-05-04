@@ -5,12 +5,13 @@ from typing import Sequence
 
 from lv import datasets, zoo
 from lv.mturk import hits
+from lv.utils.typing import Layer
 
 parser = argparse.ArgumentParser(description='generate mturk hits')
 parser.add_argument('dataset', help='name of top images dataset')
 parser.add_argument('hits_csv_file', type=pathlib.Path, help='output csv file')
 parser.add_argument(
-    '--dataset-dir',
+    '--dataset-path',
     type=pathlib.Path,
     help='directory containing dataset (default: .zoo/datasets/<dataset>)')
 parser.add_argument(
@@ -29,7 +30,7 @@ parser.add_argument('--no-display-progress',
 args = parser.parse_args()
 
 dataset = zoo.dataset(args.dataset,
-                      path=args.dataset_dir,
+                      path=args.dataset_path,
                       display_progress=not args.no_display_progress)
 if not isinstance(dataset, datasets.TopImagesDataset):
     raise ValueError(f'bad dataset type: {type(dataset).__name__}')
@@ -37,10 +38,10 @@ if not isinstance(dataset, datasets.TopImagesDataset):
 base_url = args.base_url.strip('/')
 
 
-def generate_urls(layer: str, unit: int, k: int) -> Sequence[str]:
+def generate_urls(layer: Layer, unit: int, k: int) -> Sequence[str]:
     """Generate top image URLs."""
     return [
-        f'{base_url}/{layer}/unit_{unit}/image_{index}.png'
+        f'{base_url}/{layer}/viz/unit_{unit}/image_{index}.png'
         for index in range(k)
     ]
 
