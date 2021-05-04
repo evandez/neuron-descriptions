@@ -29,13 +29,16 @@ model, layers, config = zoo.model(args.model,
                                   args.dataset,
                                   map_location=device,
                                   path=args.model_file)
-dataset = zoo.dataset(args.dataset, path=args.dataset_dir)
+generative = config.dissection.generative
+kwargs = config.dissection.kwargs
+
+# TODO(evandez): Yuck, think of a better way to do this.
+dataset = zoo.dataset(
+    f'{args.model}-zs-{args.dataset}' if generative else args.dataset,
+    path=args.dataset_dir)
 
 layers = args.layers or layers
 assert layers is not None, 'should always be >= 1 layer'
-
-generative = config.dissection.generative
-kwargs = config.dissection.kwargs
 
 for layer in layers:
     results_dir = args.results_dir / args.model / args.dataset
