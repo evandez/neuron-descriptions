@@ -37,7 +37,7 @@ if not isinstance(dataset, datasets.TopImagesDataset):
 
 # TODO(evandez): Ugly! Find a better way to namespace this.
 # Also, no need to host images.npy etc. at this URL.
-base_url = f'{args.base_url.strip("/")}/{args.dataset.replace("-", "/")}'
+base_url = f'{args.host_url.strip("/")}/{args.dataset.replace("-", "/")}'
 
 
 def generate_urls(layer: Layer, unit: int, k: int) -> Sequence[str]:
