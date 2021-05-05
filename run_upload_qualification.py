@@ -17,6 +17,9 @@ parser.add_argument('--no-display-progress',
 parser.add_argument('--no-validate-urls',
                     action='store_true',
                     help='do not validate image urls')
+parser.add_argument('--mockup-file',
+                    typoe=pathlib.Path,
+                    help='write mockup to this file')
 parser.add_argument('--name',
                     default='detailed image summarizer',
                     help='qualification name')
@@ -66,3 +69,8 @@ response = client.create_qualification_type(
     TestDurationInSeconds=args.test_duration_seconds,
     AutoGranted=False,
 )
+
+if args.mockup_file:
+    mockup_html = qualification.generate_mockup_html(config)
+    with args.mockup_file.open('w') as handle:
+        handle.write(mockup_html)
