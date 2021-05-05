@@ -178,9 +178,9 @@ class Decoder(nn.Module):
 
         self.embedding = nn.Embedding(vocab_size, embedding_size)
         self.lstm = nn.LSTMCell(embedding_size + feature_size, hidden_size)
-        self.predict = nn.Sequential(nn.Dropout(p=dropout),
-                                     nn.Linear(hidden_size, vocab_size),
-                                     nn.LogSoftmax(dim=-1))
+        self.output = nn.Sequential(nn.Dropout(p=dropout),
+                                    nn.Linear(hidden_size, vocab_size),
+                                    nn.LogSoftmax(dim=-1))
 
     @property
     def featurizer_v(self) -> featurizers.Featurizer:
@@ -303,7 +303,7 @@ class Decoder(nn.Module):
             embeddings = self.embedding(currents)
             inputs = torch.cat((embeddings, gated), dim=-1)
             h, c = self.lstm(inputs, (h, c))
-            logprobs[:, time] = log_p_w = self.predict(h)
+            logprobs[:, time] = log_p_w = self.output(h)
 
             # If copy mechanism is enabled, apply it.
             if self.copy_gate is not None:
@@ -338,6 +338,64 @@ class Decoder(nn.Module):
                              tokens=tokens,
                              attention_vs=attention_vs,
                              attention_ws=attention_ws)
+
+    def predict(self,
+                dataset: data.Dataset,
+                image_index: int = 2,
+                mask_index: int = 3,
+                batch_size: int = 16,
+                features: Optional[data.TensorDataset] = None,
+                device: Optional[Device] = None,
+                display_progress: bool = True,
+                **kwargs: Any) -> DecoderOutput:
+        """Feed entire dataset through the decoder.
+
+        Keyword arguments are passed to forward.
+
+        Args:
+            dataset (data.Dataset): The dataset of images/masks.
+            image_index (int, optional): Index of images in dataset samples.
+                Defaults to 2 to be compatible with AnnotatedTopImagesDataset.
+            mask_index (int, optional): Index of masks in dataset samples.
+                Defaults to 3 to be compatible with AnnotatedTopImagesDataset.
+            batch_size (int, optional): Number of samples to process on at
+                once. Defaults to 16.
+            features (Optional[data.TensorDataset], optional): Precomputed
+                image features. Defaults to None.
+            device (Optional[Device], optional): Send model and data to this
+                device. Defaults to None.
+            display_progress (bool, optional): Show progress for pre-
+                featurizing dataset and for predicting features.
+                Defaults to True.
+
+        Returns:
+            DecoderOutput: Decoder outputs for every sample in the dataset.
+
+        """
+        if device is not None:
+            self.to(device)
+        if features is None:
+            features = self.featurizer_v.map(dataset,
+                                             image_index=image_index,
+                                             mask_index=mask_index,
+                                             batch_size=batch_size,
+                                             device=device,
+                                             display_progress=display_progress)
+
+        loader = data.DataLoader(features, batch_size=batch_size)
+
+        predictions = []
+        for (inputs,) in tqdm(loader) if display_progress else loader:
+            with torch.no_grad():
+                outputs = self(inputs, **kwargs)
+            predictions.append(outputs)
+
+        return DecoderOutput(
+            logprobs=torch.cat([out.logprobs for out in outputs]),
+            tokens=torch.cat([out.tokens for out in outputs]),
+            attention_vs=torch.cat([out.attention_vs for out in outputs]),
+            attention_ws=torch.cat([out.attention_ws for out in outputs]),
+        )
 
     @classmethod
     def fit(cls: Type[DecoderT],
