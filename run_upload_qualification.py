@@ -18,11 +18,11 @@ parser.add_argument('--no-validate-urls',
                     action='store_true',
                     help='do not validate image urls')
 parser.add_argument('--mockup-file',
-                    typoe=pathlib.Path,
+                    type=pathlib.Path,
                     help='write mockup to this file')
 parser.add_argument('--name',
                     default='detailed image summarizer',
-                    help='qualification name')
+                    help='qualification name (or id, if updating)')
 parser.add_argument('--description',
                     help='description of the test for workers',
                     default='A simple two-question multiple choice test that '
@@ -47,6 +47,9 @@ parser.add_argument('--prod',
                     const=PROD_URL,
                     default=SANDBOX_URL,
                     help='upload to production mturk, not sandbox')
+parser.add_argument('--update',
+                    action='store_true',
+                    help='update qualification instead of creating a new one')
 args = parser.parse_args()
 
 config = qualification.parse_yaml_config(
@@ -55,22 +58,33 @@ config = qualification.parse_yaml_config(
     display_progress=not args.no_display_progress)
 questions = qualification.generate_questions_xml(config)
 answers = qualification.generate_answers_xml(config)
-
-boto3.setup_default_session(profile_name=args.aws_profile)
-client = boto3.client('mturk', endpoint_url=args.endpoint_url)
-response = client.create_qualification_type(
-    Name=args.name,
-    Keywords=' '.join(args.keywords),
-    Description=args.description,
-    QualificationTypeStatus='Active',
-    RetryDelayInSeconds=args.retry_delay_seconds,
-    Test=questions,
-    AnswerKey=answers,
-    TestDurationInSeconds=args.test_duration_seconds,
-    AutoGranted=False,
-)
-
 if args.mockup_file:
     mockup_html = qualification.generate_mockup_html(config)
     with args.mockup_file.open('w') as handle:
         handle.write(mockup_html)
+
+boto3.setup_default_session(profile_name=args.aws_profile)
+client = boto3.client('mturk', endpoint_url=args.endpoint_url)
+if args.update:
+    client.update_qualification_type(
+        QualificationTypeId=args.name,
+        RetryDelayInSeconds=args.retry_delay_seconds,
+        QualificationTypeStatus='Active',
+        Description=args.description,
+        Test=questions,
+        AnswerKey=answers,
+        TestDurationInSeconds=args.test_duration_seconds,
+        AutoGranted=False,
+    )
+else:
+    client.create_qualification_type(
+        Name=args.name,
+        Keywords=' '.join(args.keywords),
+        Description=args.description,
+        QualificationTypeStatus='Active',
+        RetryDelayInSeconds=args.retry_delay_seconds,
+        Test=questions,
+        AnswerKey=answers,
+        TestDurationInSeconds=args.test_duration_seconds,
+        AutoGranted=False,
+    )
