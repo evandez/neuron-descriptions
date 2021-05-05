@@ -19,7 +19,7 @@ parser.add_argument(
     type=int,
     help='only generate hits for this many units (default: None)')
 parser.add_argument('--host-url',
-                    default='https://unitname.csail.mit.edu',
+                    default='https://unitname.csail.mit.edu/dissect',
                     help='host url for top images (default: csail url)')
 parser.add_argument('--no-validate-urls',
                     action='store_true',
@@ -35,7 +35,9 @@ dataset = zoo.dataset(args.dataset,
 if not isinstance(dataset, datasets.TopImagesDataset):
     raise ValueError(f'bad dataset type: {type(dataset).__name__}')
 
-base_url = args.base_url.strip('/')
+# TODO(evandez): Ugly! Find a better way to namespace this.
+# Also, no need to host images.npy etc. at this URL.
+base_url = f'{args.base_url.strip("/")}/{args.dataset.replace("-", "/")}'
 
 
 def generate_urls(layer: Layer, unit: int, k: int) -> Sequence[str]:
