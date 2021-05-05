@@ -1,6 +1,6 @@
 """Pretrained word embeddings used by other models."""
-from typing import Optional, cast
 import warnings
+from typing import Optional, cast
 
 from lv.utils import lang
 
