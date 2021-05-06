@@ -259,6 +259,7 @@ class Decoder(nn.Module):
 
         # Obtain word features from word annotator or ground truth captions.
         if captions is None:
+            annos: annotators.WordAnnotations
             with torch.no_grad():
                 annos = self.annotator(features_v, threshold=threshold)
             annos_words = annos.words
@@ -266,6 +267,10 @@ class Decoder(nn.Module):
         else:
             annos_idx = self.annotator.indexer(captions, pad=True, unk=False)
             annos_words = self.annotator.indexer.unindex(annos_idx, pad=False)
+
+        pad_idx, pad_token = self.annotator.indexer.pad_index, lang.PAD_TOKEN
+        annos_words = [words or [pad_token] for words in annos_words]
+        annos_idx = [idx or [pad_idx] for idx in annos_idx]
 
         annos_idx_t = torch.tensor(annos_idx,
                                    dtype=torch.long,
