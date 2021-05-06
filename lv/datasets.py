@@ -9,11 +9,11 @@ from third_party.netdissect import renormalize
 
 import numpy
 import torch
-import tqdm
 from PIL import Image
 from torch.utils import data
 from torchvision import utils
 from torchvision.transforms import functional
+from tqdm.auto import tqdm
 
 
 class TopImages(NamedTuple):
@@ -97,7 +97,7 @@ class TopImagesDataset(data.Dataset):
         self.images_by_layer = {}
         self.masks_by_layer = {}
         renormalizer = renormalize.renormalizer(source='byte', target='pt')
-        for layer in tqdm.tqdm(layers) if display_progress else layers:
+        for layer in tqdm(layers) if display_progress else layers:
             images_file = root / str(layer) / 'images.npy'
             masks_file = root / str(layer) / 'masks.npy'
             for file in (images_file, masks_file):
