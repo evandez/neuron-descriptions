@@ -264,7 +264,7 @@ class Decoder(nn.Module):
             annos_words = annos.words
             annos_idx = self.annotator.indexer.index(annos_words, pad=True)
         else:
-            annos_idx = self.annotator.indexer(captions, pad=True)
+            annos_idx = self.annotator.indexer(captions, pad=True, unk=False)
             annos_words = self.annotator.indexer.unindex(annos_idx, pad=False)
 
         annos_idx_t = torch.tensor(annos_idx,
