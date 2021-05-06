@@ -426,7 +426,7 @@ class Decoder(nn.Module):
             annotations = self.indexer.reconstruct(self.indexer(annotations))
             for annotation in annotations:
                 # If annotation contains all unknown words, filter it.
-                if not annotation:
+                if not annotation.strip():
                     continue
                 hypotheses.append(prediction)
                 references.append(annotation)
