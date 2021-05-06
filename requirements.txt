@@ -19,6 +19,7 @@ cymem==2.0.5
 decorator==5.0.7
 defusedxml==0.7.1
 dill==0.3.3
+en-core-web-lg @ https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.0.0/en_core_web_lg-3.0.0-py3-none-any.whl
 en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.0.0/en_core_web_sm-3.0.0-py3-none-any.whl
 entrypoints==0.3
 ffmpeg==1.4
