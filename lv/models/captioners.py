@@ -348,7 +348,7 @@ class Decoder(nn.Module):
     def bleu(self,
              dataset: data.Dataset,
              annotation_index: int = 4,
-             predictions: Optional[DecoderOutput] = None,
+             predictions: Optional[StrSequence] = None,
              **kwargs: Any) -> sacrebleu.BLEUScore:
         """Compute BLEU score of this model on the given dataset.
 
@@ -360,9 +360,9 @@ class Decoder(nn.Module):
             annotation_index (int, optional): Index of language annotations in
                 dataset samples. Defaults to 4 to be compatible with
                 AnnotatedTopImagesDataset.
-            predictions (Optional[DecoderOutput], optional): Precomputed
-                predictions for all images in the dataset. By default, computed
-                from the dataset using `Decoder.predict`.
+            predictions (Optional[StrSequence], optional): Precomputed
+                predicted captions for all images in the dataset.
+                By default, computed from the dataset using `Decoder.predict`.
 
         Returns:
             sacrebleu.BLEUScore: Corpus BLEU score.
@@ -372,19 +372,18 @@ class Decoder(nn.Module):
             predictions = self.predict(dataset, **kwargs)
 
         references = []
-        for index in range(len(predictions.captions)):
+        for index in range(len(predictions)):
             annotations = dataset[index][annotation_index]
             if isinstance(annotations, str):
                 annotations = [annotations]
             references.append(annotations)
 
-        return sacrebleu.corpus_bleu(predictions.captions,
-                                     list(zip(*references)))
+        return sacrebleu.corpus_bleu(predictions, list(zip(*references)))
 
     def rouge(self,
               dataset: data.Dataset,
               annotation_index: int = 4,
-              predictions: Optional[DecoderOutput] = None,
+              predictions: Optional[StrSequence] = None,
               **kwargs: Any) -> Mapping[str, Mapping[str, float]]:
         """Compute ROUGe score of this model on the given dataset.
 
@@ -396,9 +395,9 @@ class Decoder(nn.Module):
             annotation_index (int, optional): Index of language annotations in
                 dataset samples. Defaults to 4 to be compatible with
                 AnnotatedTopImagesDataset.
-            predictions (Optional[DecoderOutput], optional): Precomputed
-                predictions for all images in the dataset. By default, computed
-                from the dataset using `Decoder.predict`.
+            predictions (Optional[StrSequence], optional): Precomputed
+                predicted captions for all images in the dataset.
+                By default, computed from the dataset using `Decoder.predict`.
 
         Returns:
             Mapping[str, Mapping[str, float]]: Average ROUGe (1, 2, l) scores.
@@ -408,12 +407,12 @@ class Decoder(nn.Module):
             predictions = self.predict(dataset, **kwargs)
 
         hypotheses, references = [], []
-        for index, caption in enumerate(predictions.captions):
+        for index, prediction in enumerate(predictions):
             annotations = dataset[index][annotation_index]
             if isinstance(annotations, str):
                 annotations = [annotations]
             for annotation in annotations:
-                hypotheses.append(caption)
+                hypotheses.append(prediction)
                 references.append(annotation)
 
         scorer = rouge.Rouge()
@@ -427,7 +426,7 @@ class Decoder(nn.Module):
                 features: Optional[data.TensorDataset] = None,
                 device: Optional[Device] = None,
                 display_progress: bool = True,
-                **kwargs: Any) -> DecoderOutput:
+                **kwargs: Any) -> StrSequence:
         """Feed entire dataset through the decoder.
 
         Keyword arguments are passed to forward.
@@ -449,7 +448,7 @@ class Decoder(nn.Module):
                 Defaults to True.
 
         Returns:
-            DecoderOutput: Decoder outputs for every sample in the dataset.
+            StrSequence: Captions for entire dataset.
 
         """
         if 'captions' in kwargs:
@@ -476,13 +475,7 @@ class Decoder(nn.Module):
         for output in outputs:
             captions += output.captions
 
-        return DecoderOutput(
-            logprobs=torch.cat([out.logprobs for out in outputs]),
-            tokens=torch.cat([out.tokens for out in outputs]),
-            attention_vs=torch.cat([out.attention_vs for out in outputs]),
-            attention_ws=torch.cat([out.attention_ws for out in outputs]),
-            captions=tuple(captions),
-        )
+        return tuple(captions)
 
     @classmethod
     def fit(cls: Type[DecoderT],
