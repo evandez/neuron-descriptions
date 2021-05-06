@@ -695,7 +695,7 @@ class Indexer(serialize.Serializable):
             # First put the caption together, removing special tokens.
             text = ' '.join([
                 token for token in tokens
-                if token not in self.indexer.specials.values()
+                if token not in self.specials.values()
             ])
 
             # Remove spaces after punctuation.
