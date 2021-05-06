@@ -376,6 +376,8 @@ class Decoder(nn.Module):
             annotations = dataset[index][annotation_index]
             if isinstance(annotations, str):
                 annotations = [annotations]
+            # Preprocess target annotations in the same way model was trained.
+            annotations = self.indexer.reconstruct(self.indexer(annotations))
             references.append(annotations)
 
         return sacrebleu.corpus_bleu(predictions, list(zip(*references)))
@@ -411,6 +413,8 @@ class Decoder(nn.Module):
             annotations = dataset[index][annotation_index]
             if isinstance(annotations, str):
                 annotations = [annotations]
+            # Preprocess target annotations in the same way model was trained.
+            annotations = self.indexer.reconstruct(self.indexer(annotations))
             for annotation in annotations:
                 hypotheses.append(prediction)
                 references.append(annotation)
