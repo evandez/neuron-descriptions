@@ -366,9 +366,10 @@ class Indexer(serialize.Serializable):
 
     def __call__(self, texts, **kwargs):
         """Implement all overloads."""
-        tokenized = self.tokenize(texts)
+        singleton = isinstance(texts, str)
+        tokenized = self.tokenize([texts] if singleton else texts)
         indexed = self.index(tokenized, **kwargs)
-        return indexed
+        return indexed[0] if singleton else indexed
 
     @overload
     def index(self,
