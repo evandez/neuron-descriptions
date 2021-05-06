@@ -466,11 +466,11 @@ class Decoder(nn.Module):
 
         loader = data.DataLoader(features, batch_size=batch_size)
 
-        predictions = []
+        outputs = []
         for (inputs,) in tqdm(loader) if display_progress else loader:
             with torch.no_grad():
-                outputs = self(inputs, **kwargs)
-            predictions.append(outputs)
+                output = self(inputs, **kwargs)
+            outputs.append(output)
 
         captions = []
         for output in outputs:
