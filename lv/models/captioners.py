@@ -6,6 +6,8 @@ from lv.models import annotators, embeddings, featurizers
 from lv.utils import lang, training
 from lv.utils.typing import Device, StrSequence
 
+import rouge
+import sacrebleu
 import torch
 from torch import nn, optim
 from torch.distributions import categorical
@@ -67,6 +69,7 @@ class DecoderOutput(NamedTuple):
     tokens: torch.Tensor
     attention_vs: torch.Tensor
     attention_ws: torch.Tensor
+    captions: StrSequence
 
 
 DecoderT = TypeVar('DecoderT', bound='Decoder')
@@ -334,10 +337,87 @@ class Decoder(nn.Module):
                     currents[index] = distribution.sample()
             tokens[:, time] = currents
 
-        return DecoderOutput(logprobs=logprobs,
-                             tokens=tokens,
-                             attention_vs=attention_vs,
-                             attention_ws=attention_ws)
+        return DecoderOutput(
+            logprobs=logprobs,
+            tokens=tokens,
+            attention_vs=attention_vs,
+            attention_ws=attention_ws,
+            captions=self.indexer.reconstruct(tokens.tolist()),
+        )
+
+    def bleu(self,
+             dataset: data.Dataset,
+             annotation_index: int = 4,
+             predictions: Optional[DecoderOutput] = None,
+             **kwargs: Any) -> sacrebleu.BLEUScore:
+        """Compute BLEU score of this model on the given dataset.
+
+        Keyword arguments forwarded to `Decoder.predict` if `predictions` not
+        provided.
+
+        Args:
+            dataset (data.Dataset): The test dataset.
+            annotation_index (int, optional): Index of language annotations in
+                dataset samples. Defaults to 4 to be compatible with
+                AnnotatedTopImagesDataset.
+            predictions (Optional[DecoderOutput], optional): Precomputed
+                predictions for all images in the dataset. By default, computed
+                from the dataset using `Decoder.predict`.
+
+        Returns:
+            sacrebleu.BLEUScore: Corpus BLEU score.
+
+        """
+        if predictions is None:
+            predictions = self.predict(dataset, **kwargs)
+
+        references = []
+        for index in range(len(predictions.captions)):
+            annotations = dataset[index][annotation_index]
+            if isinstance(annotations, str):
+                annotations = [annotations]
+            references.append(annotations)
+
+        return sacrebleu.corpus_bleu(predictions.captions,
+                                     list(zip(*references)))
+
+    def rouge(self,
+              dataset: data.Dataset,
+              annotation_index: int = 4,
+              predictions: Optional[DecoderOutput] = None,
+              **kwargs: Any) -> Mapping[str, Mapping[str, float]]:
+        """Compute ROUGe score of this model on the given dataset.
+
+        Keyword arguments forwarded to `Decoder.predict` if `predictions` not
+        provided.
+
+        Args:
+            dataset (data.Dataset): The test dataset.
+            annotation_index (int, optional): Index of language annotations in
+                dataset samples. Defaults to 4 to be compatible with
+                AnnotatedTopImagesDataset.
+            predictions (Optional[DecoderOutput], optional): Precomputed
+                predictions for all images in the dataset. By default, computed
+                from the dataset using `Decoder.predict`.
+
+        Returns:
+            Mapping[str, Mapping[str, float]]: Average ROUGe (1, 2, l) scores.
+
+        """
+        if predictions is None:
+            predictions = self.predict(dataset, **kwargs)
+
+        hypotheses, references = [], []
+        for index, caption in enumerate(predictions.captions):
+            annotations = dataset[index][annotation_index]
+            if isinstance(annotations, str):
+                annotations = [annotations]
+            for annotation in annotations:
+                hypotheses.append(caption)
+                references.append(annotation)
+
+        scorer = rouge.Rouge()
+        return scorer.get_scores(hypotheses, references, avg=True)
 
     def predict(self,
                 dataset: data.Dataset,
@@ -372,6 +452,8 @@ class Decoder(nn.Module):
             DecoderOutput: Decoder outputs for every sample in the dataset.
 
         """
+        if 'captions' in kwargs:
+            raise ValueError('setting captions= not supported')
         if device is not None:
             self.to(device)
         if features is None:
@@ -390,11 +472,16 @@ class Decoder(nn.Module):
                 outputs = self(inputs, **kwargs)
             predictions.append(outputs)
 
+        captions = []
+        for output in outputs:
+            captions += output.captions
+
         return DecoderOutput(
             logprobs=torch.cat([out.logprobs for out in outputs]),
             tokens=torch.cat([out.tokens for out in outputs]),
             attention_vs=torch.cat([out.attention_vs for out in outputs]),
             attention_ws=torch.cat([out.attention_ws for out in outputs]),
+            captions=tuple(captions),
         )
 
     @classmethod

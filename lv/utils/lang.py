@@ -603,6 +603,118 @@ class Indexer(serialize.Serializable):
 
         return tuple(unindexed)
 
+    @overload
+    def reconstruct(self, indices: Sequence[int]) -> str:
+        """Reconstruct text string from the indices.
+
+        Args:
+            indices (Sequence[int]): The token indices.
+
+        Returns:
+            str: The text string.
+
+        Raises:
+            ValueError: If indices is empty.
+
+        """
+        ...
+
+    @overload
+    def reconstruct(self, indices: Sequence[Sequence[int]]) -> StrSequence:
+        """Reconstruct text strings from each index sequence.
+
+        Args:
+            indices (Sequence[Sequence[int]]): The index sequences.
+
+        Returns:
+            StrSequence: The text strings.
+
+        Raises:
+            ValueError: If indices is empty.
+
+        """
+        ...
+
+    @overload
+    def reconstruct(self, tokens: StrSequence) -> str:
+        """Reconstruct text string from the token sequence.
+
+        Args:
+            tokens (StrSequence): The token sequence.
+
+        Returns:
+            str: The text string.
+
+        Raises:
+            ValueError: If tokens is empty.
+
+        """
+        ...
+
+    @overload
+    def reconstruct(self, tokens: Sequence[StrSequence]) -> StrSequence:
+        """Reconstruct text strings from the token sequences.
+
+        Args:
+            tokens (Sequence[StrSequence]): The token sequences.
+
+        Returns:
+            StrSequence: The text strings.
+
+        Raises:
+            ValueError: If tokens is empty.
+
+        """
+        ...
+
+    def reconstruct(self, inputs):
+        """Implement all overloads of `reconstruct`."""
+        if not inputs:
+            raise ValueError('must provide at least one seq')
+        for index, item in enumerate(inputs):
+            if not isinstance(item, (int, str)) and not item:
+                raise ValueError(f'input seq {index} is empty')
+
+        if isinstance(inputs[0], str):
+            tokenized = [inputs]
+        elif isinstance(inputs[0], int):
+            tokenized = [self.unindex(inputs)]
+        elif isinstance(inputs[0][0], str):
+            tokenized = inputs
+        else:
+            assert isinstance(inputs[0][0], int), 'unknown input type'
+            tokenized = self.unindex(inputs)
+
+        texts = []
+        for tokens in tokenized:
+            if STOP_TOKEN in tokens:
+                last = tokens.index(STOP_TOKEN)
+                tokens = tokens[:last]
+
+            # First put the caption together, removing special tokens.
+            text = ' '.join([
+                token for token in tokens
+                if token not in self.indexer.specials.values()
+            ])
+
+            # Remove spaces after punctuation.
+            for token in ('.', ',', ';', ':'):
+                text = text.replace(' ' + token, token)
+
+            # ...except for dashes, which need space removed before and after.
+            for token in ('-',):
+                text = text.replace(' %s' % token, token)
+                text = text.replace('%s ' % token, token)
+
+            # Finally, capitalize each sentence.
+            text = '. '.join([
+                sentence.strip().capitalize() for sentence in text.split('.')
+            ]).strip()
+
+            texts.append(text)
+
+        return texts[0] if isinstance(inputs[0], (str, int)) else tuple(texts)
+
     @classmethod
     def recurse(cls):
         """Override `Serializable.recurse`."""
