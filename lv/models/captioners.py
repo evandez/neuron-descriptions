@@ -620,7 +620,7 @@ class Decoder(nn.Module):
 
         progress = range(max_epochs)
         if display_progress:
-            progress = tqdm(progress)
+            progress = tqdm(progress, desc='train decoder')
 
         # Begin training!
         for _ in progress:
