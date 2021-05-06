@@ -613,7 +613,7 @@ class Decoder(nn.Module):
                                      batch_size=batch_size)
 
         # Prepare model and training tools.
-        model = cls(indexer, annotator, **kwargs)
+        model = cls(indexer, annotator, **kwargs).to(device)
         optimizer = optimizer_t(model.parameters(), **optimizer_kwargs)
         criterion = nn.NLLLoss(ignore_index=indexer.pad_index)
 
