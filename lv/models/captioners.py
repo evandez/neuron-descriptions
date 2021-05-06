@@ -416,6 +416,9 @@ class Decoder(nn.Module):
             # Preprocess target annotations in the same way model was trained.
             annotations = self.indexer.reconstruct(self.indexer(annotations))
             for annotation in annotations:
+                # If annotation contains all unknown words, filter it.
+                if not annotation:
+                    continue
                 hypotheses.append(prediction)
                 references.append(annotation)
 
