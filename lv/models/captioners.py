@@ -439,6 +439,7 @@ class Decoder(nn.Module):
                 mask_index: int = 3,
                 batch_size: int = 16,
                 features: Optional[data.TensorDataset] = None,
+                num_workers: int = 0,
                 device: Optional[Device] = None,
                 display_progress: bool = True,
                 **kwargs: Any) -> StrSequence:
@@ -456,6 +457,8 @@ class Decoder(nn.Module):
                 once. Defaults to 16.
             features (Optional[data.TensorDataset], optional): Precomputed
                 image features. Defaults to None.
+            num_workers (int, optional): Number of workers for loading data.
+                Defaults to 0.
             device (Optional[Device], optional): Send model and data to this
                 device. Defaults to None.
             display_progress (bool, optional): Show progress for pre-
@@ -478,7 +481,9 @@ class Decoder(nn.Module):
                                              device=device,
                                              display_progress=display_progress)
 
-        loader = data.DataLoader(features, batch_size=batch_size)
+        loader = data.DataLoader(features,
+                                 batch_size=batch_size,
+                                 num_workers=num_workers)
 
         outputs = []
         for (inputs,) in tqdm(loader) if display_progress else loader:
@@ -509,6 +514,7 @@ class Decoder(nn.Module):
             optimizer_kwargs: Optional[Mapping[str, Any]] = None,
             indexer_kwargs: Optional[Mapping[str, Any]] = None,
             features: Optional[data.TensorDataset] = None,
+            num_workers: int = 0,
             device: Optional[Device] = None,
             display_progress: bool = True,
             **kwargs: Any) -> DecoderT:
@@ -548,6 +554,8 @@ class Decoder(nn.Module):
             features (Optional[data.TensorDataset], optional): Precomputed
                 visual features. By default, computed before training the
                 captioner.
+            num_workers (int, optional): Number of workers for loading data.
+                Defaults to 0.
             device (Optional[Device], optional): Send all models and data
                 to this device. Defaults to None.
             display_progress (bool, optional): Show progress bar while
@@ -615,9 +623,11 @@ class Decoder(nn.Module):
         train_size = len(features) - val_size
         train, val = data.random_split(dataset, (train_size, val_size))
         train_loader = data.DataLoader(WrapperDataset(train),
+                                       num_workers=num_workers,
                                        batch_size=batch_size,
                                        shuffle=True)
         val_loader = data.DataLoader(WrapperDataset(val),
+                                     num_workers=num_workers,
                                      batch_size=batch_size)
 
         # Prepare model and training tools.

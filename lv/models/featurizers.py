@@ -28,6 +28,7 @@ class Featurizer(nn.Module):
             image_index: Union[int, str] = -3,
             mask_index: Union[int, str] = -2,
             batch_size: int = 128,
+            num_workers: int = 0,
             device: Optional[Device] = None,
             display_progress: bool = True,
             **kwargs: Any) -> data.TensorDataset:
@@ -46,6 +47,8 @@ class Featurizer(nn.Module):
                 AnnotatedTopImagesDataset.
             batch_size (int, optional): Featurize images in batches of this
                 size. Defaults to 128.
+            num_workers (int, optional): Number of workers for loading data.
+                Defaults to 0.
             device (Optional[Device], optional): Run preprocessing on this
                 device. Defaults to None.
             display_progress (bool, optional): Show progress bar.
@@ -63,7 +66,9 @@ class Featurizer(nn.Module):
 
         mapped = []
 
-        loader = data.DataLoader(dataset, batch_size=batch_size)
+        loader = data.DataLoader(dataset,
+                                 batch_size=batch_size,
+                                 num_workers=num_workers)
         for batch in tqdm(loader) if display_progress else loader:
             images = batch[image_index]
             if not isinstance(images, torch.Tensor):

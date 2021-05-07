@@ -236,6 +236,7 @@ class WordAnnotator(serialize.SerializableModule):
                 mask_index: int = 3,
                 batch_size: int = 16,
                 features: Optional[data.TensorDataset] = None,
+                num_workers: int = 0,
                 device: Optional[Device] = None,
                 display_progress: bool = True,
                 **kwargs: Any) -> WordAnnotations:
@@ -253,6 +254,8 @@ class WordAnnotator(serialize.SerializableModule):
                 once. Defaults to 16.
             features (Optional[data.TensorDataset], optional): Precomputed
                 image features. Defaults to None.
+            num_workers (int, optional): Number of workers for loading data.
+                Defaults to 0.
             device (Optional[Device], optional): Send model and data to this
                 device. Defaults to None.
             display_progress (bool, optional): Show progress for pre-
@@ -273,7 +276,9 @@ class WordAnnotator(serialize.SerializableModule):
                                            device=device,
                                            display_progress=display_progress)
 
-        loader = data.DataLoader(features, batch_size=batch_size)
+        loader = data.DataLoader(features,
+                                 batch_size=batch_size,
+                                 num_workers=num_workers)
 
         predictions = []
         for (inputs,) in tqdm(loader) if display_progress else loader:
@@ -334,6 +339,7 @@ class WordAnnotator(serialize.SerializableModule):
             optimizer_kwargs: Optional[Mapping[str, Any]] = None,
             indexer_kwargs: Optional[Mapping[str, Any]] = None,
             features: Optional[data.TensorDataset] = None,
+            num_workers: int = 0,
             device: Optional[Device] = None,
             display_progress: bool = True) -> WordAnnotatorT:
         """Train a new WordAnnotator from scratch.
@@ -362,6 +368,8 @@ class WordAnnotator(serialize.SerializableModule):
                 keyword arguments to pass at construction. Defaults to None.
             features (Optional[data.TensorDataset], optional): Precomputed
                 image features. By default, computed from the full dataset.
+            num_workers (int, optional): Number of workers for loading data.
+                Defaults to 0.
             device (Optional[Device], optional): Send model and all data to
                 this device. Defaults to None.
             display_progress (bool, optional): Show progress bars for pre-
@@ -399,8 +407,11 @@ class WordAnnotator(serialize.SerializableModule):
             indices = indexer(annotation)
             targets[index, sorted(set(indices))] = 1
 
-        features_loader = data.DataLoader(features, batch_size=batch_size)
+        features_loader = data.DataLoader(features,
+                                          num_workers=num_workers,
+                                          batch_size=batch_size)
         targets_loader = data.DataLoader(data.TensorDataset(targets),
+                                         num_workers=num_workers,
                                          batch_size=batch_size)
 
         model = cls(indexer, featurizer).to(device)
