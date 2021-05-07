@@ -258,7 +258,7 @@ class Decoder(nn.Module):
             features_v = self.featurizer_v(images, masks)
         else:
             features_v = images
-        features_v = features_v.view(batch_size, -1, self.feature_size)
+        features_v = features_v.view(batch_size, -1, self.feature_v_size)
 
         # Obtain word features from word annotator or ground truth captions.
         if captions is None:
