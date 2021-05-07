@@ -252,14 +252,13 @@ class Decoder(nn.Module):
 
         # If necessary, obtain visual features. Technically, backpropagating
         # through the featurizer is acceptable, so avoid using no_grad.
-        _, n_top_images, *_ = images.shape
         if masks is not None:
             images = images.view(-1, 3, *images.shape[-2:])
             masks = masks.view(-1, 1, *masks.shape[-2:])
             features_v = self.featurizer_v(images, masks)
         else:
             features_v = images
-        features_v = features_v.view(batch_size, n_top_images, -1)
+        features_v = features_v.view(batch_size, -1, self.feature_size)
 
         # Obtain word features from word annotator or ground truth captions.
         if captions is None:

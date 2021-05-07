@@ -152,14 +152,14 @@ class WordAnnotator(serialize.SerializableModule):
 
     def forward(self, images, masks=None, threshold=.5):
         """Implementat overloaded functions above."""
-        batch_size, n_top_images, *_ = images.shape
+        batch_size, *_ = images.shape
         if masks is not None:
             images = images.view(-1, 3, *images.shape[-2:])
             masks = masks.view(-1, 1, *masks.shape[-2:])
             features = self.featurizer(images, masks)
         else:
             features = images
-        features = features.view(batch_size, n_top_images, -1)
+        features = features.view(batch_size, -1, self.feature_size)
 
         # Compute probability of each word.
         probabilities = self.classifier(features)
