@@ -59,7 +59,7 @@ class Attention(nn.Module):
         q_hidden = self.query_to_hidden(query).unsqueeze(1)
         k_hidden = self.key_to_hidden(keys)
         hidden = torch.tanh(q_hidden + k_hidden)
-        return self.output(hidden).squeeze()
+        return self.output(hidden).view(*keys.shape[:2])
 
 
 class DecoderOutput(NamedTuple):
