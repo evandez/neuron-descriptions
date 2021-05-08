@@ -646,6 +646,7 @@ class Decoder(nn.Module):
         # Begin training!
         for _ in progress:
             model.train()
+            model.featurizer_v.eval()
             train_loss, train_reg = 0., 0.
             for features_v, captions in train_loader:
                 targets = torch.tensor(indexer(captions), device=device)[:, 1:]
