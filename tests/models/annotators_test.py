@@ -131,6 +131,7 @@ def test_word_annotator_fit(dataset, featurizer):
         batch_size=BATCH_SIZE,
         optimizer_kwargs={'lr': 1e-4},
         indexer_kwargs={'ignore_in': ('foo',)},
+        hold_out=.2,
         display_progress=False)
     # Just some basic assertions...
     assert actual.indexer is not None

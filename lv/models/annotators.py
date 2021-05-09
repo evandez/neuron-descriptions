@@ -334,7 +334,7 @@ class WordAnnotator(serialize.SerializableModule):
             annotation_index: int = 4,
             batch_size: int = 64,
             max_epochs: int = 1000,
-            patience: int = 4,
+            patience: Optional[int] = None,
             hold_out: float = .1,
             optimizer_t: Type[optim.Optimizer] = optim.Adam,
             optimizer_kwargs: Optional[Mapping[str, Any]] = None,
@@ -359,8 +359,9 @@ class WordAnnotator(serialize.SerializableModule):
                 Defaults to 64.
             max_epochs (int, optional): Maximum number of epochs to train for.
                 Defaults to 1000.
-            patience (int, optional): If loss does not improve for this many
-                epochs, stop training. Defaults to 4.
+            patience (Optional[int], optional): If validation loss does not
+                improve for this many epochs, stop training. By default, no
+                early stopping.
             hold_out (float, optional): Fraction of data to hold out as a
                 validation set. Defaults to .1.
             optimizer_t (Type[optim.Optimizer], optional): Optimizer to use.
@@ -439,7 +440,9 @@ class WordAnnotator(serialize.SerializableModule):
 
         optimizer = optimizer_t(classifier.parameters(), **optimizer_kwargs)
 
-        stopper = training.EarlyStopping(patience=patience)
+        stopper = None
+        if patience is not None:
+            stopper = training.EarlyStopping(patience=patience)
 
         # Balance the dataset using the power of BAYESIAN STATISTICS, BABY!
         n_positives = targets.sum(dim=0)
@@ -475,14 +478,14 @@ class WordAnnotator(serialize.SerializableModule):
                     predictions = classifier(inputs)
                     loss = criterion(predictions, targets)
                 val_loss += loss.item()
-            train_loss /= len(train_features_loader)
+            val_loss /= len(val_features_loader)
 
             if display_progress:
                 assert not isinstance(progress, range)
                 progress.set_description(f'train_loss={train_loss:.3f}, '
                                          f'val_loss={val_loss:.3f}')
 
-            if stopper(val_loss):
+            if stopper is not None and stopper(val_loss):
                 break
 
         return model
