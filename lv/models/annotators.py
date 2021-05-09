@@ -335,7 +335,6 @@ class WordAnnotator(serialize.SerializableModule):
             batch_size: int = 64,
             max_epochs: int = 1000,
             patience: Optional[int] = None,
-            hold_out: float = .1,
             optimizer_t: Type[optim.Optimizer] = optim.Adam,
             optimizer_kwargs: Optional[Mapping[str, Any]] = None,
             indexer_kwargs: Optional[Mapping[str, Any]] = None,
@@ -362,8 +361,6 @@ class WordAnnotator(serialize.SerializableModule):
             patience (Optional[int], optional): If validation loss does not
                 improve for this many epochs, stop training. By default, no
                 early stopping.
-            hold_out (float, optional): Fraction of data to hold out as a
-                validation set. Defaults to .1.
             optimizer_t (Type[optim.Optimizer], optional): Optimizer to use.
                 Defaults to Adam.
             optimizer_kwargs (Optional[Mapping[str, Any]], optional): Optimizer
@@ -411,29 +408,12 @@ class WordAnnotator(serialize.SerializableModule):
             indices = indexer(annotation)
             targets[index, sorted(set(indices))] = 1
 
-        # Set up train and validation datasets/loaders.
-        val_size = int(hold_out * len(features))
-        train_size = len(features) - val_size
-
-        train_targets, val_targets = data.random_split(
-            data.TensorDataset(targets), (train_size, val_size))
-
-        train_features = data.Subset(features, train_targets.indices)
-        val_features = data.Subset(features, val_targets.indices)
-
-        train_features_loader = data.DataLoader(train_features,
-                                                num_workers=num_workers,
-                                                batch_size=batch_size)
-        train_targets_loader = data.DataLoader(train_targets,
-                                               num_workers=num_workers,
-                                               batch_size=batch_size)
-
-        val_features_loader = data.DataLoader(val_features,
-                                              num_workers=num_workers,
-                                              batch_size=batch_size)
-        val_targets_loader = data.DataLoader(val_targets,
-                                             num_workers=num_workers,
-                                             batch_size=batch_size)
+        features_loader = data.DataLoader(features,
+                                          num_workers=num_workers,
+                                          batch_size=batch_size)
+        targets_loader = data.DataLoader(data.TensorDataset(targets),
+                                         num_workers=num_workers,
+                                         batch_size=batch_size)
 
         model = cls(indexer, featurizer).to(device)
         classifier = model.classifier.classifier
@@ -456,36 +436,22 @@ class WordAnnotator(serialize.SerializableModule):
 
         for _ in progress:
             train_loss = 0.
-            for (inputs,), (targets,) in zip(train_features_loader,
-                                             train_targets_loader):
+            for (inputs,), (targets,) in zip(features_loader, targets_loader):
                 inputs = inputs.view(*inputs.shape[:2], -1)
                 targets = targets[:, None, :].expand(-1, inputs.shape[1], -1)
-
                 predictions = classifier(inputs)
                 loss = criterion(predictions, targets)
                 loss.backward()
                 optimizer.step()
                 optimizer.zero_grad()
                 train_loss += loss.item()
-            train_loss /= len(train_features_loader)
-
-            val_loss = 0.
-            for (inputs,), (targets,) in zip(val_features_loader,
-                                             val_targets_loader):
-                inputs = inputs.view(*inputs.shape[:2], -1)
-                targets = targets[:, None, :].expand(-1, inputs.shape[1], -1)
-                with torch.no_grad():
-                    predictions = classifier(inputs)
-                    loss = criterion(predictions, targets)
-                val_loss += loss.item()
-            val_loss /= len(val_features_loader)
+            train_loss /= len(features_loader)
 
             if display_progress:
                 assert not isinstance(progress, range)
-                progress.set_description(f'train_loss={train_loss:.3f}, '
-                                         f'val_loss={val_loss:.3f}')
+                progress.set_description(f'loss={train_loss:.3f}')
 
-            if stopper is not None and stopper(val_loss):
+            if stopper is not None and stopper(train_loss):
                 break
 
         return model
