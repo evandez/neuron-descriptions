@@ -204,7 +204,6 @@ def dissection_models() -> ModelConfigs:
 
 def dissection_datasets() -> zoo.DatasetConfigs:
     """Return configs for all datasets used in dissection."""
-    # TODO(evandez): Are these the right transforms?
     return {
         KEY_IMAGENET:
             zoo.DatasetConfig(datasets.ImageFolder,
@@ -221,7 +220,8 @@ def dissection_datasets() -> zoo.DatasetConfigs:
                               transform=transforms.Compose([
                                   transforms.Resize(256),
                                   transforms.CenterCrop(224),
-                                  transforms.ToTensor()
+                                  transforms.ToTensor(),
+                                  renormalize.NORMALIZER['imagenet'],
                               ])),
         KEY_BIGGAN_ZS_IMAGENET:
             zoo.DatasetConfig(lv_datasets.TensorDatasetOnDisk,
