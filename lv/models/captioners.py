@@ -3,7 +3,7 @@ from typing import (Any, Mapping, NamedTuple, Optional, Type, TypeVar, Union,
                     overload)
 
 from lv.models import annotators, embeddings, featurizers
-from lv.utils import lang, training
+from lv.utils import lang, serialize, training
 from lv.utils.typing import Device, StrSequence
 
 import rouge
@@ -79,8 +79,11 @@ STRATEGY_GREEDY = 'greedy'
 STRATEGY_SAMPLE = 'sample'
 STRATEGIES = (STRATEGY_GREEDY, STRATEGY_SAMPLE)
 
+WORD2VEC_SPACY = 'spacy'
+WORD2VECS = (WORD2VEC_SPACY,)
 
-class Decoder(nn.Module):
+
+class Decoder(serialize.SerializableModule):
     """Neuron caption decoder.
 
     Roughly mimics the architecture described in Show, Attend, and Tell
@@ -93,7 +96,7 @@ class Decoder(nn.Module):
     def __init__(self,
                  indexer: lang.Indexer,
                  annotator: annotators.WordAnnotator,
-                 featurizer_w: Optional[nn.Embedding] = None,
+                 word2vec: str = WORD2VEC_SPACY,
                  copy: bool = True,
                  embedding_size: int = 128,
                  hidden_size: int = 512,
@@ -108,9 +111,9 @@ class Decoder(nn.Module):
             annotator (annotators.WordAnnotator): Annotator for predicting
                 which words will appear in an image. Used to construct word
                 features that are attended over at every decoding step.
-            featurizer_w (Optional[nn.Embedding], optional): Embedding for
-                words predicted by the annotator. Defaults to the built in
-                word vectors of spacy's large model.
+            word2vec (str, optional): Kind of pretrained word embedding to
+                use for words predicted by the annotator. Options include:
+                'spacy'. Defaults to 'spacy'.
             copy (bool, optional): Use a copy mechanism in the model.
                 Defaults to True.
             embedding_size (int, optional): Size of previous-word embeddings
@@ -138,16 +141,9 @@ class Decoder(nn.Module):
                              'vocabulary, but indexer is missing these words: '
                              f'{annotator.indexer.unique - indexer.unique} ')
 
-        if featurizer_w is None:
-            featurizer_w = embeddings.spacy(annotator.indexer)
-        elif featurizer_w.num_embeddings != len(annotator.indexer):
-            raise ValueError(f'featurizer_w has {featurizer_w.num_embeddings} '
-                             'tokens but annotator has '
-                             f'{len(annotator.indexer)} in its vocab')
-
         self.indexer = indexer
         self.annotator = annotator
-        self.featurizer_w = featurizer_w
+        self.word2vec = word2vec
         self.copy = copy
         self.embedding_size = embedding_size
         self.hidden_size = hidden_size
@@ -155,8 +151,13 @@ class Decoder(nn.Module):
         self.threshold = threshold
         self.dropout = dropout
 
+        if word2vec == WORD2VEC_SPACY:
+            self.featurizer_w = embeddings.spacy(annotator.indexer)
+        else:
+            raise ValueError(f'unknown word2vec type: {word2vec}')
+
         self.feature_v_size = feature_v_size = annotator.feature_size
-        self.feature_w_size = feature_w_size = featurizer_w.embedding_dim
+        self.feature_w_size = feature_w_size = self.featurizer_w.embedding_dim
         self.feature_size = feature_size = feature_v_size + feature_w_size
         self.vocab_size = vocab_size = len(indexer)
 
@@ -492,6 +493,45 @@ class Decoder(nn.Module):
             captions += output.captions
 
         return tuple(captions)
+
+    def properties(self, **kwargs):
+        """Override `SerializableModule.properties`."""
+        properties = super().properties(**kwargs)
+        properties.update({
+            'indexer': self.indexer,
+            'annotator': self.annotator,
+            'word2vec': self.word2vec,
+            'copy': self.copy,
+            'embedding_size': self.embedding_size,
+            'hidden_size': self.hidden_size,
+            'attention_hidden_size': self.attention_hidden_size,
+            'threshold': self.threshold,
+            'dropout': self.dropout,
+        })
+
+        state_dict = properties.get('state_dict', {})
+
+        # If the featurizer is serializable, remove its parameters from the
+        # state dict and serialize instead. We only have one Serializable
+        # featurizer type, so just check for that.
+        featurizer_v = self.featurizer_v
+        if isinstance(featurizer_v, featurizers.PretrainedPyramidFeaturizer):
+            keys = [
+                key for key in state_dict
+                if key.startswith('annotator.featurizer.')
+            ]
+            for key in keys:
+                del state_dict[key]
+
+        return properties
+
+    @classmethod
+    def recurse(cls):
+        """Override `SerializableModule.recurse`."""
+        return {
+            'annotator': annotators.WordAnnotator,
+            'indexer': lang.Indexer,
+        }
 
     @classmethod
     def fit(cls: Type[DecoderT],
