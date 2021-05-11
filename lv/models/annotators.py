@@ -305,9 +305,9 @@ class WordAnnotator(serialize.SerializableModule):
         featurizer = self.featurizer
         if isinstance(featurizer, featurizers.PretrainedPyramidFeaturizer):
             state_dict = properties.get('state_dict', {})
-            for key in state_dict:
-                if key.startswith('featurizer.'):
-                    del state_dict[key]
+            keys = [key for key in state_dict if key.startswith('featurizer.')]
+            for key in keys:
+                del state_dict[key]
             assert isinstance(featurizer, serialize.Serializable)
             properties['featurizer'] = featurizer
 
