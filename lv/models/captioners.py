@@ -98,6 +98,7 @@ class Decoder(serialize.SerializableModule):
                  annotator: annotators.WordAnnotator,
                  word2vec: str = WORD2VEC_SPACY,
                  copy: bool = True,
+                 max_words: int = 10,
                  embedding_size: int = 128,
                  hidden_size: int = 512,
                  attention_hidden_size: Optional[int] = None,
@@ -116,6 +117,8 @@ class Decoder(serialize.SerializableModule):
                 'spacy'. Defaults to 'spacy'.
             copy (bool, optional): Use a copy mechanism in the model.
                 Defaults to True.
+            max_words (bool, optional): Maximum number of words to take from
+                ground truth captions or the word annotator. Defaults to 10.
             embedding_size (int, optional): Size of previous-word embeddings
                 that are input to the LSTM. Defaults to 128.
             hidden_size (int, optional): Size of LSTM hidden states.
@@ -136,8 +139,9 @@ class Decoder(serialize.SerializableModule):
         """
         super().__init__()
 
-        if not annotator.indexer.unique <= indexer.unique:
-            raise ValueError('annotator vocabulary must be subset of indexer '
+        if copy and not annotator.indexer.unique <= indexer.unique:
+            raise ValueError('when using a copy mechanism in the decoder, '
+                             'annotator vocabulary must be subset of indexer '
                              'vocabulary, but indexer is missing these words: '
                              f'{annotator.indexer.unique - indexer.unique} ')
 
@@ -145,6 +149,7 @@ class Decoder(serialize.SerializableModule):
         self.annotator = annotator
         self.word2vec = word2vec
         self.copy = copy
+        self.max_words = max_words
         self.embedding_size = embedding_size
         self.hidden_size = hidden_size
         self.attention_hidden_size = attention_hidden_size
@@ -198,7 +203,8 @@ class Decoder(serialize.SerializableModule):
                 length: int = ...,
                 strategy: Strategy = ...,
                 captions: Optional[StrSequence] = ...,
-                threshold: Optional[float] = ...) -> DecoderOutput:
+                threshold: Optional[float] = ...,
+                max_words: Optional[int] = ...) -> DecoderOutput:
         """Decode captions for the given top images and masks.
 
         Args:
@@ -216,6 +222,9 @@ class Decoder(serialize.SerializableModule):
             threshold (Optional[float], optional): Threshold for whether
                 annotator predicts a word. Overrides the `threshold` field on
                 this class if set. Defaults to None.
+            max_words (Optional[int], optional): Maximum number of words to
+                take from captions, if set, or from word annotator predictions.
+                Defaults to `self.max_words`.
 
         Returns:
             DecoderOutput: Decoder outputs.
@@ -238,7 +247,8 @@ class Decoder(serialize.SerializableModule):
                 length=15,
                 strategy=STRATEGY_GREEDY,
                 captions=None,
-                threshold=None):
+                threshold=None,
+                max_words=None):
         """Implement both overloads."""
         if isinstance(strategy, str) and strategy not in STRATEGIES:
             raise ValueError(f'unknown strategy: {strategy}')
@@ -250,6 +260,8 @@ class Decoder(serialize.SerializableModule):
 
         if threshold is None:
             threshold = self.threshold
+        if max_words is None:
+            max_words = self.max_words
 
         # If necessary, obtain visual features. Technically, backpropagating
         # through the featurizer is acceptable, so avoid using no_grad.
@@ -266,10 +278,15 @@ class Decoder(serialize.SerializableModule):
             annos: annotators.WordAnnotations
             with torch.no_grad():
                 annos = self.annotator(features_v, threshold=threshold)
-            annos_words = annos.words
-            annos_idx = self.annotator.indexer.index(annos_words, pad=True)
+            annos_idx = self.annotator.indexer.index(annos.words,
+                                                     pad=True,
+                                                     length=max_words)
+            annos_words = self.annotator.indexer.unindex(annos_idx, pad=False)
         else:
-            annos_idx = self.annotator.indexer(captions, pad=True, unk=False)
+            annos_idx = self.annotator.indexer(captions,
+                                               pad=True,
+                                               unk=False,
+                                               length=max_words)
             annos_words = self.annotator.indexer.unindex(annos_idx, pad=False)
 
         annos_idx_t = torch.tensor(annos_idx,
