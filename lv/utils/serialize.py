@@ -205,10 +205,11 @@ class SerializableModule(Serializable, nn.Module):
 
         """
         properties = {**properties}  # We mutate the dict, so copy it!
-        state_dict = properties.pop('state_dict', default=None)
-        module = super(cls, cls).deserialize(properties, strict=strict)
+        state_dict = properties.pop('state_dict', None)
+        module = super(SerializableModule, cls).deserialize(properties,
+                                                            strict=strict)
         if state_dict is not None:
-            module.load_state_dict(state_dict)
+            module.load_state_dict(state_dict, strict=strict)
         return module
 
     @classmethod
