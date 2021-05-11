@@ -161,6 +161,10 @@ class Vocab(serialize.Serializable):
         """Return the set of unique tokens."""
         return frozenset(self.ids)
 
+    def properties(self, **_):
+        """Override `Serializable.properties`."""
+        return {'tokens': self.tokens}
+
 
 def vocab(texts: StrSequence,
           tokenize: Optional[Tokenizer] = None,
@@ -715,6 +719,18 @@ class Indexer(serialize.Serializable):
             texts.append(text)
 
         return texts[0] if isinstance(inputs[0], (str, int)) else tuple(texts)
+
+    def properties(self, **_):
+        """Override `Serializable.properties`."""
+        return {
+            'vocab': self.vocab,
+            'tokenize': self.tokenize,
+            'start': self.start,
+            'stop': self.stop,
+            'pad': self.pad,
+            'unk': self.unk,
+            'length': self.length,
+        }
 
     @classmethod
     def recurse(cls):
