@@ -97,7 +97,7 @@ class Decoder(serialize.SerializableModule):
                  indexer: lang.Indexer,
                  annotator: annotators.WordAnnotator,
                  word2vec: str = WORD2VEC_SPACY,
-                 copy: bool = True,
+                 copy: bool = False,
                  max_words: int = 10,
                  embedding_size: int = 128,
                  hidden_size: int = 512,
@@ -116,7 +116,7 @@ class Decoder(serialize.SerializableModule):
                 use for words predicted by the annotator. Options include:
                 'spacy'. Defaults to 'spacy'.
             copy (bool, optional): Use a copy mechanism in the model.
-                Defaults to True.
+                Defaults to False.
             max_words (bool, optional): Maximum number of words to take from
                 ground truth captions or the word annotator. Defaults to 10.
             embedding_size (int, optional): Size of previous-word embeddings
