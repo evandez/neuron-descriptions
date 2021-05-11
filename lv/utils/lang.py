@@ -51,7 +51,8 @@ class Tokenizer(serialize.Serializable):
                     continue
                 text = token.lemma_ if self.lemmatize else token.text
                 text = text.lower() if self.lowercase else text
-                tokens.append(text)
+                if text.strip():
+                    tokens.append(text)
             tokenized.append(tuple(tokens))
 
         if isinstance(texts, str):
