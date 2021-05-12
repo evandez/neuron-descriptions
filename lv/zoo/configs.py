@@ -8,7 +8,7 @@ in lv/dissection/zoo.py instead.
 import lv.datasets
 from lv.zoo import core
 
-HOST = 'http://unitname.csail.mit.edu'
+HOST = 'https://unitname.csail.mit.edu'
 
 
 def models() -> core.ModelConfigs:
