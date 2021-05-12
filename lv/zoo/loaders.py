@@ -87,3 +87,28 @@ def dataset(name: str,
     dataset = config.load(path=path, **kwargs)
 
     return dataset
+
+
+def datasets(name: str,
+             *others: str,
+             path: Optional[PathLike] = None,
+             **kwargs: Any) -> data.Dataset:
+    """Load each dataset and concatenate them.
+
+    Args:
+        name (str): First dataset configuration name. Must specify at least
+            this argument. See `DATASET_CONFIGS` for all options.
+        path (Optional[PathLike], optional): Root path for all datasets.
+            Individual paths will be computed by appending dataset name to
+            this path. Defaults to None.
+
+    Returns:
+        data.Dataset: All datasets concatenated into one.
+
+    """
+    concated = dataset(name, path=path and pathlib.Path(path) / name, **kwargs)
+    for other in others:
+        concated += dataset(other,
+                            path=path and pathlib.Path(path) / other,
+                            **kwargs)
+    return concated

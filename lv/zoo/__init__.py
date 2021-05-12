@@ -2,4 +2,4 @@
 # flake8: noqa
 from lv.zoo.core import (DatasetConfig, DatasetConfigs, ModelConfig,
                          ModelConfigs)
-from lv.zoo.loaders import Model, dataset, model
+from lv.zoo.loaders import Model, dataset, datasets, model
