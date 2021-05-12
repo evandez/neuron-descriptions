@@ -12,6 +12,7 @@ from torch import hub, nn
 from torch.utils import data
 
 TransformWeights = Callable[[Any], OrderedDict[str, torch.Tensor]]
+ModelFactory = Callable[..., nn.Sequential]
 
 
 @dataclasses.dataclass
@@ -25,7 +26,7 @@ class ModelConfig:
     """
 
     def __init__(self,
-                 factory: Callable[..., nn.Sequential],
+                 factory: ModelFactory,
                  layers: Optional[Iterable[Layer]] = None,
                  url: Optional[str] = None,
                  load_weights: bool = True,
@@ -36,7 +37,7 @@ class ModelConfig:
         The keyword arguments are treated as defaults for the model.
 
         Args:
-            factory (Callable[..., nn.Sequential]): Factory function that
+            factory (ModelFactory): Factory function that
                 creates a model from arbitrary keyword arguments.
             layers (Optional[Iterable[Layer]], optional): Layers to return
                 when model is instantiated. By default, set to the keys
@@ -64,6 +65,7 @@ class ModelConfig:
 
     def load(self,
              path: Optional[PathLike] = None,
+             factory: Optional[ModelFactory] = None,
              map_location: Optional[Device] = None,
              **kwargs: Any) -> Tuple[nn.Sequential, Iterable[Layer]]:
         """Load the model from the given path.
@@ -73,6 +75,8 @@ class ModelConfig:
                 weights. If not set, model will be initialized to whatever the
                 factory function returns. If set and path does not exist but
                 URL field is set, weights will be downloaded to this path.
+            factory (Optional[ModelFactory], optional): Override for config
+                default factory. Defaults to None.
             map_location (Optional[Device], optional): Passed to `torch.load`,
                 effectively sending all model weights to this device at load
                 time. Defaults to None.
@@ -81,10 +85,13 @@ class ModelConfig:
             Tuple[nn.Sequential, Iterable[Layer]]: The loaded model.
 
         """
+        if factory is None:
+            factory = self.factory
+
         for key, default in self.defaults.items():
             kwargs.setdefault(key, default)
 
-        model = self.factory(**kwargs)
+        model = factory(**kwargs)
 
         if path is not None and self.load_weights:
             path = pathlib.Path(path)
@@ -109,6 +116,8 @@ class ModelConfig:
 
 ModelConfigs = Mapping[str, Mapping[str, ModelConfig]]
 
+DatasetFactory = Callable[..., data.Dataset]
+
 
 class DatasetConfig:
     """Dataset configuration.
@@ -119,7 +128,7 @@ class DatasetConfig:
     """
 
     def __init__(self,
-                 factory: Callable[..., data.Dataset],
+                 factory: DatasetFactory,
                  url: Optional[str] = None,
                  requires_path: bool = True,
                  **defaults: Any):
@@ -128,8 +137,8 @@ class DatasetConfig:
         The keyword arguments are treated as defaults for the dataset.
 
         Args:
-            factory (Callable[..., data.Dataset]): Factory function that
-                creates the dataset from a path and arbitrary kwargs.
+            factory (DatasetFactory): Factory function that creates the dataset
+                from a path and arbitrary kwargs.
             url (Optional[str], optional): URL to a zip file containing the
                 dataset. Will attempt to download and unzip files from this
                 URL at load time. Defaults to None.
@@ -143,18 +152,26 @@ class DatasetConfig:
         self.requires_path = requires_path
         self.defaults = defaults
 
-    def load(self, path: Optional[PathLike] = None, **kwargs) -> data.Dataset:
+    def load(self,
+             path: Optional[PathLike] = None,
+             factory: Optional[DatasetFactory] = None,
+             **kwargs) -> data.Dataset:
         """Load the dataset from the given path.
 
         Args:
             path (Optional[PathLike], optional): Dataset path. If it does
                 not exist but URL is set on the config, dataset will be
                 downloaded.
+            factory (Optional[DatasetFactory]): Override for config default
+                factory.
 
         Returns:
             data.Dataset: The loaded dataset.
 
         """
+        if factory is None:
+            factory = self.factory
+
         for key, default in self.defaults.items():
             kwargs.setdefault(key, default)
 
@@ -162,7 +179,7 @@ class DatasetConfig:
         if path is None:
             if self.requires_path:
                 raise ValueError('dataset requires path, but none given')
-            return self.factory(**kwargs)
+            return factory(**kwargs)
 
         # Otherwise, handle URL if it is set and pass path as an arg.
         path = pathlib.Path(path)
@@ -175,7 +192,7 @@ class DatasetConfig:
         if not path.exists():
             raise FileNotFoundError(f'dataset path does not exist: {path}')
 
-        return self.factory(path, **kwargs)
+        return factory(path, **kwargs)
 
 
 DatasetConfigs = Mapping[str, DatasetConfig]
