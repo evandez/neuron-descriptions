@@ -418,6 +418,8 @@ class WordAnnotator(serialize.SerializableModule):
         model = cls(indexer, featurizer).to(device)
         classifier = model.classifier.classifier
 
+        optimizer_kwargs = dict(optimizer_kwargs)
+        optimizer_kwargs.setdefault('lr', 1e-4)
         optimizer = optimizer_t(classifier.parameters(), **optimizer_kwargs)
 
         stopper = None
