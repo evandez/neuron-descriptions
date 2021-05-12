@@ -103,7 +103,7 @@ FeatureSize = int
 FeaturizerConfig = Tuple[FeaturizerFactory, FeaturizerLayers, FeatureSize]
 
 
-class PretrainedPyramidFeaturizer(Featurizer, serialize.SerializableModule):
+class MaskedPyramidFeaturizer(Featurizer, serialize.SerializableModule):
     """Map images and masks to a pyramid of masked convolutional features.
 
     Images are fed to a pretrained image classifier trained on ImageNet.
@@ -119,13 +119,13 @@ class PretrainedPyramidFeaturizer(Featurizer, serialize.SerializableModule):
 
         Args:
             config (str, optional): The featurizer config to use.
-                See `PretrainedPyramidFeaturizer.configs` for options.
+                See `MaskedPyramidFeaturizer.configs` for options.
                 Defaults to 'resnet18'.
 
         """
         super().__init__()
 
-        configs = PretrainedPyramidFeaturizer.configs()
+        configs = MaskedPyramidFeaturizer.configs()
         if config not in configs:
             raise ValueError(f'featurizer not supported: {config}')
 
@@ -233,3 +233,12 @@ class PretrainedPyramidFeaturizer(Featurizer, serialize.SerializableModule):
                 1024,
             ),
         }
+
+
+class MaskedImagePyramidFeaturizer(MaskedPyramidFeaturizer):
+    """Same as MaskedPyramidFeaturizer, but images are masked, not features."""
+
+    def forward(self, images, masks, **kwargs):
+        """Mask the images and then compute pyramid features."""
+        masked = images * masks
+        return super().forward(masked, torch.ones_like(masks), **kwargs)

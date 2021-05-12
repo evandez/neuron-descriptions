@@ -205,7 +205,7 @@ class WordFeaturizer(serialize.SerializableModule):
         # state dict and serialize instead. We only have one Serializable
         # featurizer type, so just check for that.
         featurizer_v = self.annotator.featurizer
-        if isinstance(featurizer_v, featurizers.PretrainedPyramidFeaturizer):
+        if isinstance(featurizer_v, featurizers.MaskedPyramidFeaturizer):
             keys = [
                 key for key in state_dict
                 if key.startswith('annotator.featurizer.')
@@ -877,7 +877,7 @@ class Decoder(serialize.SerializableModule):
 
         featurizer_v = self.featurizer_v
         if featurizer_v is not None and isinstance(
-                featurizer_v, featurizers.PretrainedPyramidFeaturizer):
+                featurizer_v, featurizers.MaskedPyramidFeaturizer):
             delete += [
                 key for key in state_dict if key.startswith('featurizer_v.')
             ]
@@ -887,7 +887,7 @@ class Decoder(serialize.SerializableModule):
         if featurizer_w is not None:
             properties['featurizer_w'] = featurizer_w
             if isinstance(featurizer_w.featurizer,
-                          featurizers.PretrainedPyramidFeaturizer):
+                          featurizers.MaskedPyramidFeaturizer):
                 delete += [
                     key for key in state_dict
                     if key.startswith('featurizer_w.annotator.featurizer.')
@@ -903,7 +903,7 @@ class Decoder(serialize.SerializableModule):
         """Override `SerializableModule.recurse`."""
         return {
             'featurizer_w': WordFeaturizer,
-            'featurizer_v': featurizers.PretrainedPyramidFeaturizer,
+            'featurizer_v': featurizers.MaskedPyramidFeaturizer,
             'indexer': lang.Indexer,
         }
 

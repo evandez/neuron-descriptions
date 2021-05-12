@@ -303,7 +303,7 @@ class WordAnnotator(serialize.SerializableModule):
         # state dict and serialize instead. We only have one Serializable
         # featurizer type, so just check for that.
         featurizer = self.featurizer
-        if isinstance(featurizer, featurizers.PretrainedPyramidFeaturizer):
+        if isinstance(featurizer, featurizers.MaskedPyramidFeaturizer):
             state_dict = properties.get('state_dict', {})
             keys = [key for key in state_dict if key.startswith('featurizer.')]
             for key in keys:
@@ -319,10 +319,10 @@ class WordAnnotator(serialize.SerializableModule):
         return {
             'indexer': lang.Indexer,
             # This class will only support deserializing
-            # PretrainedPyramidFeaturizer. This is a limitation of our
+            # MaskedPyramidFeaturizer. This is a limitation of our
             # serialization method: each class can only be deserialized in
             # one way.
-            'featurizer': featurizers.PretrainedPyramidFeaturizer,
+            'featurizer': featurizers.MaskedPyramidFeaturizer,
         }
 
     @classmethod

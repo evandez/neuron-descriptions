@@ -23,10 +23,10 @@ def test_featurizer_map(featurizer, top_images_dataset, device):
 
 
 def test_pretrained_pyramid_featurizer_init_bad_config():
-    """Test PretrainedPyramidFeaturizer.__init__ dies on bad config."""
+    """Test MaskedPyramidFeaturizer.__init__ dies on bad config."""
     bad = 'bad-config'
     with pytest.raises(ValueError, match=f'.*{bad}.*'):
-        featurizers.PretrainedPyramidFeaturizer(config=bad)
+        featurizers.MaskedPyramidFeaturizer(config=bad)
 
 
 BATCH_SIZE = 10
@@ -49,9 +49,9 @@ def masks():
 
 @pytest.mark.parametrize('config', ('resnet18', 'alexnet'))
 def test_pretrained_pyramid_featurizer_forward(config, images, masks):
-    """Test PretrainedPyramidFeaturizer.forward returns correct shape."""
-    featurizer = featurizers.PretrainedPyramidFeaturizer(config=config,
-                                                         pretrained=False)
+    """Test MaskedPyramidFeaturizer.forward returns correct shape."""
+    featurizer = featurizers.MaskedPyramidFeaturizer(config=config,
+                                                     pretrained=False)
     actual = featurizer(images, masks)
     assert actual.shape == (BATCH_SIZE, *featurizer.feature_shape)
     assert not torch.isnan(actual).any()
@@ -60,9 +60,9 @@ def test_pretrained_pyramid_featurizer_forward(config, images, masks):
 @pytest.mark.parametrize('config', ('resnet18', 'alexnet'))
 def test_pretrained_pyramid_featurizer_forward_invalid_mask(
         config, images, masks):
-    """Test PretrainedPyramidFeaturizer.forward handles some invalid masks."""
-    featurizer = featurizers.PretrainedPyramidFeaturizer(config=config,
-                                                         pretrained=False)
+    """Test MaskedPyramidFeaturizer.forward handles some invalid masks."""
+    featurizer = featurizers.MaskedPyramidFeaturizer(config=config,
+                                                     pretrained=False)
     masks[-2:] = 0
     actual = featurizer(images, masks)
     assert actual.shape == (BATCH_SIZE, *featurizer.feature_shape)
@@ -74,9 +74,9 @@ def test_pretrained_pyramid_featurizer_forward_invalid_mask(
 @pytest.mark.parametrize('config', ('resnet18', 'alexnet'))
 def test_pretrained_pyramid_featurizer_forward_all_invalid_masks(
         config, images, masks):
-    """Test PretrainedPyramidFeaturizer.forward handles all invalid masks."""
-    featurizer = featurizers.PretrainedPyramidFeaturizer(config=config,
-                                                         pretrained=False)
+    """Test MaskedPyramidFeaturizer.forward handles all invalid masks."""
+    featurizer = featurizers.MaskedPyramidFeaturizer(config=config,
+                                                     pretrained=False)
     actual = featurizer(images, torch.zeros_like(masks))
     assert actual.shape == (BATCH_SIZE, *featurizer.feature_shape)
     assert actual.eq(0).all()
