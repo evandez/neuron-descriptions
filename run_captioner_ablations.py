@@ -1,7 +1,7 @@
 """Script for running all captioner ablations."""
 import argparse
 import pathlib
-from typing import Optional, Sized, cast
+from typing import Sized, cast
 
 from lv import zoo
 from lv.models import annotators, captioners, featurizers
@@ -45,17 +45,7 @@ assert run is not None, 'failed to initialize wandb?'
 
 device = 'cuda' if args.cuda else 'cpu'
 
-dataset: Optional[data.Dataset] = None
-for key in args.datasets:
-    path = args.datasets_root
-    if path is not None:
-        path /= key
-    loaded = zoo.dataset(key, path=path)
-    if dataset is None:
-        dataset = loaded
-    else:
-        dataset += loaded
-assert dataset is not None
+dataset = zoo.datasets(*args.datasets)
 
 size = len(cast(Sized, dataset))
 test_size = int(args.hold_out * size)
@@ -70,7 +60,6 @@ annotator = annotators.WordAnnotator.fit(
     train,
     featurizer,
     indexer_kwargs={'ignore_rarer_than': 5},
-    optimizer_kwargs={'lr': 1e-4},
     features=train_features)
 
 ablations = {
@@ -86,14 +75,16 @@ ablations = {
 }
 for condition, captioner in ablations.items():
     captioner.fit(train,
-                  features=train_features if key != 'sat' else None,
+                  features=train_features if condition != 'sat' else None,
                   device=device)
     predictions = captioner.predict(
-        test, features=test_features if key != 'sat' else None, device=device)
+        test,
+        features=test_features if condition != 'sat' else None,
+        device=device)
     bleu = captioner.bleu(test, predictions=predictions)
     rouge = captioner.rouge(test, predictions=predictions)
 
-    log = {'condition': 'condition', 'bleu': bleu.score}
+    log = {'condition': condition, 'bleu': bleu.score}
     for index, precision in enumerate(bleu.precisions):
         log[f'bleu-{index + 1}'] = precision
     for kind, scores in rouge.items():
@@ -102,7 +93,7 @@ for condition, captioner in ablations.items():
     log['samples'] = [
         wandb.Image(
             test[index].as_pil_image_grid(),
-            caption=predictions[index],
+            caption=f'({condition.upper()}) {predictions[index]}',
         ) for index in test.indices[:25]
     ]
     wandb.log(log)
