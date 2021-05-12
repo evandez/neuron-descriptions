@@ -19,22 +19,22 @@ def models() -> core.ModelConfigs:
 def datasets() -> core.DatasetConfigs:
     """Return all dataset configs."""
     return {
-        'alexnet-imagenet':
+        'alexnet/imagenet':
             core.DatasetConfig(lv.datasets.AnnotatedTopImagesDataset,
                                url=f'{HOST}/data/alexnet-imagenet.zip'),
-        'alexnet-places365':
+        'alexnet/places365':
             core.DatasetConfig(lv.datasets.AnnotatedTopImagesDataset,
                                url=f'{HOST}/data/alexnet-places365.zip'),
-        'resnet152-imagenet':
+        'resnet152/imagenet':
             core.DatasetConfig(lv.datasets.AnnotatedTopImagesDataset,
                                url=f'{HOST}/data/resnet152-imagenet.zip'),
-        'resnet152-places365':
+        'resnet152/places365':
             core.DatasetConfig(lv.datasets.AnnotatedTopImagesDataset,
                                url=f'{HOST}/data/resnet152-places365.zip'),
-        'biggan-imagenet':
+        'biggan/imagenet':
             core.DatasetConfig(lv.datasets.AnnotatedTopImagesDataset,
                                url=f'{HOST}/data/biggan-imagenet.zip'),
-        'biggan-places365':
+        'biggan/places365':
             core.DatasetConfig(lv.datasets.AnnotatedTopImagesDataset,
                                url=f'{HOST}/data/biggan-places365.zip'),
     }
