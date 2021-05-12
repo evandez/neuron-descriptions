@@ -5,7 +5,7 @@ from typing import (Any, Mapping, Optional, Sequence, Tuple, Type, TypeVar,
 
 from lv.models import featurizers
 from lv.utils import lang, serialize, training
-from lv.utils.typing import Device
+from lv.utils.typing import Device, StrSequence
 
 import numpy
 import torch
@@ -60,7 +60,7 @@ class WordAnnotations:
 
     # Predicted words and corresponding indices. Each has length
     # of batch_size. Length of internal lists could be anything.
-    words: Sequence[Sequence[str]]
+    words: Sequence[StrSequence]
     indices: Sequence[Sequence[int]]
 
     def __post_init__(self) -> None:

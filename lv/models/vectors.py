@@ -1,4 +1,4 @@
-"""Pretrained word embeddings used by other models."""
+"""Pretrained word vectors used by other models."""
 import warnings
 from typing import Optional, cast
 

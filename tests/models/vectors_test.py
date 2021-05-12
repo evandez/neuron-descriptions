@@ -1,5 +1,5 @@
 """Unit tests for lv/models/embeddings module."""
-from lv.models import embeddings
+from lv.models import vectors
 from lv.utils import lang
 
 import numpy
@@ -27,7 +27,7 @@ def indexer():
 
 def test_spacy(indexer, nlp):
     """Test spacy returns well formed embeddings."""
-    actual = embeddings.spacy(indexer, nlp=nlp)
+    actual = vectors.spacy(indexer, nlp=nlp)
     assert actual.num_embeddings == len(indexer)
     assert actual.embedding_dim == VECTOR_SIZE
     assert not actual.weight.data[:len(VOCAB)].eq(0).all(dim=-1).any()
@@ -37,4 +37,4 @@ def test_spacy(indexer, nlp):
 def test_spacy_no_vectors(indexer):
     """Test spacy dies when no vectors present."""
     with pytest.raises(ValueError, match='.*no vectors.*'):
-        embeddings.spacy(indexer, nlp=spacy.load('en_core_web_sm'))
+        vectors.spacy(indexer, nlp=spacy.load('en_core_web_sm'))

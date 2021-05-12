@@ -1,11 +1,12 @@
 """Models for captioning neurons."""
-from typing import (Any, Mapping, NamedTuple, Optional, Type, TypeVar, Union,
-                    overload)
+from typing import (Any, Mapping, NamedTuple, Optional, Sequence, Sized, Tuple,
+                    Type, TypeVar, Union, cast, overload)
 
-from lv.models import annotators, embeddings, featurizers
+from lv.models import annotators, featurizers, vectors
 from lv.utils import lang, serialize, training
 from lv.utils.typing import Device, StrSequence
 
+import numpy
 import rouge
 import sacrebleu
 import torch
@@ -62,14 +63,172 @@ class Attention(nn.Module):
         return self.output(hidden).view(*keys.shape[:2])
 
 
+WORD2VEC_SPACY = 'spacy'
+WORD2VECS = (WORD2VEC_SPACY,)
+
+
+class WordFeaturizer(serialize.SerializableModule):
+    """Wrap a WordAnnotator and pretrained word vectors."""
+
+    def __init__(self,
+                 annotator: annotators.WordAnnotator,
+                 word2vec: str = WORD2VEC_SPACY,
+                 threshold: float = .5,
+                 max_words: int = 10):
+        """Initialize the word featurizer.
+
+        Args:
+            annotator (annotators.WordAnnotator): Word annotation model that
+                predicts words given visual features.
+            word2vec (str, optional): Pretrained word vectors to use.
+                Defaults to WORD2VEC_SPACY.
+            threshold (float, optional): Default threshold to use when
+                predicting applicable words. Defaults to .5.
+            max_words (int, optional): Maximum number of words to take from
+                the predictor. If fewer than this many words predicted, the
+                difference will be filled with padding tokens. Defaults to 10.
+
+        Raises:
+            ValueError: If unknown word vectors model are specified.
+
+        """
+        super().__init__()
+        self.annotator = annotator
+        self.word2vec = word2vec
+        self.threshold = threshold
+        self.max_words = max_words
+
+        if word2vec == WORD2VEC_SPACY:
+            self.vectors = vectors.spacy(annotator.indexer)
+        else:
+            raise ValueError(f'unknown word2vec type: {word2vec}')
+
+    @property
+    def feature_size(self) -> int:
+        """Return the size of the word vectors."""
+        return self.vectors.embedding_dim
+
+    @overload
+    def forward(
+        self,
+        images: torch.Tensor,
+        masks: torch.Tensor,
+        threshold: Optional[float] = ...,
+        max_words: Optional[int] = ...,
+        captions: Optional[StrSequence] = ...,
+    ) -> Tuple[torch.Tensor, Sequence[StrSequence]]:
+        """Predict words from visual features and return their word vectors.
+
+        Args:
+            images (torch.Tensor): Top images. Should have shape
+                (batch_size, k, 3, height, width).
+            masks (torch.Tensor): Top image masks. Should have shape
+                (batch_size, k, 1, height, width).
+            threshold (Optional[float], optional): Only look at words predicted
+                with this probability or higher. Defaults to `self.threshold`.
+            max_words (Optional[int], optional): Maximum number of words to
+                return. Defaults to `self.max_words`.
+            captions (Optional[StrSequence], optional): Take words from these
+                captions instead of the word predictor. Must have length same
+                as batch_size. Defaults to None.
+
+        Raises:
+            ValueError: If captions is set and has bad length.
+
+        Returns:
+            Tuple[torch.Tensor, Sequence[StrSequence]]: Word vectors with
+                shape (batch_size, max_words, vector_size).
+
+        """
+        ...
+
+    @overload
+    def forward(self, features_v: torch.Tensor,
+                **kwargs: Any) -> Tuple[torch.Tensor, Sequence[StrSequence]]:
+        """Predict words from (precomputed) visual features.
+
+        Same as other overload, but assumes features already are computed.
+        """
+        ...
+
+    def forward(self,
+                images,
+                masks=None,
+                threshold=None,
+                max_words=None,
+                captions=None):
+        """Implement both overloads."""
+        if captions is not None and len(captions) != len(images):
+            raise ValueError(f'expected {len(images)} ground truth '
+                             f'captions, got {len(captions)}')
+
+        if threshold is None:
+            threshold = self.threshold
+        if max_words is None:
+            max_words = self.max_words
+
+        if captions is None:
+            annos: annotators.WordAnnotations
+            with torch.no_grad():
+                annos = self.annotator(images, masks, threshold=threshold)
+            words = annos.words
+            idx = self.annotator.indexer.index(annos.words,
+                                               pad=True,
+                                               length=max_words)
+            words = self.annotator.indexer.unindex(idx, pad=False)
+        else:
+            idx = self.annotator.indexer(captions,
+                                         pad=True,
+                                         unk=False,
+                                         length=max_words)
+            words = self.annotator.indexer.unindex(idx, pad=False)
+
+        idx_t = torch.tensor(idx, dtype=torch.long, device=images.device)
+        with torch.no_grad():
+            features_w = self.vectors(idx_t)
+
+        return features_w, words
+
+    def properties(self, **kwargs):
+        """Override `SerializableModule.properties`."""
+        properties = super().properties(**kwargs)
+        properties.update({
+            'annotator': self.annotator,
+            'word2vec': self.word2vec,
+            'threshold': self.threshold,
+            'max_words': self.max_words,
+        })
+
+        state_dict = properties.get('state_dict', {})
+
+        # If the featurizer is serializable, remove its parameters from the
+        # state dict and serialize instead. We only have one Serializable
+        # featurizer type, so just check for that.
+        featurizer_v = self.annotator.featurizer
+        if isinstance(featurizer_v, featurizers.PretrainedPyramidFeaturizer):
+            keys = [
+                key for key in state_dict
+                if key.startswith('annotator.featurizer.')
+            ]
+            for key in keys:
+                del state_dict[key]
+
+        return properties
+
+    @classmethod
+    def recurse(cls):
+        """Override `SerializableModule.recurse`."""
+        return {'annotator': annotators.WordAnnotator}
+
+
 class DecoderOutput(NamedTuple):
     """Wraps output of the caption decoder."""
 
+    captions: StrSequence
     logprobs: torch.Tensor
     tokens: torch.Tensor
-    attention_vs: torch.Tensor
-    attention_ws: torch.Tensor
-    captions: StrSequence
+    attention_vs: Optional[torch.Tensor]
+    attention_ws: Optional[torch.Tensor]
 
 
 DecoderT = TypeVar('DecoderT', bound='Decoder')
@@ -78,9 +237,6 @@ Strategy = Union[torch.Tensor, str]
 STRATEGY_GREEDY = 'greedy'
 STRATEGY_SAMPLE = 'sample'
 STRATEGIES = (STRATEGY_GREEDY, STRATEGY_SAMPLE)
-
-WORD2VEC_SPACY = 'spacy'
-WORD2VECS = (WORD2VEC_SPACY,)
 
 
 class Decoder(serialize.SerializableModule):
@@ -95,30 +251,25 @@ class Decoder(serialize.SerializableModule):
 
     def __init__(self,
                  indexer: lang.Indexer,
-                 annotator: annotators.WordAnnotator,
-                 word2vec: str = WORD2VEC_SPACY,
+                 featurizer_v: Optional[featurizers.Featurizer] = None,
+                 featurizer_w: Optional[WordFeaturizer] = None,
                  copy: bool = False,
-                 max_words: int = 10,
                  embedding_size: int = 128,
                  hidden_size: int = 512,
                  attention_hidden_size: Optional[int] = None,
-                 threshold: float = .5,
                  dropout: float = .5):
         """Initialize the decoder.
 
         Args:
             indexer (lang.Indexer): Indexer for captions. The vocab used by
                 this indexer must be a superset of the `WordAnnotator` vocab.
-            annotator (annotators.WordAnnotator): Annotator for predicting
-                which words will appear in an image. Used to construct word
-                features that are attended over at every decoding step.
-            word2vec (str, optional): Kind of pretrained word embedding to
-                use for words predicted by the annotator. Options include:
-                'spacy'. Defaults to 'spacy'.
+            featurizer_v (Optional[featurizers.Featurizer], optional): Visual
+                featurizer. If this is not set, `featurizer_w` must be.
+            featurizer_w (Optional[WordFeaturizer], optional): Word featurizer.
+                If this is not set, `featurizer_v` must be. By default, only
+                visual features are used.
             copy (bool, optional): Use a copy mechanism in the model.
                 Defaults to False.
-            max_words (bool, optional): Maximum number of words to take from
-                ground truth captions or the word annotator. Defaults to 10.
             embedding_size (int, optional): Size of previous-word embeddings
                 that are input to the LSTM. Defaults to 128.
             hidden_size (int, optional): Size of LSTM hidden states.
@@ -126,8 +277,6 @@ class Decoder(serialize.SerializableModule):
             attention_hidden_size (Optional[int], optional): Size of attention
                 mechanism hidden layer. Defaults to minimum of visual feature
                 size plus word feature size and `hidden_size`.
-            threshold (float, optional): Probability cutoff for whether
-                `WordAnnotator` predicts a word or not. Defaults to .5.
             dropout (float, optional): Dropout probability, applied before
                 output layer of LSTM. Defaults to .5.
 
@@ -139,45 +288,53 @@ class Decoder(serialize.SerializableModule):
         """
         super().__init__()
 
-        if copy and not annotator.indexer.unique <= indexer.unique:
-            raise ValueError('when using a copy mechanism in the decoder, '
-                             'annotator vocabulary must be subset of indexer '
-                             'vocabulary, but indexer is missing these words: '
-                             f'{annotator.indexer.unique - indexer.unique} ')
+        if featurizer_v is None and featurizer_w is None:
+            raise ValueError('must set at least one of '
+                             'featurizer_v and featurizer_w')
+
+        if copy:
+            if featurizer_w is None:
+                raise ValueError('must set featurizer_w if copy=True')
+            elif featurizer_w.annotator.indexer.unique <= indexer.unique:
+                raise ValueError(
+                    'when using a copy mechanism, annotator vocab must be a '
+                    'subset of indexer vocab, but indexer is missing words: '
+                    f'{featurizer_w.annotator.indexer.unique - indexer.unique}'
+                )
 
         self.indexer = indexer
-        self.annotator = annotator
-        self.word2vec = word2vec
+        self.featurizer_v = featurizer_v
+        self.featurizer_w = featurizer_w
         self.copy = copy
-        self.max_words = max_words
         self.embedding_size = embedding_size
         self.hidden_size = hidden_size
         self.attention_hidden_size = attention_hidden_size
-        self.threshold = threshold
         self.dropout = dropout
 
-        if word2vec == WORD2VEC_SPACY:
-            self.featurizer_w = embeddings.spacy(annotator.indexer)
-        else:
-            raise ValueError(f'unknown word2vec type: {word2vec}')
+        self.feature_v_size, self.attend_v = None, None
+        if featurizer_v is not None:
+            self.feature_v_size = numpy.prod(featurizer_v.feature_shape).item()
+            self.attend_v = Attention(hidden_size,
+                                      self.feature_v_size,
+                                      hidden_size=attention_hidden_size)
 
-        self.feature_v_size = feature_v_size = annotator.feature_size
-        self.feature_w_size = feature_w_size = self.featurizer_w.embedding_dim
-        self.feature_size = feature_size = feature_v_size + feature_w_size
-        self.vocab_size = vocab_size = len(indexer)
+        self.feature_w_size, self.attend_w = None, None
+        if featurizer_w is not None:
+            self.feature_w_size = featurizer_w.vectors.embedding_dim
+            self.attend_w = Attention(hidden_size,
+                                      self.feature_w_size,
+                                      hidden_size=attention_hidden_size)
 
-        self.attend_v = Attention(hidden_size,
-                                  feature_v_size,
-                                  hidden_size=attention_hidden_size)
-        self.attend_w = Attention(hidden_size,
-                                  feature_w_size,
-                                  hidden_size=attention_hidden_size)
-        self.feature_gate = nn.Sequential(nn.Linear(hidden_size, feature_size),
-                                          nn.Sigmoid())
+        self.feature_size = self.feature_v_size or 0
+        self.feature_size += self.feature_w_size or 0
+        self.feature_gate = nn.Sequential(
+            nn.Linear(hidden_size, self.feature_size),
+            nn.Sigmoid(),
+        )
 
-        self.init_h = nn.Sequential(nn.Linear(feature_size, hidden_size),
+        self.init_h = nn.Sequential(nn.Linear(self.feature_size, hidden_size),
                                     nn.Tanh())
-        self.init_c = nn.Sequential(nn.Linear(feature_size, hidden_size),
+        self.init_c = nn.Sequential(nn.Linear(self.feature_size, hidden_size),
                                     nn.Tanh())
 
         self.copy_gate = None
@@ -185,16 +342,27 @@ class Decoder(serialize.SerializableModule):
             self.copy_gate = nn.Sequential(nn.Linear(hidden_size, 1),
                                            nn.Sigmoid())
 
-        self.embedding = nn.Embedding(vocab_size, embedding_size)
-        self.lstm = nn.LSTMCell(embedding_size + feature_size, hidden_size)
+        self.vocab_size = len(indexer)
+        self.embedding = nn.Embedding(self.vocab_size, embedding_size)
+        self.lstm = nn.LSTMCell(embedding_size + self.feature_size,
+                                hidden_size)
         self.output = nn.Sequential(nn.Dropout(p=dropout),
-                                    nn.Linear(hidden_size, vocab_size),
+                                    nn.Linear(hidden_size, self.vocab_size),
                                     nn.LogSoftmax(dim=-1))
 
     @property
-    def featurizer_v(self) -> featurizers.Featurizer:
-        """Return the visual featurizer for this captioner."""
-        return self.annotator.featurizer
+    def featurizer_v_(self) -> featurizers.Featurizer:
+        """Return the visual featurizer used in this model.
+
+        This function ends with _ because it descends into the word annotator,
+        if necessary, to find its visual featurizer, which is guaranteed to
+        be there.
+        """
+        featurizer_v = self.featurizer_v
+        if featurizer_v is None:
+            assert self.featurizer_w is not None
+            featurizer_v = self.featurizer_w.annotator.featurizer
+        return featurizer_v
 
     @overload
     def forward(self,
@@ -202,10 +370,10 @@ class Decoder(serialize.SerializableModule):
                 masks: torch.Tensor,
                 length: int = ...,
                 strategy: Strategy = ...,
-                captions: Optional[StrSequence] = ...,
-                threshold: Optional[float] = ...,
-                max_words: Optional[int] = ...) -> DecoderOutput:
+                **kwargs: Any) -> DecoderOutput:
         """Decode captions for the given top images and masks.
+
+        Keyword arguments are forwarded to WordFeaturizer, if decoder has one.
 
         Args:
             images (torch.Tensor): Top-k images for a neuron.
@@ -217,14 +385,6 @@ class Decoder(serialize.SerializableModule):
                 values will be used as inputs at each time step, so it should
                 have shape (batch_size, length). Other options include 'greedy'
                 and 'sample'. Defaults to 'greedy'.
-            captions (Optional[StrSequence], optional): Instead of using word
-                annotator, extract words from these captions. Defaults to None.
-            threshold (Optional[float], optional): Threshold for whether
-                annotator predicts a word. Overrides the `threshold` field on
-                this class if set. Defaults to None.
-            max_words (Optional[int], optional): Maximum number of words to
-                take from captions, if set, or from word annotator predictions.
-                Defaults to `self.max_words`.
 
         Returns:
             DecoderOutput: Decoder outputs.
@@ -246,81 +406,91 @@ class Decoder(serialize.SerializableModule):
                 masks=None,
                 length=15,
                 strategy=STRATEGY_GREEDY,
-                captions=None,
-                threshold=None,
-                max_words=None):
+                **kwargs):
         """Implement both overloads."""
         if isinstance(strategy, str) and strategy not in STRATEGIES:
             raise ValueError(f'unknown strategy: {strategy}')
 
         batch_size = len(images)
-        if captions is not None and len(captions) != batch_size:
-            raise ValueError(f'expected {batch_size} grount truth captions, '
-                             f'got {len(captions)}')
-
-        if threshold is None:
-            threshold = self.threshold
-        if max_words is None:
-            max_words = self.max_words
 
         # If necessary, obtain visual features. Technically, backpropagating
         # through the featurizer is acceptable, so avoid using no_grad.
-        if masks is not None:
-            images = images.view(-1, 3, *images.shape[-2:])
-            masks = masks.view(-1, 1, *masks.shape[-2:])
-            features_v = self.featurizer_v(images, masks)
-        else:
-            features_v = images
-        features_v = features_v.view(batch_size, -1, self.feature_v_size)
+        features_v = None
+        if self.featurizer_v is not None:
+            if masks is not None:
+                images = images.view(-1, 3, *images.shape[-2:])
+                masks = masks.view(-1, 1, *masks.shape[-2:])
+                features_v = self.featurizer_v(images, masks)
+            else:
+                features_v = images
+            features_v = features_v.view(batch_size, -1, self.feature_v_size)
 
         # Obtain word features from word annotator or ground truth captions.
-        if captions is None:
-            annos: annotators.WordAnnotations
-            with torch.no_grad():
-                annos = self.annotator(features_v, threshold=threshold)
-            annos_idx = self.annotator.indexer.index(annos.words,
-                                                     pad=True,
-                                                     length=max_words)
-            annos_words = self.annotator.indexer.unindex(annos_idx, pad=False)
-        else:
-            annos_idx = self.annotator.indexer(captions,
-                                               pad=True,
-                                               unk=False,
-                                               length=max_words)
-            annos_words = self.annotator.indexer.unindex(annos_idx, pad=False)
-
-        annos_idx_t = torch.tensor(annos_idx,
-                                   dtype=torch.long,
-                                   device=features_v.device)
-        with torch.no_grad():
-            features_w = self.featurizer_w(annos_idx_t)
+        features_w, words = None, None
+        if self.featurizer_w is not None:
+            if features_v is not None:
+                features_w, words = self.featurizer_w(features_v, **kwargs)
+            else:
+                features_w, words = self.featurizer_w(images, masks, **kwargs)
 
         # Prepare outputs.
         tokens = features_v.new_zeros(batch_size, length, dtype=torch.long)
         logprobs = features_v.new_zeros(batch_size, length, self.vocab_size)
-        attention_vs = features_v.new_zeros(batch_size, length,
-                                            features_v.shape[1])
-        attention_ws = features_v.new_zeros(batch_size, length,
-                                            annos_idx_t.shape[-1])
+
+        attention_vs = None
+        if self.featurizer_v is not None:
+            assert features_v is not None
+            attention_vs = features_v.new_zeros(batch_size, length,
+                                                features_v.shape[1])
+
+        attention_ws = None
+        if self.featurizer_w is not None:
+            assert features_w is not None
+            attention_ws = features_v.new_zeros(batch_size, length,
+                                                features_w.shape[1])
 
         # Compute initial hidden state and cell value.
-        features = (features_v, features_w)
-        pooled = torch.cat([fs.mean(dim=1) for fs in features], dim=-1)
+        pooled = torch.cat(
+            [
+                fs.mean(dim=1)
+                for fs in (features_v, features_w)
+                if fs is not None
+            ],
+            dim=-1,
+        )
         h, c = self.init_h(pooled), self.init_c(pooled)
 
         # Begin decoding.
         currents = tokens.new_empty(batch_size).fill_(self.indexer.start_index)
         for time in range(length):
             # Attend over visual features.
-            attention_vs[:, time] = attention_v = self.attend_v(h, features_v)
-            attenuated_v = attention_v.unsqueeze(-1).mul(features_v).sum(dim=1)
+            attention_v, attenuated_v = None, None
+            if self.featurizer_v is not None:
+                assert features_v is not None
+                assert attention_vs is not None
+                assert self.attend_v is not None
+                attention_v = self.attend_v(h, features_v)
+                attention_vs[:, time] = attention_v
+                attenuated_v = attention_v.unsqueeze(-1).mul(features_v).sum(1)
 
             # Attend over word featuers.
-            attention_ws[:, time] = attention_w = self.attend_w(h, features_w)
-            attenuated_w = attention_w.unsqueeze(-1).mul(features_w).sum(dim=1)
+            attention_w, attenuated_w = None, None
+            if self.featurizer_w is not None:
+                assert features_w is not None
+                assert attention_ws is not None
+                assert self.attend_w is not None
+                attention_w = self.attend_w(h, features_w)
+                attention_ws[:, time] = attention_w
+                attenuated_w = attention_w.unsqueeze(-1).mul(features_w).sum(1)
 
             # Concatenate and gate attenuated features.
-            attenuated = torch.cat((attenuated_v, attenuated_w), dim=-1)
+            attenuated = torch.cat(
+                [
+                    attenuated for attenuated in (attenuated_v, attenuated_w)
+                    if attenuated is not None
+                ],
+                dim=-1,
+            )
             gate = self.feature_gate(h)
             gated = attenuated * gate
 
@@ -332,17 +502,18 @@ class Decoder(serialize.SerializableModule):
 
             # If copy mechanism is enabled, apply it.
             if self.copy_gate is not None:
-                word_idx = [self.indexer[w] for ws in annos_words for w in ws]
+                assert words is not None
+                assert attention_w is not None
+                word_idx = [self.indexer[w] for ws in words for w in ws]
                 batch_idx = [
-                    idx for idx, ws in enumerate(annos_words)
-                    for _ in range(len(ws))
+                    idx for idx, ws in enumerate(words) for _ in range(len(ws))
                 ]
 
                 p_copy = self.copy_gate(h)
                 p_copy_w = torch.zeros_like(log_p_w)
                 p_copy_w[batch_idx, word_idx] = torch.cat([
                     attention_w[idx, :len(words)]
-                    for idx, words in enumerate(annos_words)
+                    for idx, words in enumerate(words)
                 ])
                 p_w = (1 - p_copy) * torch.exp(log_p_w) + p_copy * p_copy_w
                 logprobs[:, time] = log_p_w = torch.log(p_w)
@@ -360,11 +531,11 @@ class Decoder(serialize.SerializableModule):
             tokens[:, time] = currents
 
         return DecoderOutput(
+            captions=self.indexer.reconstruct(tokens.tolist()),
             logprobs=logprobs,
             tokens=tokens,
             attention_vs=attention_vs,
             attention_ws=attention_ws,
-            captions=self.indexer.reconstruct(tokens.tolist()),
         )
 
     def bleu(self,
@@ -409,7 +580,7 @@ class Decoder(serialize.SerializableModule):
               annotation_index: int = 4,
               predictions: Optional[StrSequence] = None,
               **kwargs: Any) -> Mapping[str, Mapping[str, float]]:
-        """Compute ROUGe score of this model on the given dataset.
+        """Compute ROUGE score of this model on the given dataset.
 
         Keyword arguments forwarded to `Decoder.predict` if `predictions` not
         provided.
@@ -424,7 +595,7 @@ class Decoder(serialize.SerializableModule):
                 By default, computed from the dataset using `Decoder.predict`.
 
         Returns:
-            Mapping[str, Mapping[str, float]]: Average ROUGe (1, 2, l) scores.
+            Mapping[str, Mapping[str, float]]: Average ROUGE (1, 2, l) scores.
 
         """
         if predictions is None:
@@ -488,12 +659,13 @@ class Decoder(serialize.SerializableModule):
         if device is not None:
             self.to(device)
         if features is None:
-            features = self.featurizer_v.map(dataset,
-                                             image_index=image_index,
-                                             mask_index=mask_index,
-                                             batch_size=batch_size,
-                                             device=device,
-                                             display_progress=display_progress)
+            features = self.featurizer_v_.map(
+                dataset,
+                image_index=image_index,
+                mask_index=mask_index,
+                batch_size=batch_size,
+                device=device,
+                display_progress=display_progress)
 
         loader = data.DataLoader(features,
                                  batch_size=batch_size,
@@ -511,49 +683,8 @@ class Decoder(serialize.SerializableModule):
 
         return tuple(captions)
 
-    def properties(self, **kwargs):
-        """Override `SerializableModule.properties`."""
-        properties = super().properties(**kwargs)
-        properties.update({
-            'indexer': self.indexer,
-            'annotator': self.annotator,
-            'word2vec': self.word2vec,
-            'copy': self.copy,
-            'embedding_size': self.embedding_size,
-            'hidden_size': self.hidden_size,
-            'attention_hidden_size': self.attention_hidden_size,
-            'threshold': self.threshold,
-            'dropout': self.dropout,
-        })
-
-        state_dict = properties.get('state_dict', {})
-
-        # If the featurizer is serializable, remove its parameters from the
-        # state dict and serialize instead. We only have one Serializable
-        # featurizer type, so just check for that.
-        featurizer_v = self.featurizer_v
-        if isinstance(featurizer_v, featurizers.PretrainedPyramidFeaturizer):
-            keys = [
-                key for key in state_dict
-                if key.startswith('annotator.featurizer.')
-            ]
-            for key in keys:
-                del state_dict[key]
-
-        return properties
-
-    @classmethod
-    def recurse(cls):
-        """Override `SerializableModule.recurse`."""
-        return {
-            'annotator': annotators.WordAnnotator,
-            'indexer': lang.Indexer,
-        }
-
-    @classmethod
-    def fit(cls: Type[DecoderT],
+    def fit(self,
             dataset: data.Dataset,
-            annotator: annotators.WordAnnotatorT,
             image_index: int = 2,
             mask_index: int = 3,
             annotation_index: int = 4,
@@ -565,17 +696,14 @@ class Decoder(serialize.SerializableModule):
             use_ground_truth_words: bool = True,
             optimizer_t: Type[optim.Optimizer] = optim.Adam,
             optimizer_kwargs: Optional[Mapping[str, Any]] = None,
-            indexer_kwargs: Optional[Mapping[str, Any]] = None,
             features: Optional[data.TensorDataset] = None,
             num_workers: int = 0,
             device: Optional[Device] = None,
-            display_progress: bool = True,
-            **kwargs: Any) -> DecoderT:
+            display_progress: bool = True) -> None:
         """Train a new decoder on the given data.
 
         Args:
             dataset (data.Dataset): Dataset to train on.
-            annotator (annotators.WordAnnotatorT): Word annotator model.
             image_index (int, optional): Index of images in dataset samples.
                 Defaults to 2 to be compatible with AnnotatedTopImagesDataset.
             mask_index (int, optional): Index of masks in dataset samples.
@@ -601,9 +729,6 @@ class Decoder(serialize.SerializableModule):
                 Defaults to optim.Adam.
             optimizer_kwargs (Optional[Mapping[str, Any]], optional): Optimizer
                 options. By default, no kwargs are passed to optimizer.
-            indexer_kwargs (Optional[Mapping[str, Any]], optional): Indexer
-                options. By default, indexer is configured to not ignore stop
-                words and punctuation.
             features (Optional[data.TensorDataset], optional): Precomputed
                 visual features. By default, computed before training the
                 captioner.
@@ -614,37 +739,19 @@ class Decoder(serialize.SerializableModule):
             display_progress (bool, optional): Show progress bar while
                 training. Defaults to True.
 
-        Returns:
-            DecoderT: The trained decoder.
-
         """
+        if device is not None:
+            self.to(device)
         if optimizer_kwargs is None:
             optimizer_kwargs = {}
-        if indexer_kwargs is None:
-            indexer_kwargs = {}
         if features is None:
-            features = annotator.featurizer.map(
+            features = self.featurizer_v_.map(
                 dataset,
                 image_index=image_index,
                 mask_index=mask_index,
                 batch_size=batch_size,
                 device=device,
                 display_progress=display_progress)
-
-        # Prepare indexer.
-        annotations = []
-        for index in range(len(features)):
-            annotation = dataset[index][annotation_index]
-            annotation = lang.join(annotation)
-            annotations.append(annotation)
-
-        indexer_kwargs = dict(indexer_kwargs)
-        if 'tokenize' not in indexer_kwargs:
-            indexer_kwargs['tokenize'] = lang.tokenizer(ignore_stop=False,
-                                                        ignore_punct=False)
-        for key in ('start', 'stop', 'pad', 'unk'):
-            indexer_kwargs.setdefault(key, True)
-        indexer = lang.indexer(annotations, **indexer_kwargs)
 
         # Prepare dataset and data loader. Use an anonymous dataset class to
         # make this easier, since we want to split train/val by neuron, but
@@ -684,9 +791,8 @@ class Decoder(serialize.SerializableModule):
                                      batch_size=batch_size)
 
         # Prepare model and training tools.
-        model = cls(indexer, annotator, **kwargs).to(device)
-        optimizer = optimizer_t(model.parameters(), **optimizer_kwargs)
-        criterion = nn.NLLLoss(ignore_index=indexer.pad_index)
+        optimizer = optimizer_t(self.parameters(), **optimizer_kwargs)
+        criterion = nn.NLLLoss(ignore_index=self.indexer.pad_index)
 
         stopper = None
         if patience is not None:
@@ -698,14 +804,15 @@ class Decoder(serialize.SerializableModule):
 
         # Begin training!
         for _ in progress:
-            model.train()
-            model.featurizer_v.eval()
+            self.train()
+            self.featurizer_v_.eval()
             train_loss, train_reg = 0., 0.
             for features_v, captions in train_loader:
-                targets = torch.tensor(indexer(captions), device=device)[:, 1:]
+                targets = torch.tensor(self.indexer(captions),
+                                       device=device)[:, 1:]
                 _, length = targets.shape
 
-                outputs = model(
+                outputs = self(
                     features_v,
                     length=length,
                     strategy=targets,
@@ -726,14 +833,15 @@ class Decoder(serialize.SerializableModule):
             train_loss /= len(train_loader)
             train_reg /= len(train_loader)
 
-            model.eval()
+            self.eval()
             val_loss = 0.
             for features_v, captions in val_loader:
-                targets = torch.tensor(indexer(captions), device=device)[:, 1:]
+                targets = torch.tensor(self.indexer(captions),
+                                       device=device)[:, 1:]
                 _, length = targets.shape
 
                 with torch.no_grad():
-                    outputs = model(
+                    outputs = self(
                         features_v,
                         length=length,
                         strategy=targets,
@@ -752,4 +860,115 @@ class Decoder(serialize.SerializableModule):
             if stopper is not None and stopper(val_loss):
                 break
 
-        return model
+    def properties(self, **kwargs):
+        """Override `SerializableModule.properties`."""
+        properties = super().properties(**kwargs)
+        properties.update({
+            'indexer': self.indexer,
+            'copy': self.copy,
+            'embedding_size': self.embedding_size,
+            'hidden_size': self.hidden_size,
+            'attention_hidden_size': self.attention_hidden_size,
+            'dropout': self.dropout,
+        })
+
+        state_dict = properties.get('state_dict', {})
+        delete = []
+
+        featurizer_v = self.featurizer_v
+        if featurizer_v is not None and isinstance(
+                featurizer_v, featurizers.PretrainedPyramidFeaturizer):
+            delete += [
+                key for key in state_dict if key.startswith('featurizer_v.')
+            ]
+            properties['featurizer_v'] = featurizer_v
+
+        featurizer_w = self.featurizer_w
+        if featurizer_w is not None:
+            properties['featurizer_w'] = featurizer_w
+            if isinstance(featurizer_w.featurizer,
+                          featurizers.PretrainedPyramidFeaturizer):
+                delete += [
+                    key for key in state_dict
+                    if key.startswith('featurizer_w.annotator.featurizer.')
+                ]
+
+        for key in delete:
+            del state_dict[key]
+
+        return properties
+
+    @classmethod
+    def recurse(cls):
+        """Override `SerializableModule.recurse`."""
+        return {
+            'featurizer_w': WordFeaturizer,
+            'featurizer_v': featurizers.PretrainedPyramidFeaturizer,
+            'indexer': lang.Indexer,
+        }
+
+
+def decoder(dataset: data.Dataset,
+            featurizer: Optional[featurizers.Featurizer] = None,
+            annotator: Optional[annotators.WordAnnotator] = None,
+            annotation_index: int = 4,
+            indexer_kwargs: Optional[Mapping[str, Any]] = None,
+            word_featurizer_kwargs: Optional[Mapping[str, Any]] = None,
+            **kwargs: Any) -> Decoder:
+    """Instantiate a new decoder.
+
+    Args:
+        dataset (data.Dataset): Dataset to draw vocabulary from.
+        featurizer (Optional[featurizers.Featurer], optional): Visual
+            featurizer. Must set this OR `annotator`, not both.
+            Defaults to None.
+        annotator (Optional[annotators.WordAnnotator], optional): Word
+            annotation model. Must set this OR `featurizer`, not both.
+            Defaults to None.
+        annotation_index (int, optional): Index of language annotations in
+            dataset samples. Defaults to 4 to be compatible with
+            AnnotatedTopImagesDataset.
+        indexer_kwargs (Optional[Mapping[str, Any]], optional): Indexer
+            options. By default, indexer is configured to not ignore stop
+            words and punctuation.
+        word_featurizer_kwargs (Optional[Mapping[str, Any]], optional): Word
+            featurizer options. Defaults to None.
+
+    Raises:
+        ValueError: If both `featurizer` and `annotator` are set.
+
+    Returns:
+        Decoder: The instantiated decoder.
+
+    """
+    if (featurizer is None) == (annotator is None):
+        raise ValueError('must set exactly one of featurizer and annotator')
+    if indexer_kwargs is None:
+        indexer_kwargs = {}
+    if word_featurizer_kwargs is None:
+        word_featurizer_kwargs = {}
+
+    annotations = []
+    for index in range(len(cast(Sized, dataset))):
+        annotation = dataset[index][annotation_index]
+        annotation = lang.join(annotation)
+        annotations.append(annotation)
+
+    indexer_kwargs = dict(indexer_kwargs)
+    if 'tokenize' not in indexer_kwargs:
+        indexer_kwargs['tokenize'] = lang.tokenizer(ignore_stop=False,
+                                                    ignore_punct=False)
+    for key in ('start', 'stop', 'pad', 'unk'):
+        indexer_kwargs.setdefault(key, True)
+    indexer = lang.indexer(annotations, **indexer_kwargs)
+
+    featurizer_v, featurizer_w = featurizer, None
+    if featurizer_v is None:
+        assert featurizer is None
+        assert annotator is not None
+        featurizer_w = WordFeaturizer(annotator, **word_featurizer_kwargs)
+
+    return Decoder(indexer,
+                   featurizer_v=featurizer_v,
+                   featurizer_w=featurizer_w,
+                   **kwargs)
