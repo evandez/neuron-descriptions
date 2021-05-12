@@ -413,14 +413,14 @@ class Decoder(serialize.SerializableModule):
 
         batch_size = len(images)
 
-        # If necessary, obtain visual features. Technically, backpropagating
-        # through the featurizer is acceptable, so avoid using no_grad.
+        # If necessary, obtain visual features.
         features_v = None
         if self.featurizer_v is not None:
             if masks is not None:
                 images = images.view(-1, 3, *images.shape[-2:])
                 masks = masks.view(-1, 1, *masks.shape[-2:])
-                features_v = self.featurizer_v(images, masks)
+                with torch.no_grad():
+                    features_v = self.featurizer_v(images, masks)
             else:
                 features_v = images
             features_v = features_v.view(batch_size, -1, self.feature_v_size)
@@ -920,10 +920,10 @@ def decoder(dataset: data.Dataset,
     Args:
         dataset (data.Dataset): Dataset to draw vocabulary from.
         featurizer (Optional[featurizers.Featurer], optional): Visual
-            featurizer. Must set this OR `annotator`, not both.
+            featurizer. Must set this or `annotator`, or both.
             Defaults to None.
         annotator (Optional[annotators.WordAnnotator], optional): Word
-            annotation model. Must set this OR `featurizer`, not both.
+            annotation model. Must set this or `featurizer`, or both.
             Defaults to None.
         annotation_index (int, optional): Index of language annotations in
             dataset samples. Defaults to 4 to be compatible with
@@ -941,7 +941,7 @@ def decoder(dataset: data.Dataset,
         Decoder: The instantiated decoder.
 
     """
-    if (featurizer is None) == (annotator is None):
+    if featurizer is None and annotator is None:
         raise ValueError('must set exactly one of featurizer and annotator')
     if indexer_kwargs is None:
         indexer_kwargs = {}
@@ -956,16 +956,16 @@ def decoder(dataset: data.Dataset,
 
     indexer_kwargs = dict(indexer_kwargs)
     if 'tokenize' not in indexer_kwargs:
-        indexer_kwargs['tokenize'] = lang.tokenizer(ignore_stop=False,
+        copy = kwargs.get('copy', False)
+        indexer_kwargs['tokenize'] = lang.tokenizer(lemmatize=copy,
+                                                    ignore_stop=False,
                                                     ignore_punct=False)
     for key in ('start', 'stop', 'pad', 'unk'):
         indexer_kwargs.setdefault(key, True)
     indexer = lang.indexer(annotations, **indexer_kwargs)
 
-    featurizer_v, featurizer_w = featurizer, None
-    if featurizer_v is None:
-        assert featurizer is None
-        assert annotator is not None
+    featurizer_v = featurizer
+    if annotator is not None:
         featurizer_w = WordFeaturizer(annotator, **word_featurizer_kwargs)
 
     return Decoder(indexer,
