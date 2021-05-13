@@ -964,7 +964,7 @@ def decoder(dataset: data.Dataset,
         indexer_kwargs.setdefault(key, True)
     indexer = lang.indexer(annotations, **indexer_kwargs)
 
-    featurizer_v = featurizer
+    featurizer_v, featurizer_w = featurizer, None
     if annotator is not None:
         featurizer_w = WordFeaturizer(annotator, **word_featurizer_kwargs)
 
