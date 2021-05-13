@@ -45,7 +45,7 @@ assert run is not None, 'failed to initialize wandb?'
 
 device = 'cuda' if args.cuda else 'cpu'
 
-dataset = zoo.datasets(*args.datasets)
+dataset = zoo.datasets(*args.datasets, path=args.datasets_root)
 
 size = len(cast(Sized, dataset))
 test_size = int(args.hold_out * size)

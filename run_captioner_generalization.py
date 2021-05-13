@@ -75,15 +75,15 @@ device = 'cuda' if args.cuda else 'cpu'
 for experiment in args.experiments or EXPERIMENTS.keys():
     splits = EXPERIMENTS[experiment]
     if len(splits) == 2:
-        left = zoo.datasets(*splits[0], path=args.dataset_root)
-        right = zoo.datasets(*splits[1], path=args.dataset_root)
+        left = zoo.datasets(*splits[0], path=args.datasets_root)
+        right = zoo.datasets(*splits[1], path=args.datasets_root)
         configs = ((left, right, *splits), (right, left, *reversed(splits)))
     else:
         assert len(splits) == 1, 'weird splits?'
         names, = splits
         configs = []
         for name in names:
-            dataset = zoo.datasets(name, path=args.dataset_root)
+            dataset = zoo.datasets(name, path=args.datasets_root)
             size = len(cast(Sized, dataset))
             test_size = (.1 * size)
             train_size = size - test_size
