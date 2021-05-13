@@ -803,24 +803,24 @@ class Decoder(serialize.SerializableModule):
         for _ in progress:
             self.train()
             self.featurizer_v_.eval()
-            train_loss, train_reg = 0., 0.
+            train_loss = 0.
             for features_v, captions in train_loader:
                 targets = torch.tensor(self.indexer(captions),
                                        device=device)[:, 1:]
                 _, length = targets.shape
 
-                outputs = self(
+                outputs: DecoderOutput = self(
                     features_v,
                     length=length,
                     strategy=targets,
                     captions=captions if use_ground_truth_words else None)
 
                 loss = criterion(outputs.logprobs.permute(0, 2, 1), targets)
-                train_loss += loss.item()
 
-                regularizer = ((1 - outputs.attention_vs.sum(dim=1))**2).mean()
-                train_reg += regularizer.item()
-                loss += regularization_weight * regularizer
+                attention_vs = outputs.attention_vs
+                if attention_vs is not None:
+                    regularizer = ((1 - attention_vs.sum(dim=1))**2).mean()
+                    loss += regularization_weight * regularizer
 
                 loss.backward()
                 optimizer.step()
@@ -828,7 +828,6 @@ class Decoder(serialize.SerializableModule):
 
                 train_loss += loss.item()
             train_loss /= len(train_loader)
-            train_reg /= len(train_loader)
 
             self.eval()
             val_loss = 0.
@@ -851,7 +850,6 @@ class Decoder(serialize.SerializableModule):
             if display_progress:
                 assert not isinstance(progress, range)
                 progress.set_description(f'train_loss={train_loss:.3f}, '
-                                         f'train_reg={train_reg:.3f}, '
                                          f'val_loss={val_loss:.3f}')
 
             if stopper(val_loss):
