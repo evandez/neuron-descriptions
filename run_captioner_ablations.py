@@ -32,6 +32,10 @@ parser.add_argument('--wandb-group',
                     help='wandb group name')
 parser.add_argument('--wandb-entity', help='wandb user or team')
 parser.add_argument('--wandb-dir', metavar='PATH', help='wandb directory')
+parser.add_argument('--wandb-n-samples',
+                    type=int,
+                    default=25,
+                    help='number of samples to upload for each model')
 parser.add_argument('--cuda', action='store_true', help='use cuda device')
 args = parser.parse_args()
 
@@ -95,6 +99,6 @@ for condition, captioner in ablations.items():
         wandb.Image(
             test[index].as_pil_image_grid(),
             caption=f'({condition.upper()}) {predictions[index]}',
-        ) for index in test.indices[:25]
+        ) for index in range(min(len(test), args.wandb_n_samples))
     ]
     wandb.log(log)
