@@ -70,7 +70,7 @@ annotator_f1, _ = annotator.score(test,
                                   features=test_features,
                                   device=device,
                                   display_progress_as='test word annotator')
-run.summary['annotator-f1'] = annotator_f1
+run.summary['annotator-f1'] = annotator_f1  # type: ignore
 
 ablations = {
     'sat':
