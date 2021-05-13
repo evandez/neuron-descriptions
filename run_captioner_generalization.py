@@ -76,7 +76,8 @@ assert run is not None, 'failed to initialize wandb?'
 
 device = 'cuda' if args.cuda else 'cpu'
 
-for experiment in args.experiments or EXPERIMENTS.keys():
+for index, experiment in enumerate(args.experiments or EXPERIMENTS.keys()):
+    print(f'-------- EXPERIMENT {index + 1}: {experiment} --------')
     splits = EXPERIMENTS[experiment]
     if len(splits) == 2:
         left = zoo.datasets(*splits[0], path=args.datasets_root)
@@ -96,14 +97,21 @@ for experiment in args.experiments or EXPERIMENTS.keys():
 
     for train, test, train_keys, test_keys in configs:
         featurizer = featurizers.MaskedPyramidFeaturizer().to(device)
-        train_features = featurizer.map(train, device=device)
-        test_features = featurizer.map(test, device=device)
+        train_features = featurizer.map(
+            train, display_progress_as='featurize train set', device=device)
+        test_features = featurizer.map(
+            test, display_progress_as='featurize test set', device=device)
 
         annotator = annotators.WordAnnotator.fit(
             train,
             featurizer,
             indexer_kwargs={'ignore_rarer_than': 5},
             features=train_features)
+        annotator_f1, _ = annotator.score(
+            test,
+            features=test_features,
+            device=device,
+            display_progress_as='test word annotator')
 
         captioner = captioners.decoder(train,
                                        featurizer=featurizer,
@@ -119,6 +127,7 @@ for experiment in args.experiments or EXPERIMENTS.keys():
             'condition': experiment,
             'train': train_keys,
             'test': test_keys,
+            'annotator-f1': annotator_f1,
             'bleu': bleu.score,
         }
         for index, precision in enumerate(bleu.precisions):

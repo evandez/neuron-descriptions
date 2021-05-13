@@ -42,7 +42,9 @@ def test_top_images_as_pil_image_grid_bad_opacity(top_images, opacity):
 @pytest.mark.parametrize('device', (None, 'cpu', torch.device('cpu')))
 def test_top_images_dataset_init(top_images_root, device):
     """Test TopImagesDataset.__init__ eagerly reads data."""
-    dataset = datasets.TopImagesDataset(top_images_root, device=device)
+    dataset = datasets.TopImagesDataset(top_images_root,
+                                        display_progress=False,
+                                        device=device)
     assert dataset.root == top_images_root
     assert dataset.layers == tuple(
         f'layer-{i}' for i in range(conftest.N_LAYERS))
@@ -129,7 +131,9 @@ def test_top_images_dataset_init_bad_images_or_masks(top_images_root,
 def test_top_images_dataset_getitem(top_images_root, top_image_tensors,
                                     top_image_masks):
     """Test TopImagesDataset.__getitem__ returns samples in right order."""
-    dataset = datasets.TopImagesDataset(top_images_root, device='cpu')
+    dataset = datasets.TopImagesDataset(top_images_root,
+                                        display_progress=False,
+                                        device='cpu')
     for layer in range(conftest.N_LAYERS):
         for unit in range(conftest.N_UNITS_PER_LAYER):
             index = layer * conftest.N_UNITS_PER_LAYER + unit
@@ -210,7 +214,8 @@ def test_annotated_top_images_dataset_init_no_keep_unannotated_samples(
         layer_column=conftest.LAYER_COLUMN,
         unit_column=conftest.UNIT_COLUMN,
         annotation_column=conftest.ANNOTATION_COLUMN,
-        keep_unannotated_samples=keep_unannotated_samples)
+        keep_unannotated_samples=keep_unannotated_samples,
+        display_progress=False)
 
     # Yeah, yeah, yeah, this is bad practice, I know...
     if keep_unannotated_samples:

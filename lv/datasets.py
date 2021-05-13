@@ -68,8 +68,8 @@ class TopImagesDataset(data.Dataset):
                 By default, all subdirectories of root are treated as layers.
             device (Optional[Union[str, torch.device]], optional): Send all
                 tensors to this device.
-            display_progress (bool, optional): Show the progress bar when
-                reading images into menu. Defaults to True.
+            display_progress (bool, optional): Show a progress
+                bar when reading images into menu. Defaults to True.
 
         Raises:
             FileNotFoundError: If root directory does not exist or if layer
@@ -94,10 +94,15 @@ class TopImagesDataset(data.Dataset):
         self.layers = layers = tuple(sorted(layers))
         self.device = device
 
+        progress = layers
+        if display_progress is not None:
+            progress = tqdm(progress,
+                            desc=f'load {root.parent.name}/{root.name}')
+
         self.images_by_layer = {}
         self.masks_by_layer = {}
         renormalizer = renormalize.renormalizer(source='byte', target='pt')
-        for layer in tqdm(layers) if display_progress else layers:
+        for layer in progress:
             images_file = root / str(layer) / 'images.npy'
             masks_file = root / str(layer) / 'masks.npy'
             for file in (images_file, masks_file):

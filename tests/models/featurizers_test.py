@@ -13,7 +13,7 @@ def test_featurizer_map(featurizer, top_images_dataset, device):
     actual = featurizer.map(top_images_dataset,
                             image_index=-2,
                             mask_index=-1,
-                            display_progress=False,
+                            display_progress_as=None,
                             device=device)
     assert len(actual) == len(top_images_dataset)
     for (features,) in actual:

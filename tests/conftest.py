@@ -88,7 +88,7 @@ def top_images_root(top_image_tensors, top_image_masks):
 @pytest.fixture
 def top_images_dataset(top_images_root):
     """Return a TopImagesDataset for testing."""
-    return datasets.TopImagesDataset(top_images_root)
+    return datasets.TopImagesDataset(top_images_root, display_progress=False)
 
 
 def annotation(layer_index, unit_index):
@@ -136,4 +136,5 @@ def annotated_top_images_dataset(top_images_root,
         annotations_csv_file=top_images_annotations_csv_file,
         layer_column=LAYER_COLUMN,
         unit_column=UNIT_COLUMN,
-        annotation_column=ANNOTATION_COLUMN)
+        annotation_column=ANNOTATION_COLUMN,
+        display_progress=False)

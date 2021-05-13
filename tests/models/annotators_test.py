@@ -107,7 +107,7 @@ def test_word_annotator_predict(word_annotator, dataset):
     """Test WordAnnotator.predict can process entire dataset."""
     actual = word_annotator.predict(dataset,
                                     batch_size=BATCH_SIZE,
-                                    display_progress=False)
+                                    display_progress_as=None)
     assert_word_annotations_valid(actual, len(dataset))
 
 
@@ -115,7 +115,7 @@ def test_word_annotator_score(word_annotator, dataset):
     """Test WordAnnotator.score can process entire dataset."""
     actual = word_annotator.score(dataset,
                                   batch_size=BATCH_SIZE,
-                                  display_progress=False)
+                                  display_progress_as=None)
     assert len(actual) == 2
     f1, predictions = actual
     assert f1 >= 0 and f1 <= 1
@@ -131,7 +131,7 @@ def test_word_annotator_fit(dataset, featurizer):
         batch_size=BATCH_SIZE,
         optimizer_kwargs={'lr': 1e-4},
         indexer_kwargs={'ignore_in': ('foo',)},
-        display_progress=False)
+        display_progress_as=None)
     # Just some basic assertions...
     assert actual.indexer is not None
     assert actual.featurizer is featurizer

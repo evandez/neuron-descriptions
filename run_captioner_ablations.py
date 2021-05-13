@@ -66,6 +66,11 @@ annotator = annotators.WordAnnotator.fit(
     indexer_kwargs={'ignore_rarer_than': 5},
     features=train_features,
     device=device)
+annotator_f1, _ = annotator.score(test,
+                                  features=test_features,
+                                  device=device,
+                                  display_progress_as='test word annotator')
+run.summary['annotator-f1'] = annotator_f1
 
 ablations = {
     'sat':
@@ -83,10 +88,12 @@ for condition, factory in ablations.items():
     captioner = factory()
     captioner.fit(train,
                   features=train_features if condition != 'sat' else None,
+                  display_progress_as=f'train {condition}',
                   device=device)
     predictions = captioner.predict(
         test,
         features=test_features if condition != 'sat' else None,
+        display_progress_as=f'test {condition}',
         device=device)
     bleu = captioner.bleu(test, predictions=predictions)
     rouge = captioner.rouge(test, predictions=predictions)

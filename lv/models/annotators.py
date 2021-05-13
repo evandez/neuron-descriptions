@@ -238,7 +238,7 @@ class WordAnnotator(serialize.SerializableModule):
                 features: Optional[data.TensorDataset] = None,
                 num_workers: int = 0,
                 device: Optional[Device] = None,
-                display_progress: bool = True,
+                display_progress_as: Optional[str] = 'predict words',
                 **kwargs: Any) -> WordAnnotations:
         """Feed entire dataset through the annotation model.
 
@@ -258,9 +258,9 @@ class WordAnnotator(serialize.SerializableModule):
                 Defaults to 0.
             device (Optional[Device], optional): Send model and data to this
                 device. Defaults to None.
-            display_progress (bool, optional): Show progress for pre-
-                featurizing dataset and for predicting features.
-                Defaults to True.
+            display_progress_as (Optional[str], optional): Show a progress bar
+                with this key when predicting words. Defaults to
+                'predict words'.
 
         Returns:
             WordAnnotations: Predicted annotations for every sample in dataset.
@@ -269,19 +269,23 @@ class WordAnnotator(serialize.SerializableModule):
         if device is not None:
             self.to(device)
         if features is None:
-            features = self.featurizer.map(dataset,
-                                           image_index=image_index,
-                                           mask_index=mask_index,
-                                           batch_size=batch_size,
-                                           device=device,
-                                           display_progress=display_progress)
+            features = self.featurizer.map(
+                dataset,
+                image_index=image_index,
+                mask_index=mask_index,
+                batch_size=batch_size,
+                device=device,
+                display_progress_as=display_progress_as and
+                'featurize dataset')
 
         loader = data.DataLoader(features,
                                  batch_size=batch_size,
                                  num_workers=num_workers)
+        if display_progress_as is not None:
+            loader = tqdm(loader, desc=display_progress_as)
 
         predictions = []
-        for (inputs,) in tqdm(loader) if display_progress else loader:
+        for (inputs,) in loader:
             outputs = self(inputs, **kwargs)
             predictions.append(outputs)
 
@@ -326,22 +330,24 @@ class WordAnnotator(serialize.SerializableModule):
         }
 
     @classmethod
-    def fit(cls: Type[WordAnnotatorT],
-            dataset: data.Dataset,
-            featurizer: featurizers.Featurizer,
-            image_index: int = 2,
-            mask_index: int = 3,
-            annotation_index: int = 4,
-            batch_size: int = 64,
-            max_epochs: int = 1000,
-            patience: Optional[int] = None,
-            optimizer_t: Type[optim.Optimizer] = optim.Adam,
-            optimizer_kwargs: Optional[Mapping[str, Any]] = None,
-            indexer_kwargs: Optional[Mapping[str, Any]] = None,
-            features: Optional[data.TensorDataset] = None,
-            num_workers: int = 0,
-            device: Optional[Device] = None,
-            display_progress: bool = True) -> WordAnnotatorT:
+    def fit(
+        cls: Type[WordAnnotatorT],
+        dataset: data.Dataset,
+        featurizer: featurizers.Featurizer,
+        image_index: int = 2,
+        mask_index: int = 3,
+        annotation_index: int = 4,
+        batch_size: int = 64,
+        max_epochs: int = 1000,
+        patience: Optional[int] = None,
+        optimizer_t: Type[optim.Optimizer] = optim.Adam,
+        optimizer_kwargs: Optional[Mapping[str, Any]] = None,
+        indexer_kwargs: Optional[Mapping[str, Any]] = None,
+        features: Optional[data.TensorDataset] = None,
+        num_workers: int = 0,
+        device: Optional[Device] = None,
+        display_progress_as: Optional[str] = 'train word annotator',
+    ) -> WordAnnotatorT:
         """Train a new WordAnnotator from scratch.
 
         Args:
@@ -373,8 +379,9 @@ class WordAnnotator(serialize.SerializableModule):
                 Defaults to 0.
             device (Optional[Device], optional): Send model and all data to
                 this device. Defaults to None.
-            display_progress (bool, optional): Show progress bars for pre-
-                featurizing dataset and for training model. Defaults to True.
+            display_progress_as (Optional[str], optional): Show a progress bar
+                with this key when training model.
+                Defaults to 'train word annotator'.
 
         Returns:
             WordAnnotatorT: The trained WordAnnotator.
@@ -385,12 +392,14 @@ class WordAnnotator(serialize.SerializableModule):
         if indexer_kwargs is None:
             indexer_kwargs = {}
         if features is None:
-            features = featurizer.map(dataset,
-                                      image_index=image_index,
-                                      mask_index=mask_index,
-                                      batch_size=batch_size,
-                                      device=device,
-                                      display_progress=display_progress)
+            features = featurizer.map(
+                dataset,
+                image_index=image_index,
+                mask_index=mask_index,
+                batch_size=batch_size,
+                device=device,
+                display_progress_as=display_progress_as and
+                'featurize dataset')
 
         annotations = []
         for index in range(len(features)):
@@ -433,8 +442,8 @@ class WordAnnotator(serialize.SerializableModule):
         criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
 
         progress = range(max_epochs)
-        if display_progress:
-            progress = tqdm(progress)
+        if display_progress_as is not None:
+            progress = tqdm(progress, desc=display_progress_as)
 
         for _ in progress:
             train_loss = 0.
@@ -449,7 +458,7 @@ class WordAnnotator(serialize.SerializableModule):
                 train_loss += loss.item()
             train_loss /= len(features_loader)
 
-            if display_progress:
+            if display_progress_as is not None:
                 assert not isinstance(progress, range)
                 progress.set_description(f'loss={train_loss:.3f}')
 

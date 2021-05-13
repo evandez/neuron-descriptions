@@ -30,7 +30,7 @@ class Featurizer(nn.Module):
             batch_size: int = 128,
             num_workers: int = 0,
             device: Optional[Device] = None,
-            display_progress: bool = True,
+            display_progress_as: Optional[str] = 'featurize dataset',
             **kwargs: Any) -> data.TensorDataset:
         """Featurize an entire dataset.
 
@@ -51,8 +51,8 @@ class Featurizer(nn.Module):
                 Defaults to 0.
             device (Optional[Device], optional): Run preprocessing on this
                 device. Defaults to None.
-            display_progress (bool, optional): Show progress bar.
-                Defaults to True.
+            display_progress_as (Optional[str], optional): Show a progress bar
+                with this key. Defaults to 'featurize dataset'.
 
         Raises:
             ValueError: If images or masks are not tensors.
@@ -69,7 +69,9 @@ class Featurizer(nn.Module):
         loader = data.DataLoader(dataset,
                                  batch_size=batch_size,
                                  num_workers=num_workers)
-        for batch in tqdm(loader) if display_progress else loader:
+        if display_progress_as is not None:
+            loader = tqdm(loader, desc=display_progress_as)
+        for batch in loader:
             images = batch[image_index]
             if not isinstance(images, torch.Tensor):
                 raise ValueError(f'non-tensor images: {type(images).__name__}')

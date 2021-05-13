@@ -627,7 +627,7 @@ class Decoder(serialize.SerializableModule):
                 features: Optional[data.TensorDataset] = None,
                 num_workers: int = 0,
                 device: Optional[Device] = None,
-                display_progress: bool = True,
+                display_progress_as: Optional[str] = 'predict captions',
                 **kwargs: Any) -> StrSequence:
         """Feed entire dataset through the decoder.
 
@@ -647,9 +647,8 @@ class Decoder(serialize.SerializableModule):
                 Defaults to 0.
             device (Optional[Device], optional): Send model and data to this
                 device. Defaults to None.
-            display_progress (bool, optional): Show progress for pre-
-                featurizing dataset and for predicting features.
-                Defaults to True.
+            display_progress_as (Optional[str], optional): Show a progress bar
+                with this key. Defaults to 'predict captions'.
 
         Returns:
             StrSequence: Captions for entire dataset.
@@ -666,14 +665,16 @@ class Decoder(serialize.SerializableModule):
                 mask_index=mask_index,
                 batch_size=batch_size,
                 device=device,
-                display_progress=display_progress)
+                display_progress=display_progress_as and 'featurize dataset')
 
         loader = data.DataLoader(features,
                                  batch_size=batch_size,
                                  num_workers=num_workers)
+        if display_progress_as is not None:
+            loader = tqdm(loader, desc=display_progress_as)
 
         outputs = []
-        for (inputs,) in tqdm(loader) if display_progress else loader:
+        for (inputs,) in loader:
             with torch.no_grad():
                 output = self(inputs, **kwargs)
             outputs.append(output)
@@ -700,7 +701,7 @@ class Decoder(serialize.SerializableModule):
             features: Optional[data.TensorDataset] = None,
             num_workers: int = 0,
             device: Optional[Device] = None,
-            display_progress: bool = True) -> None:
+            display_progress_as: Optional[str] = 'train decoder') -> None:
         """Train a new decoder on the given data.
 
         Args:
@@ -737,8 +738,8 @@ class Decoder(serialize.SerializableModule):
                 Defaults to 0.
             device (Optional[Device], optional): Send all models and data
                 to this device. Defaults to None.
-            display_progress (bool, optional): Show progress bar while
-                training. Defaults to True.
+            display_progress_as (Optional[str], optional): Show a progress bar
+                with this key. Defaults to 'train captioner'.
 
         """
         if device is not None:
@@ -746,13 +747,13 @@ class Decoder(serialize.SerializableModule):
         if optimizer_kwargs is None:
             optimizer_kwargs = {}
         if features is None:
-            features = self.featurizer_v_.map(
-                dataset,
-                image_index=image_index,
-                mask_index=mask_index,
-                batch_size=batch_size,
-                device=device,
-                display_progress=display_progress)
+            features = self.featurizer_v_.map(dataset,
+                                              image_index=image_index,
+                                              mask_index=mask_index,
+                                              batch_size=batch_size,
+                                              device=device,
+                                              progress=display_progress_as and
+                                              'featurize dataset')
 
         # Prepare dataset and data loader. Use an anonymous dataset class to
         # make this easier, since we want to split train/val by neuron, but
@@ -797,8 +798,8 @@ class Decoder(serialize.SerializableModule):
         stopper = training.EarlyStopping(patience=patience)
 
         progress = range(max_epochs)
-        if display_progress:
-            progress = tqdm(progress, desc='train decoder')
+        if display_progress_as is not None:
+            progress = tqdm(progress, desc=display_progress_as)
 
         # Begin training!
         for _ in progress:
@@ -848,7 +849,7 @@ class Decoder(serialize.SerializableModule):
                 val_loss += loss.item()
             val_loss /= len(val_loader)
 
-            if display_progress:
+            if display_progress_as is not None:
                 assert not isinstance(progress, range)
                 progress.set_description(f'train_loss={train_loss:.3f}, '
                                          f'val_loss={val_loss:.3f}')
