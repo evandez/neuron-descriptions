@@ -90,7 +90,7 @@ for index, experiment in enumerate(args.experiments or EXPERIMENTS.keys()):
         for name in names:
             dataset = zoo.datasets(name, path=args.datasets_root)
             size = len(cast(Sized, dataset))
-            test_size = (.1 * size)
+            test_size = int(.1 * size)
             train_size = size - test_size
             train, test = data.random_split(dataset, (train_size, test_size))
             configs.append((train, test, (name,), (name,)))
