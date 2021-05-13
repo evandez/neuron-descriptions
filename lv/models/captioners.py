@@ -562,14 +562,15 @@ class Decoder(serialize.SerializableModule):
         """
         if predictions is None:
             predictions = self.predict(dataset, **kwargs)
+        predictions = [pred.lower().strip('. ') for pred in predictions]
 
         references = []
         for index in range(len(predictions)):
             annotations = dataset[index][annotation_index]
             if isinstance(annotations, str):
                 annotations = [annotations]
-            # Preprocess target annotations in the same way model was trained.
-            annotations = self.indexer.reconstruct(self.indexer(annotations))
+            # Preprocess target annotations in the same way as the predictions.
+            annotations = [anno.lower().strip('. ') for anno in annotations]
             references.append(annotations)
 
         return sacrebleu.corpus_bleu(predictions, list(zip(*references)))
@@ -602,15 +603,20 @@ class Decoder(serialize.SerializableModule):
 
         hypotheses, references = [], []
         for index, prediction in enumerate(predictions):
+            prediction = prediction.lower().strip('. ')
+
             annotations = dataset[index][annotation_index]
             if isinstance(annotations, str):
                 annotations = [annotations]
+
             # Preprocess target annotations in the same way model was trained.
-            annotations = self.indexer.reconstruct(self.indexer(annotations))
             for annotation in annotations:
+                annotation = annotation.lower().strip('. ')
+
                 # If annotation contains all unknown words, filter it.
-                if not annotation.strip():
+                if not annotation:
                     continue
+
                 hypotheses.append(prediction)
                 references.append(annotation)
 
