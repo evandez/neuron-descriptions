@@ -414,7 +414,7 @@ class Decoder(serialize.SerializableModule):
         batch_size = len(images)
 
         # If necessary, obtain visual features.
-        features_v = None
+        features_v: Optional[torch.Tensor] = None
         if self.featurizer_v is not None:
             if masks is not None:
                 images = images.view(-1, 3, *images.shape[-2:])
@@ -426,7 +426,8 @@ class Decoder(serialize.SerializableModule):
             features_v = features_v.view(batch_size, -1, self.feature_v_size)
 
         # Obtain word features from word annotator or ground truth captions.
-        features_w, words = None, None
+        features_w: Optional[torch.Tensor] = None
+        words: Optional[Sequence[StrSequence]] = None
         if self.featurizer_w is not None:
             if features_v is not None:
                 features_w, words = self.featurizer_w(features_v, **kwargs)
@@ -434,20 +435,20 @@ class Decoder(serialize.SerializableModule):
                 features_w, words = self.featurizer_w(images, masks, **kwargs)
 
         # Prepare outputs.
-        tokens = features_v.new_zeros(batch_size, length, dtype=torch.long)
-        logprobs = features_v.new_zeros(batch_size, length, self.vocab_size)
+        tokens = images.new_zeros(batch_size, length, dtype=torch.long)
+        logprobs = images.new_zeros(batch_size, length, self.vocab_size)
 
         attention_vs = None
         if self.featurizer_v is not None:
             assert features_v is not None
-            attention_vs = features_v.new_zeros(batch_size, length,
-                                                features_v.shape[1])
+            attention_vs = images.new_zeros(batch_size, length,
+                                            features_v.shape[1])
 
         attention_ws = None
         if self.featurizer_w is not None:
             assert features_w is not None
-            attention_ws = features_v.new_zeros(batch_size, length,
-                                                features_w.shape[1])
+            attention_ws = images.new_zeros(batch_size, length,
+                                            features_w.shape[1])
 
         # Compute initial hidden state and cell value.
         pooled = torch.cat(
