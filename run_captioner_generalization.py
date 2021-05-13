@@ -102,11 +102,10 @@ for index, experiment in enumerate(args.experiments or EXPERIMENTS.keys()):
         test_features = featurizer.map(
             test, display_progress_as='featurize test set', device=device)
 
-        annotator = annotators.WordAnnotator.fit(
-            train,
-            featurizer,
-            indexer_kwargs={'ignore_rarer_than': 5},
-            features=train_features)
+        annotator = annotators.WordAnnotator.fit(train,
+                                                 featurizer,
+                                                 features=train_features,
+                                                 device=device)
         annotator_f1, _ = annotator.score(
             test,
             features=test_features,
