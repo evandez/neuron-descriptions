@@ -74,7 +74,7 @@ class WordFeaturizer(serialize.SerializableModule):
                  annotator: annotators.WordAnnotator,
                  word2vec: str = WORD2VEC_SPACY,
                  threshold: float = .5,
-                 max_words: int = 10):
+                 num_words: int = 10):
         """Initialize the word featurizer.
 
         Args:
@@ -84,9 +84,10 @@ class WordFeaturizer(serialize.SerializableModule):
                 Defaults to WORD2VEC_SPACY.
             threshold (float, optional): Default threshold to use when
                 predicting applicable words. Defaults to .5.
-            max_words (int, optional): Maximum number of words to take from
-                the predictor. If fewer than this many words predicted, the
-                difference will be filled with padding tokens. Defaults to 10.
+            num_words (int, optional): Exact number of words to take from
+                the predictor. If ground truth captions are provided and
+                contain fewer than this many words, the difference will be
+                filled with padding tokens. Defaults to 10.
 
         Raises:
             ValueError: If unknown word vectors model are specified.
@@ -96,7 +97,7 @@ class WordFeaturizer(serialize.SerializableModule):
         self.annotator = annotator
         self.word2vec = word2vec
         self.threshold = threshold
-        self.max_words = max_words
+        self.num_words = num_words
 
         if word2vec == WORD2VEC_SPACY:
             self.vectors = vectors.spacy(annotator.indexer)
@@ -114,7 +115,7 @@ class WordFeaturizer(serialize.SerializableModule):
         images: torch.Tensor,
         masks: torch.Tensor,
         threshold: Optional[float] = ...,
-        max_words: Optional[int] = ...,
+        num_words: Optional[int] = ...,
         captions: Optional[StrSequence] = ...,
     ) -> Tuple[torch.Tensor, Sequence[StrSequence]]:
         """Predict words from visual features and return their word vectors.
@@ -126,8 +127,8 @@ class WordFeaturizer(serialize.SerializableModule):
                 (batch_size, k, 1, height, width).
             threshold (Optional[float], optional): Only look at words predicted
                 with this probability or higher. Defaults to `self.threshold`.
-            max_words (Optional[int], optional): Maximum number of words to
-                return. Defaults to `self.max_words`.
+            num_words (Optional[int], optional): Maximum number of words to
+                return. Defaults to `self.num_words`.
             captions (Optional[StrSequence], optional): Take words from these
                 captions instead of the word predictor. Must have length same
                 as batch_size. Defaults to None.
@@ -137,7 +138,7 @@ class WordFeaturizer(serialize.SerializableModule):
 
         Returns:
             Tuple[torch.Tensor, Sequence[StrSequence]]: Word vectors with
-                shape (batch_size, max_words, vector_size).
+                shape (batch_size, num_words, vector_size).
 
         """
         ...
@@ -155,7 +156,7 @@ class WordFeaturizer(serialize.SerializableModule):
                 images,
                 masks=None,
                 threshold=None,
-                max_words=None,
+                num_words=None,
                 captions=None):
         """Implement both overloads."""
         if captions is not None and len(captions) != len(images):
@@ -164,24 +165,21 @@ class WordFeaturizer(serialize.SerializableModule):
 
         if threshold is None:
             threshold = self.threshold
-        if max_words is None:
-            max_words = self.max_words
+        if num_words is None:
+            num_words = self.num_words
 
         if captions is None:
             annos: annotators.WordAnnotations
             with torch.no_grad():
                 annos = self.annotator(images, masks, threshold=threshold)
-            words = annos.words
-            idx = self.annotator.indexer.index(annos.words,
-                                               pad=True,
-                                               length=max_words)
-            words = self.annotator.indexer.unindex(idx, pad=False)
+            idx = annos.probabilities.topk(k=self.num_words).indices.tolist()
+            words = self.annotator.indexer.unindex(idx, specials=False)
         else:
             idx = self.annotator.indexer(captions,
                                          pad=True,
                                          unk=False,
-                                         length=max_words)
-            words = self.annotator.indexer.unindex(idx, pad=False)
+                                         length=self.num_words)
+            words = self.annotator.indexer.unindex(idx, specials=False)
 
         idx_t = torch.tensor(idx, dtype=torch.long, device=images.device)
         with torch.no_grad():
@@ -196,7 +194,7 @@ class WordFeaturizer(serialize.SerializableModule):
             'annotator': self.annotator,
             'word2vec': self.word2vec,
             'threshold': self.threshold,
-            'max_words': self.max_words,
+            'num_words': self.num_words,
         })
 
         state_dict = properties.get('state_dict', {})
