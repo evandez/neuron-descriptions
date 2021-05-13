@@ -8,12 +8,10 @@ import spacy as sp
 import torch
 from spacy.lang import en
 from torch import nn
-from tqdm.auto import tqdm
 
 
 def spacy(indexer: lang.Indexer,
-          nlp: Optional[en.English] = None,
-          display_progress: bool = True) -> nn.Embedding:
+          nlp: Optional[en.English] = None) -> nn.Embedding:
     """Return spacy embeddings for words in the given indexer's vocab.
 
     Args:
@@ -21,8 +19,6 @@ def spacy(indexer: lang.Indexer,
             be assigned zero vectors.
         nlp (Optional[en.English], optional): NLP object to use to get
             vectors. Defaults to new instance of en_core_web_lg.
-        display_progress (bool, optional): Display progress bar when loading
-            word vectors. Defaults to True.
 
     Raises:
         ValueError: If `nlp` has no pretrained vectors.
@@ -37,13 +33,9 @@ def spacy(indexer: lang.Indexer,
     if not len(nlp.vocab.vectors):
         raise ValueError('found no vectors; you surely do not want this')
 
-    words = tuple(enumerate(indexer.vocab.tokens))
-    if display_progress:
-        words = tqdm(words, desc='load spacy vectors')
-
     vectors = torch.zeros(len(indexer), nlp.vocab.vectors.shape[-1])
     unknown = []
-    for index, word in words:
+    for index, word in enumerate(indexer.vocab.tokens):
         vector = nlp.vocab.get_vector(word)
         if not vector.shape:
             unknown.append(word)
