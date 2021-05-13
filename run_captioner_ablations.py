@@ -6,8 +6,8 @@ from typing import Sized, cast
 from lv import zoo
 from lv.models import annotators, captioners, featurizers
 
-from torch.utils import data
 import wandb
+from torch.utils import data
 
 parser = argparse.ArgumentParser(description='run captioner abalations')
 parser.add_argument('--datasets',
