@@ -690,7 +690,7 @@ class Decoder(serialize.SerializableModule):
             annotation_index: int = 4,
             batch_size: int = 64,
             max_epochs: int = 100,
-            patience: Optional[int] = None,
+            patience: int = 4,
             hold_out: float = .1,
             regularization_weight: float = 1.,
             use_ground_truth_words: bool = True,
@@ -716,7 +716,7 @@ class Decoder(serialize.SerializableModule):
             max_epochs (int, optional): Maximum number of epochs to train for.
                 Defaults to 1000.
             patience (int, optional): If loss does not improve for this many
-                epochs, stop training. By default, no early stopping.
+                epochs, stop training. Defaults to 4.
             hold_out (float, optional): Fraction of data to hold out as a
                 validation set. Defaults to .1.
             regularization_weight (float, optional): Weight for double
@@ -793,10 +793,7 @@ class Decoder(serialize.SerializableModule):
         # Prepare model and training tools.
         optimizer = optimizer_t(self.parameters(), **optimizer_kwargs)
         criterion = nn.NLLLoss(ignore_index=self.indexer.pad_index)
-
-        stopper = None
-        if patience is not None:
-            stopper = training.EarlyStopping(patience=patience)
+        stopper = training.EarlyStopping(patience=patience)
 
         progress = range(max_epochs)
         if display_progress:
@@ -857,7 +854,7 @@ class Decoder(serialize.SerializableModule):
                                          f'train_reg={train_reg:.3f}, '
                                          f'val_loss={val_loss:.3f}')
 
-            if stopper is not None and stopper(val_loss):
+            if stopper(val_loss):
                 break
 
     def properties(self, **kwargs):
