@@ -60,7 +60,8 @@ annotator = annotators.WordAnnotator.fit(
     train,
     featurizer,
     indexer_kwargs={'ignore_rarer_than': 5},
-    features=train_features)
+    features=train_features,
+    device=device)
 
 ablations = {
     'sat':
