@@ -69,16 +69,18 @@ annotator = annotators.WordAnnotator.fit(
 
 ablations = {
     'sat':
-        captioners.decoder(
+        lambda: captioners.decoder(
             train, featurizer=featurizers.MaskedImagePyramidFeaturizer()),
     'sat+mf':
-        captioners.decoder(train, featurizer=featurizer),
+        lambda: captioners.decoder(train, featurizer=featurizer),
     'sat+wf':
-        captioners.decoder(train, annotator=annotator),
+        lambda: captioners.decoder(train, annotator=annotator),
     'sat+mf+wf':
-        captioners.decoder(train, featurizer=featurizer, annotator=annotator),
+        lambda: captioners.decoder(
+            train, featurizer=featurizer, annotator=annotator),
 }
-for condition, captioner in ablations.items():
+for condition, factory in ablations.items():
+    captioner = factory()
     captioner.fit(train,
                   features=train_features if condition != 'sat' else None,
                   device=device)
