@@ -75,6 +75,7 @@ run = wandb.run
 assert run is not None, 'failed to initialize wandb?'
 
 device = 'cuda' if args.cuda else 'cpu'
+featurizer = featurizers.MaskedPyramidFeaturizer().to(device)
 
 for index, experiment in enumerate(args.experiments or EXPERIMENTS.keys()):
     print(f'-------- EXPERIMENT {index + 1}: {experiment} --------')
@@ -96,7 +97,6 @@ for index, experiment in enumerate(args.experiments or EXPERIMENTS.keys()):
             configs.append((train, test, (name,), (name,)))
 
     for train, test, train_keys, test_keys in configs:
-        featurizer = featurizers.MaskedPyramidFeaturizer().to(device)
         train_features = featurizer.map(
             train, display_progress_as='featurize train set', device=device)
         test_features = featurizer.map(
