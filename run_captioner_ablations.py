@@ -11,7 +11,8 @@ from torch.utils import data
 
 parser = argparse.ArgumentParser(description='run captioner abalations')
 parser.add_argument('--datasets',
-                    default=('alexnet/imagenet', 'alexnet/places365'),
+                    default=('alexnet/imagenet', 'alexnet/places365',
+                             'resnet152/imagenet', 'resnet152/places365'),
                     nargs='+',
                     help='training datasets (default: all datasets)')
 parser.add_argument('--datasets-root',
