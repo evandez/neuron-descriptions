@@ -849,8 +849,9 @@ class Decoder(serialize.SerializableModule):
 
             if display_progress_as is not None:
                 assert not isinstance(progress, range)
-                progress.set_description(f'train_loss={train_loss:.3f}, '
-                                         f'val_loss={val_loss:.3f}')
+                progress.set_description(f'{display_progress_as} '
+                                         f'[train_loss={train_loss:.3f}, '
+                                         f'val_loss={val_loss:.3f}]')
 
             if stopper(val_loss):
                 break

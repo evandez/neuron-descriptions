@@ -460,7 +460,8 @@ class WordAnnotator(serialize.SerializableModule):
 
             if display_progress_as is not None:
                 assert not isinstance(progress, range)
-                progress.set_description(f'loss={train_loss:.3f}')
+                progress.set_description(f'{display_progress_as} '
+                                         f'[loss={train_loss:.3f}]')
 
             if stopper is not None and stopper(train_loss):
                 break
