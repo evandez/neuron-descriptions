@@ -615,7 +615,10 @@ class Decoder(serialize.SerializableModule):
                 references.append(annotation)
 
         scorer = rouge.Rouge()
-        return scorer.get_scores(hypotheses, references, avg=True)
+        return scorer.get_scores(hypotheses,
+                                 references,
+                                 avg=True,
+                                 ignore_empty=True)
 
     def predict(self,
                 dataset: data.Dataset,
