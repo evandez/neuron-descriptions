@@ -9,7 +9,17 @@ from lv.models import annotators, captioners, featurizers
 import wandb
 from torch.utils import data
 
+SAT = 'sat'
+SAT_MF = 'sat+mf'
+SAT_WF = 'sat+wf'
+SAT_MF_WF = 'sat+mf+wf'
+EXPERIMENTS = (SAT, SAT_MF, SAT_WF, SAT_MF_WF)
+
 parser = argparse.ArgumentParser(description='run captioner abalations')
+parser.add_argument('--experiments',
+                    nargs='+',
+                    choices=EXPERIMENTS,
+                    help='experiments to run (default: all)')
 parser.add_argument('--datasets',
                     default=('alexnet/imagenet', 'alexnet/places365',
                              'resnet152/imagenet', 'resnet152/places365'),
@@ -73,7 +83,7 @@ annotator_f1, _ = annotator.score(test,
                                   display_progress_as='test word annotator')
 run.summary['annotator-f1'] = annotator_f1  # type: ignore
 
-ablations = {
+factories = {
     'sat':
         lambda: captioners.decoder(
             train, featurizer=featurizers.MaskedImagePyramidFeaturizer()),
@@ -85,21 +95,22 @@ ablations = {
         lambda: captioners.decoder(
             train, featurizer=featurizer, annotator=annotator),
 }
-for condition, factory in ablations.items():
+for experiment in args.experiments or factories.keys():
+    factory = factories[experiment]
     captioner = factory()
     captioner.fit(train,
-                  features=train_features if condition != 'sat' else None,
-                  display_progress_as=f'train {condition}',
+                  features=train_features if experiment != 'sat' else None,
+                  display_progress_as=f'train {experiment}',
                   device=device)
     predictions = captioner.predict(
         test,
-        features=test_features if condition != 'sat' else None,
-        display_progress_as=f'test {condition}',
+        features=test_features if experiment != 'sat' else None,
+        display_progress_as=f'test {experiment}',
         device=device)
     bleu = captioner.bleu(test, predictions=predictions)
     rouge = captioner.rouge(test, predictions=predictions)
 
-    log = {'condition': condition, 'bleu': bleu.score}
+    log = {'experiment': experiment, 'bleu': bleu.score}
     for index, precision in enumerate(bleu.precisions):
         log[f'bleu-{index + 1}'] = precision
     for kind, scores in rouge.items():
@@ -108,7 +119,7 @@ for condition, factory in ablations.items():
     log['samples'] = [
         wandb.Image(
             test[index].as_pil_image_grid(),
-            caption=f'({condition.upper()}) {predictions[index]}',
+            caption=f'({experiment}) {predictions[index]}',
         ) for index in range(min(len(test), args.wandb_n_samples))
     ]
     wandb.log(log)
