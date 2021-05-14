@@ -153,7 +153,7 @@ for model in args.models:
                     device=device)
 
             annotator, annotator_f1 = None, None
-            if args.model not in (SAT, SAT_MF):
+            if model not in (SAT, SAT_MF):
                 annotator = annotators.WordAnnotator.fit(
                     train, featurizer, features=train_features, device=device)
                 annotator_f1, _ = annotator.score(
@@ -162,15 +162,15 @@ for model in args.models:
                     device=device,
                     display_progress_as='test word annotator')
 
-            if args.model in (SAT, SAT_MF):
+            if model in (SAT, SAT_MF):
                 assert featurizer is not None
                 captioner = captioners.decoder(train, featurizer=featurizer)
-            elif args.model == SAT_WF:
+            elif model == SAT_WF:
                 assert annotator is not None
                 assert featurizer is None
                 captioner = captioners.decoder(train, annotator=annotator)
             else:
-                assert args.model == SAT_MF_WF
+                assert model == SAT_MF_WF
                 assert featurizer is not None
                 assert annotator is not None
                 captioner = captioners.decoder(train,
