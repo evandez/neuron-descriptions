@@ -2,7 +2,7 @@
 import collections
 import csv
 import pathlib
-from typing import Any, Iterable, NamedTuple, Optional, Sequence, Union, cast
+from typing import Any, Iterable, NamedTuple, Optional, Sequence, Union
 
 from lv.utils.typing import Layer, PathLike
 from third_party.netdissect import renormalize
