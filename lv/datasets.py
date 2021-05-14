@@ -2,7 +2,7 @@
 import collections
 import csv
 import pathlib
-from typing import Any, Iterable, NamedTuple, Optional, Sequence, Union
+from typing import Any, Iterable, NamedTuple, Optional, Sequence, Union, cast
 
 from lv.utils.typing import Layer, PathLike
 from third_party.netdissect import renormalize
@@ -19,7 +19,7 @@ from tqdm.auto import tqdm
 class TopImages(NamedTuple):
     """Top images for a unit."""
 
-    layer: Layer
+    layer: str
     unit: int
     images: torch.Tensor
     masks: torch.Tensor
@@ -82,16 +82,12 @@ class TopImagesDataset(data.Dataset):
         if not root.is_dir():
             raise FileNotFoundError(f'root directory not found: {root}')
         if layers is None:
-            layers = [
-                int(f.name) if f.name.isdigit() else f.name
-                for f in root.iterdir()
-                if f.is_dir()
-            ]
+            layers = [f.name for f in root.iterdir() if f.is_dir()]
         if not layers:
             raise ValueError('no layers given and root has no subdirectories')
 
         self.root = root
-        self.layers = layers = tuple(sorted(layers))
+        self.layers = layers = tuple(sorted(str(layer) for layer in layers))
         self.device = device
 
         progress = layers
@@ -146,7 +142,7 @@ class TopImagesDataset(data.Dataset):
             units = zip(self.images_by_layer[layer],
                         self.masks_by_layer[layer])
             for unit, (images, masks) in enumerate(units):
-                sample = TopImages(layer=layer,
+                sample = TopImages(layer=str(layer),
                                    unit=unit,
                                    images=images,
                                    masks=masks)
@@ -182,6 +178,7 @@ class TopImagesDataset(data.Dataset):
             TopImages: The top images.
 
         """
+        layer = str(layer)
         if layer not in self.images_by_layer:
             raise KeyError(f'layer "{layer}" does not exist')
         if unit >= len(self.images_by_layer[layer]):
@@ -207,7 +204,7 @@ DEFAULT_ANNOTATIONS_FILE_NAME = 'annotations.csv'
 class AnnotatedTopImages(NamedTuple):
     """Top images and annotation for a unit."""
 
-    layer: Layer
+    layer: str
     unit: int
     images: torch.Tensor
     masks: torch.Tensor
@@ -339,7 +336,7 @@ class AnnotatedTopImagesDataset(data.Dataset):
             AnnotatedTopImages: The annotated top images.
 
         """
-        key = (layer, unit)
+        key = (str(layer), unit)
         if key not in self.samples_by_layer_unit:
             raise KeyError(f'no annotated top images for: {key}')
         sample = self.samples_by_layer_unit[key]
