@@ -135,20 +135,19 @@ for model in args.models:
                 size = len(cast(Sized, dataset))
                 test_size = int(.1 * size)
                 train_size = size - test_size
-                train, test = data.random_split(dataset,
-                                                (train_size, test_size))
-                configs.append((train, test, (name,), (name,)))
+                split = data.random_split(dataset, (train_size, test_size))
+                configs.append((*split, (name,), (name,)))
 
         # For every train/test set, train the captioner, test it, and log.
-        for train_dataset, test_dataset, train_keys, test_keys in configs:
+        for train, test, train_keys, test_keys in configs:
             train_features, test_features = None, None
             if featurizer is not None:
                 train_features = featurizer.map(
-                    cast(data.Dataset, train_dataset),
+                    cast(data.Dataset, train),
                     display_progress_as='featurize train set',
                     device=device)
                 test_features = featurizer.map(
-                    cast(data.Dataset, test_dataset),
+                    cast(data.Dataset, test),
                     display_progress_as='featurize test set',
                     device=device)
 
