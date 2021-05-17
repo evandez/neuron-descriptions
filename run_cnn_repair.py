@@ -54,6 +54,7 @@ parser.add_argument('--annotations',
                     help='annotations to train captioner on (default: all)')
 parser.add_argument('--datasets-root',
                     type=pathlib.Path,
+                    default='.zoo/datasets',
                     help='root dir for datasets (default: .zoo/datasets)')
 parser.add_argument(
     '--out-root',
@@ -127,10 +128,12 @@ for experiment in args.experiments:
         print(f'-------- BEGIN EXPERIMENT: {experiment}/{version} --------')
 
         # Start by training the classifier on spurious data.
-        dataset = zoo.dataset(f'{experiment}/{version}/train',
-                              path=args.datasets_root)
-        test = zoo.dataset(f'{experiment}/{version}/test',
-                           path=args.datasets_root)
+        dataset = zoo.dataset(experiment,
+                              path=args.datasets_root / experiment / version /
+                              'train')
+        test = zoo.dataset(experiment,
+                           path=args.datasets_root / experiment / version /
+                           'test')
         size = len(cast(Sized, dataset))
         val_size = int(args.hold_out * size)
         train_size = size - val_size
