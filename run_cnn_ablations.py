@@ -244,6 +244,11 @@ def main() -> None:
                                {'left', 'right', 'above', 'under', 'around'}
                                for token in tokens)
                     ]
+                elif experiment == EXPERIMENT_MANY_WORDS:
+                    indices = sorted(range(len(captions)),
+                                     key=lambda index: len(tokenized[index]),
+                                     reverse=True)
+                    indices = indices[:ablatable]
                 else:
                     raise ValueError(f'unknown experiment: {experiment}')
 
