@@ -124,9 +124,10 @@ for experiment in args.experiments:
         print(f'-------- BEGIN EXPERIMENT: {experiment}/{version} --------')
 
         # Start by training the classifier on spurious data.
-        dataset, test = zoo.datasets(f'{experiment}/{version}/train',
-                                     f'{experiment}/{version}/test',
-                                     path=args.datasets_root)
+        dataset = zoo.dataset(f'{experiment}/{version}/train',
+                              path=args.datasets_root)
+        test = zoo.dataset(f'{experiment}/{version}/test',
+                           path=args.datasets_root)
         size = len(cast(Sized, dataset))
         val_size = int(args.hold_out * size)
         train_size = size - val_size
