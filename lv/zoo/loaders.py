@@ -106,9 +106,10 @@ def datasets(name: str,
         data.Dataset: All datasets concatenated into one.
 
     """
-    concated = dataset(name, path=path and pathlib.Path(path) / name, **kwargs)
+    if path is None:
+        # TODO(evandez): Find somewhere to commonize this line.
+        path = pathlib.Path(__file__).parents[2] / '.zoo/datasets'
+    concated = dataset(name, path=pathlib.Path(path) / name, **kwargs)
     for other in others:
-        concated += dataset(other,
-                            path=path and pathlib.Path(path) / other,
-                            **kwargs)
+        concated += dataset(other, path=pathlib.Path(path) / other, **kwargs)
     return concated
