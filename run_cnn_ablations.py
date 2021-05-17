@@ -1,6 +1,7 @@
 """Run CNN editing experiments."""
 import argparse
 import collections
+import pathlib
 import random
 from typing import Callable, Sequence, Sized, Union, cast
 
@@ -129,6 +130,20 @@ EXPERIMENTS = (EXPERIMENT_OBJECT_WORDS, EXPERIMENT_SPATIAL_RELATION,
 
 MODELS = (lv.zoo.KEY_ALEXNET, lv.zoo.KEY_RESNET152)
 DATASETS = (lv.zoo.KEY_IMAGENET, lv.zoo.KEY_PLACES365)
+TRAIN = {
+    lv.zoo.KEY_ALEXNET: (
+        lv.zoo.KEY_RESNET152_IMAGENET,
+        lv.zoo.KEY_RESNET152_PLACES365,
+        lv.zoo.KEY_BIGGAN_IMAGENET,
+        lv.zoo.KEY_BIGGAN_PLACES365,
+    ),
+    lv.zoo.KEY_RESNET152: (
+        lv.zoo.KEY_ALEXNET_IMAGENET,
+        lv.zoo.KEY_ALEXNET_PLACES365,
+        lv.zoo.KEY_BIGGAN_IMAGENET,
+        lv.zoo.KEY_BIGGAN_PLACES365,
+    ),
+}
 
 
 def main() -> None:
@@ -148,6 +163,9 @@ def main() -> None:
                         choices=EXPERIMENTS,
                         default=EXPERIMENTS,
                         help='experiments to run (default: all)')
+    parser.add_argument('--datasets-root',
+                        type=pathlib.Path,
+                        help='root dir for datasets (default: .zoo/datasets)')
     parser.add_argument('--max-ablation',
                         type=float,
                         default=.1,
@@ -197,7 +215,8 @@ def main() -> None:
         object_synset = wordnet.synset('object.n.01')
 
     for dataset_name in args.datasets:
-        dataset = lv.dissection.zoo.dataset(dataset_name)
+        dataset = lv.dissection.zoo.dataset(dataset_name,
+                                            path=args.datasets_root)
         for model_name in args.models:
             model, *_ = lv.dissection.zoo.model(model_name, dataset_name)
             model.eval()
@@ -214,14 +233,13 @@ def main() -> None:
                     assert isinstance(captions, list)
                     captions.append(caption)
             else:
-                train = lv.zoo.datasets('bar')
-                test = lv.zoo.dataset('bar')
+                train = lv.zoo.datasets(*TRAIN[model_name],
+                                        path=args.datasets_root)
                 featurizer = featurizers.MaskedPyramidFeaturizer().to(device)
-                captioner = captioners.decoder(
-                    train, featurizer=featurizer).to(device)
+                captioner = captioners.decoder(train, featurizer=featurizer)
                 captioner.fit(train, device=device)
                 captioner.eval()
-                captions = captioner.predict(test, device=device)
+                captions = captioner.predict(annotations, device=device)
             tokenized = tuple(nlp.pipe(captions))
 
             for experiment in args.experiments:
