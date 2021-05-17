@@ -17,7 +17,7 @@ from torch import nn, optim
 from torch.utils import data
 from tqdm.auto import tqdm
 
-DATASETS = (zoo.KEY_SPURIOUS_IMAGENET, zoo.KEY_SPURIOUS_PLACES365)
+EXPERIMENTS = (zoo.KEY_SPURIOUS_IMAGENET, zoo.KEY_SPURIOUS_PLACES365)
 VERSIONS = ('original', 'spurious')
 
 ANNOTATIONS = (
@@ -32,12 +32,14 @@ ANNOTATIONS = (
 
 parser = argparse.ArgumentParser(description='train a cnn on spurious data')
 parser.add_argument('--experiments',
-                    choices=DATASETS,
-                    default=DATASETS,
+                    choices=EXPERIMENTS,
+                    default=EXPERIMENTS,
+                    nargs='+',
                     help='train one model for each of these datasets')
 parser.add_argument('--versions',
                     choices=VERSIONS,
                     default=VERSIONS,
+                    nargs='+',
                     help='version(s) of each dataset to use')
 parser.add_argument(
     '--n-random-trials',
@@ -48,6 +50,7 @@ parser.add_argument(
 parser.add_argument('--annotations',
                     choices=ANNOTATIONS,
                     default=ANNOTATIONS,
+                    nargs='+',
                     help='annotations to train captioner on (default: all)')
 parser.add_argument('--datasets-root',
                     type=pathlib.Path,
@@ -120,7 +123,7 @@ captioner = captioners.decoder(annotations, featurizer=featurizer)
 captioner.fit(annotations, device=device)
 
 for experiment in args.experiments:
-    for version in ('original', 'spurious'):
+    for version in args.versions:
         print(f'-------- BEGIN EXPERIMENT: {experiment}/{version} --------')
 
         # Start by training the classifier on spurious data.
