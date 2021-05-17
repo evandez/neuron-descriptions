@@ -250,7 +250,16 @@ def main() -> None:
                                      reverse=True)
                     indices = indices[:ablatable]
                 else:
-                    raise ValueError(f'unknown experiment: {experiment}')
+                    assert experiment == EXPERIMENT_LARGE_EMBEDDING_DIFFERENCE
+                    scores = torch.zeros(len(captions))
+                    for index, tokens in enumerate(tokenized):
+                        vectors = torch.stack([
+                            torch.from_numpy(token.vector) for token in tokens
+                        ])
+                        distances = vectors[:, None] - vectors[None, :]
+                        distances = (distances**2).sum(dim=-1)
+                        scores[index] = distances.max()
+                    indices = scores.topk(k=ablatable).indices.tolist()
 
                 if len(indices) > ablatable:
                     indices = random.sample(indices, k=ablatable)
