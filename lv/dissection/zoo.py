@@ -8,6 +8,8 @@ from lv.dissection import transforms as lv_transforms
 from lv.ext.pretorched.gans import biggan
 from lv.ext.torchvision import models
 from lv.utils.typing import Layer
+from lv.zoo import (KEY_ALEXNET, KEY_RESNET152, KEY_BIGGAN, KEY_IMAGENET,
+                    KEY_PLACES365)
 from third_party import alexnet, resnet152
 from third_party.netdissect import renormalize
 
@@ -20,14 +22,11 @@ from torchvision import datasets, transforms
 LV_HOST = 'http://wednesday.csail.mit.edu/dez/latent-vocabulary/dissect/models'
 DISSECT_HOST = 'https://dissect.csail.mit.edu/models'
 
-KEY_ALEXNET = 'alexnet'
 KEY_RESNET18 = 'resnet18'
-KEY_RESNET152 = 'resnet152'
 KEY_VGG_16 = 'vgg16'
-KEY_BIGGAN = 'biggan'
 
-KEY_IMAGENET = 'imagenet'
-KEY_PLACES365 = 'places365'
+KEY_SPURIOUS_IMAGENET = 'spurious-imagenet'
+KEY_SPURIOUS_PLACES365 = 'spurious-places365'
 KEY_BIGGAN_ZS_IMAGENET = 'biggan-zs-imagenet'
 KEY_BIGGAN_ZS_PLACES365 = 'biggan-zs-places365'
 
@@ -205,7 +204,7 @@ def dissection_models() -> ModelConfigs:
 def dissection_datasets() -> zoo.DatasetConfigs:
     """Return configs for all datasets used in dissection."""
     return {
-        KEY_IMAGENET:
+        zoo.KEY_IMAGENET:
             zoo.DatasetConfig(datasets.ImageFolder,
                               transform=transforms.Compose([
                                   transforms.Resize(256),
@@ -215,13 +214,27 @@ def dissection_datasets() -> zoo.DatasetConfigs:
                               ])),
         # TODO(evandez): This uses ImageFolder to be backwards compatible,
         # but we should probably use datasets.Places365 in the final version.
-        KEY_PLACES365:
+        zoo.KEY_PLACES365:
             zoo.DatasetConfig(datasets.ImageFolder,
                               transform=transforms.Compose([
                                   transforms.Resize(256),
                                   transforms.CenterCrop(224),
                                   transforms.ToTensor(),
                                   renormalize.NORMALIZER['imagenet'],
+                              ])),
+        KEY_SPURIOUS_IMAGENET:
+            zoo.DatasetConfig(datasets.ImageFolder,
+                              transform=transforms.Compose([
+                                  transforms.Resize(224),
+                                  transforms.ToTensor(),
+                                  renormalize.NORMALIZER['imagenet']
+                              ])),
+        KEY_SPURIOUS_PLACES365:
+            zoo.DatasetConfig(datasets.ImageFolder,
+                              transform=transforms.Compose([
+                                  transforms.Resize(224),
+                                  transforms.ToTensor(),
+                                  renormalize.NORMALIZER['imagenet']
                               ])),
         KEY_BIGGAN_ZS_IMAGENET:
             zoo.DatasetConfig(lv_datasets.TensorDatasetOnDisk,

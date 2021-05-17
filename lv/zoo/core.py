@@ -66,6 +66,7 @@ class ModelConfig:
     def load(self,
              path: Optional[PathLike] = None,
              factory: Optional[ModelFactory] = None,
+             load_weights: Optional[bool] = None,
              map_location: Optional[Device] = None,
              **kwargs: Any) -> Tuple[nn.Sequential, Iterable[Layer]]:
         """Load the model from the given path.
@@ -77,6 +78,8 @@ class ModelConfig:
                 URL field is set, weights will be downloaded to this path.
             factory (Optional[ModelFactory], optional): Override for config
                 default factory. Defaults to None.
+            load_weights (Optional[bool], optional): Override for config
+                on whether weights should be loaded. Defaults to None.
             map_location (Optional[Device], optional): Passed to `torch.load`,
                 effectively sending all model weights to this device at load
                 time. Defaults to None.
@@ -87,13 +90,15 @@ class ModelConfig:
         """
         if factory is None:
             factory = self.factory
+        if load_weights is None:
+            load_weights = self.load_weights
 
         for key, default in self.defaults.items():
             kwargs.setdefault(key, default)
 
         model = factory(**kwargs)
 
-        if path is not None and self.load_weights:
+        if path is not None and load_weights:
             path = pathlib.Path(path)
             if not path.exists() and self.url is not None:
                 path.parent.mkdir(exist_ok=True, parents=True)
