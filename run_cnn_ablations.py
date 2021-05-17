@@ -145,6 +145,10 @@ def main() -> None:
                         choices=EXPERIMENTS,
                         default=EXPERIMENTS,
                         help='experiments to run (default: all)')
+    parser.add_argument('--max-ablation',
+                        type=float,
+                        default=.1,
+                        help='max fraction of neurons to ablate (default: .1)')
     parser.add_argument(
         '--n-random-trials',
         type=int,
@@ -192,6 +196,7 @@ def main() -> None:
             annotations = lv.zoo.datasets(f'{model_name}/{dataset_name}',
                                           path=args.datasets_root)
             assert isinstance(annotations, datasets.AnnotatedTopImagesDataset)
+            ablatable = int(args.max_ablation * len(annotations))
 
             if args.ground_truth:
                 captions: StrSequence = []
@@ -222,6 +227,9 @@ def main() -> None:
                 else:
                     raise ValueError(f'unknown experiment: {experiment}')
 
+                if len(indices) > ablatable:
+                    indices = random.sample(indices, k=ablatable)
+
                 accuracy = ablate_and_test(
                     model,
                     dataset,
@@ -240,6 +248,7 @@ def main() -> None:
                     'experiment': experiment,
                     'condition': 'text',
                     'trial': 1,
+                    'neurons': len(indices),
                     'accuracy': accuracy,
                     'samples': samples,
                 })
@@ -264,6 +273,7 @@ def main() -> None:
                         'experiment': experiment,
                         'condition': 'random',
                         'trial': trial + 1,
+                        'neurons': len(indices),
                         'accuracy': accuracy,
                         'samples': samples,
                     })

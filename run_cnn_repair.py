@@ -209,6 +209,7 @@ for experiment in args.experiments:
             'version': version,
             'condition': 'text',
             'trial': 1,
+            'neurons': len(indices),
             'accuracy': accuracy,
             'samples': samples,
         })
@@ -234,6 +235,7 @@ for experiment in args.experiments:
                 'version': version,
                 'condition': 'random',
                 'trial': trial + 1,
+                'neurons': len(indices),
                 'accuracy': accuracy,
                 'samples': samples,
             })
