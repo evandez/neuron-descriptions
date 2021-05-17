@@ -8,8 +8,8 @@ from lv.dissection import transforms as lv_transforms
 from lv.ext.pretorched.gans import biggan
 from lv.ext.torchvision import models
 from lv.utils.typing import Layer
-from lv.zoo import (KEY_ALEXNET, KEY_RESNET152, KEY_BIGGAN, KEY_IMAGENET,
-                    KEY_PLACES365)
+from lv.zoo import (KEY_ALEXNET, KEY_BIGGAN, KEY_IMAGENET, KEY_PLACES365,
+                    KEY_RESNET152)
 from third_party import alexnet, resnet152
 from third_party.netdissect import renormalize
 
