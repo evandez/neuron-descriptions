@@ -82,8 +82,8 @@ parser.add_argument('--wandb-name',
                     default='captioner-generalization',
                     help='wandb run name (default: captioner-generalization)')
 parser.add_argument('--wandb-group',
-                    default='experiments',
-                    help='wandb group name')
+                    default='captioner',
+                    help='wandb group name (default: captioner)')
 parser.add_argument('--wandb-entity', help='wandb user or team')
 parser.add_argument('--wandb-dir', metavar='PATH', help='wandb directory')
 parser.add_argument('--wandb-n-samples',

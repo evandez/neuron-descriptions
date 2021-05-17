@@ -183,13 +183,12 @@ def main() -> None:
     parser.add_argument('--wandb-project',
                         default='lv',
                         help='wandb project name (default: lv)')
-    parser.add_argument(
-        '--wandb-name',
-        default='cnn-editing',
-        help='wandb run name (default: captioner-generalization)')
+    parser.add_argument('--wandb-name',
+                        default='cnn-ablations',
+                        help='wandb run name (default: cnn-ablations)')
     parser.add_argument('--wandb-group',
-                        default='experiments',
-                        help='wandb group name')
+                        default='applications',
+                        help='wandb group name (default: applications)')
     parser.add_argument('--wandb-entity', help='wandb user or team')
     parser.add_argument('--wandb-dir', metavar='PATH', help='wandb directory')
     parser.add_argument('--wandb-n-samples',
