@@ -11,9 +11,12 @@ from lv.models import captioners, featurizers
 from lv.utils.typing import StrSequence
 from third_party.netdissect import nethook
 
+import nltk
 import spacy
 import torch
 import wandb
+from nltk.corpus import wordnet
+from spacy_wordnet import wordnet_annotator
 from torch import nn
 from torch.utils import data
 from tqdm.auto import tqdm
@@ -186,6 +189,12 @@ def main() -> None:
     device = 'cuda' if args.cuda else 'cpu'
 
     nlp = spacy.load('en_core_web_lg')
+    object_synset = None
+    if EXPERIMENT_OBJECT_WORDS in args.experiments:
+        nltk.download('wordnet')
+        nlp.add_pipe(wordnet_annotator.WordnetAnnotator(lang=nlp.lang),
+                     after='tagger')
+        object_synset = wordnet.synset('object.n.01')
 
     for dataset_name in args.datasets:
         dataset = lv.dissection.zoo.dataset(dataset_name)
@@ -216,8 +225,19 @@ def main() -> None:
             tokenized = tuple(nlp.pipe(captions))
 
             for experiment in args.experiments:
-                print(f'-------- BEGIN EXPERIMENT: {experiment} --------')
-                if experiment == EXPERIMENT_SPATIAL_RELATION:
+                print('-------- BEGIN EXPERIMENT: '
+                      f'{model_name}/{dataset_name}/{experiment} '
+                      '--------')
+                if experiment == EXPERIMENT_OBJECT_WORDS:
+                    assert object_synset is not None
+                    indices = [
+                        index for index, tokens in enumerate(tokenized)
+                        if any(object_synset in synset.lowest_common_hypernyms(
+                            object_synset)
+                               for token in tokens
+                               for synset in token.wordnet.synsets())
+                    ]
+                elif experiment == EXPERIMENT_SPATIAL_RELATION:
                     indices = [
                         index for index, tokens in enumerate(tokenized)
                         if any(token.lemma_.lower() in
