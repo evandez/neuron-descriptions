@@ -278,7 +278,7 @@ def main() -> None:
                         if any(object_synset in synset.lowest_common_hypernyms(
                             object_synset)
                                for token in tokens
-                               for synset in token.wordnet.synsets())
+                               for synset in token._.wordnet.synsets())
                     ]
                 elif experiment == EXPERIMENT_SPATIAL_RELATION:
                     indices = [
