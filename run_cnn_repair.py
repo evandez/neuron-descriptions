@@ -220,7 +220,7 @@ for experiment in args.experiments:
             'version': version,
             'condition': 'baseline',
             'trial': 1,
-            'neurons': 0,
+            'n-ablated': 0,
             'accuracy': accuracy,
         })
 
@@ -247,9 +247,9 @@ for experiment in args.experiments:
         wandb.log({
             'experiment': experiment,
             'version': version,
-            'condition': 'text',
+            'condition': 'ablate-text',
             'trial': 1,
-            'neurons': len(indices),
+            'n-ablated': len(indices),
             'accuracy': accuracy,
             'samples': samples,
         })
@@ -275,9 +275,9 @@ for experiment in args.experiments:
             wandb.log({
                 'experiment': experiment,
                 'version': version,
-                'condition': 'random',
+                'condition': 'ablate-random',
                 'trial': trial + 1,
-                'neurons': len(indices),
+                'n-ablated': len(indices),
                 'accuracy': accuracy,
                 'samples': samples,
             })
