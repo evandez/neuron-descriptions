@@ -232,7 +232,7 @@ def main() -> None:
         # TODO(evandez): Figure out a way to not do this.
         @language.Language.factory('spacy_wordnet',
                                    default_config={'lang': 'en'})
-        def _(_nlp, _name, lang):
+        def _(nlp, name, lang):
             return wordnet_annotator.WordnetAnnotator(lang=lang)
 
         nlp.add_pipe('spacy_wordnet', after='tagger')
