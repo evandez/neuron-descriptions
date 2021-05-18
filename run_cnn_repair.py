@@ -8,7 +8,7 @@ import lv.zoo
 import run_cnn_ablations
 from lv import datasets
 from lv.dissection import dissect, zoo
-from lv.models import captioners, featurizers
+from lv.models import annotators, captioners, featurizers
 from lv.utils import training
 from third_party.netdissect import renormalize
 
@@ -31,6 +31,13 @@ ANNOTATIONS = (
     # lv.zoo.KEY_BIGGAN_PLACES365,
 )
 
+CAPTIONER_SAT = 'sat'
+CAPTIONER_SAT_MF = 'sat+mf'
+CAPTIONER_SAT_WF = 'sat+wf'
+CAPTIONER_SAT_MF_WF = 'sat+mf+wf'
+CAPTIONERS = (CAPTIONER_SAT, CAPTIONER_SAT_MF, CAPTIONER_SAT_WF,
+              CAPTIONER_SAT_MF_WF)
+
 parser = argparse.ArgumentParser(description='train a cnn on spurious data')
 parser.add_argument('--experiments',
                     choices=EXPERIMENTS,
@@ -42,6 +49,10 @@ parser.add_argument('--versions',
                     default=VERSIONS,
                     nargs='+',
                     help='version(s) of each dataset to use')
+parser.add_argument('--captioner',
+                    choices=CAPTIONERS,
+                    default=CAPTIONER_SAT_MF,
+                    help='captioning model to use (default: sat+mf)')
 parser.add_argument('--cnn',
                     choices=(lv.zoo.KEY_ALEXNET, zoo.KEY_RESNET18),
                     default=lv.zoo.KEY_ALEXNET,
@@ -124,10 +135,41 @@ args.out_root.mkdir(exist_ok=True, parents=True)
 # Before diving into experiments, train a captioner on all the data.
 # TODO(evandez): Use a pretrained captioner.
 annotations = lv.zoo.datasets(*args.annotations, path=args.datasets_root)
-featurizer = featurizers.MaskedPyramidFeaturizer().to(device)
-captioner = captioners.decoder(annotations, featurizer=featurizer)
-captioner.fit(annotations, device=device)
 
+if args.captioner != CAPTIONER_SAT:
+    featurizer = featurizers.MaskedPyramidFeaturizer().to(device)
+else:
+    featurizer = featurizers.MaskedImagePyramidFeaturizer().to(device)
+
+features = None
+if args.captioner != CAPTIONER_SAT_WF:
+    features = featurizer.map(annotations,
+                              num_workers=args.num_workers,
+                              device=device)
+
+annotator = None
+if args.captioner in (CAPTIONER_SAT_WF, CAPTIONER_SAT_MF_WF):
+    annotator = annotators.WordAnnotator.fit(annotations,
+                                             featurizer=featurizer,
+                                             features=features,
+                                             num_workers=args.num_workers,
+                                             device=device)
+
+if args.captioner in (CAPTIONER_SAT, CAPTIONER_SAT_MF):
+    captioner = captioners.decoder(annotations, featurizer=featurizer)
+else:
+    captioner = captioners.decoder(
+        annotations,
+        annotator=annotator,
+        featurizer=None if args.captioner == CAPTIONER_SAT_WF else featurizer)
+
+captioner.fit(annotations,
+              features=features,
+              num_workers=args.num_workers,
+              display_progress_as=f'train {args.captioner}',
+              device=device)
+
+# Now that we have the captioner, we can start the experiments.
 for experiment in args.experiments:
     for version in args.versions:
         print(f'\n-------- BEGIN EXPERIMENT: {experiment}/{version} --------')
@@ -218,9 +260,9 @@ for experiment in args.experiments:
         wandb.log({
             'experiment': experiment,
             'version': version,
-            'condition': 'baseline',
+            'condition': 'ablate-nothing',
             'trial': 1,
-            'n-ablated': 0,
+            'n_ablated': 0,
             'accuracy': accuracy,
         })
 
@@ -249,7 +291,7 @@ for experiment in args.experiments:
             'version': version,
             'condition': 'ablate-text',
             'trial': 1,
-            'n-ablated': len(indices),
+            'n_ablated': len(indices),
             'accuracy': accuracy,
             'samples': samples,
         })
@@ -277,7 +319,7 @@ for experiment in args.experiments:
                 'version': version,
                 'condition': 'ablate-random',
                 'trial': trial + 1,
-                'n-ablated': len(indices),
+                'n_ablated': len(indices),
                 'accuracy': accuracy,
                 'samples': samples,
             })
