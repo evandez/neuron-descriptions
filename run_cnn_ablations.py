@@ -8,7 +8,7 @@ from typing import Callable, Optional, Sequence, Sized, Union, cast
 import lv.dissection.zoo
 import lv.zoo
 from lv import datasets
-from lv.models import captioners, featurizers
+from lv.models import annotators, captioners, featurizers
 from lv.utils.typing import Device, StrSequence
 from third_party.netdissect import nethook
 
@@ -149,7 +149,7 @@ SPATIAL_RELATIONS = frozenset({
     'center',
 })
 
-MODELS = (lv.zoo.KEY_ALEXNET, lv.zoo.KEY_RESNET152)
+CNNS = (lv.zoo.KEY_ALEXNET, lv.zoo.KEY_RESNET152)
 DATASETS = (lv.zoo.KEY_IMAGENET, lv.zoo.KEY_PLACES365)
 TRAIN = {
     lv.zoo.KEY_ALEXNET: (
@@ -168,15 +168,27 @@ TRAIN = {
     ),
 }
 
+CAPTIONER_GT = 'gt'
+CAPTIONER_SAT = 'sat'
+CAPTIONER_SAT_MF = 'sat+mf'
+CAPTIONER_SAT_WF = 'sat+wf'
+CAPTIONER_SAT_MF_WF = 'sat+mf+wf'
+CAPTIONERS = (CAPTIONER_GT, CAPTIONER_SAT, CAPTIONER_SAT_MF, CAPTIONER_SAT_WF,
+              CAPTIONER_SAT_MF_WF)
+
 
 def main() -> None:
     """Run the script."""
     parser = argparse.ArgumentParser(
         description='run cnn ablation experiments')
-    parser.add_argument('--models',
-                        choices=MODELS,
-                        default=MODELS,
-                        help='models to ablate (default: alexnet, resnet152)')
+    parser.add_argument('--cnns',
+                        choices=CNNS,
+                        default=CNNS,
+                        help='cnns to ablate (default: alexnet, resnet152)')
+    parser.add_argument('--captioner',
+                        choices=CAPTIONERS,
+                        default=CAPTIONER_SAT_MF,
+                        help='captioning model to use (default: sat+mf)')
     parser.add_argument(
         '--datasets',
         choices=DATASETS,
@@ -202,9 +214,6 @@ def main() -> None:
         default=5,
         help='for each experiment, delete an equal number of random '
         'neurons and retest this many times (default: 5)')
-    parser.add_argument('--ground-truth',
-                        action='store_true',
-                        help='use ground truth captions')
     parser.add_argument(
         '--num-workers',
         type=int,
@@ -256,35 +265,70 @@ def main() -> None:
         dataset = lv.dissection.zoo.dataset(dataset_name,
                                             path=args.datasets_root /
                                             dataset_name / 'val')
-        for model_name in args.models:
-            model, *_ = lv.dissection.zoo.model(model_name, dataset_name)
-            model.to(device).eval()
+        for cnn_name in args.cnns:
+            cnn, *_ = lv.dissection.zoo.model(cnn_name, dataset_name)
+            cnn.to(device).eval()
 
-            annotations = lv.zoo.datasets(f'{model_name}/{dataset_name}',
+            annotations = lv.zoo.datasets(f'{cnn_name}/{dataset_name}',
                                           path=args.datasets_root)
             assert isinstance(annotations, datasets.AnnotatedTopImagesDataset)
 
-            if args.ground_truth:
+            # Obtain captions for every neuron in the CNN.
+            if args.captioner == CAPTIONER_GT:
                 captions: StrSequence = []
                 for index in range(len(cast(Sized, annotations))):
                     caption = random.choice(annotations[index].annotations)
                     assert isinstance(captions, list)
                     captions.append(caption)
             else:
-                train = lv.zoo.datasets(*TRAIN[model_name],
+                train = lv.zoo.datasets(*TRAIN[cnn_name],
                                         path=args.datasets_root)
-                featurizer = featurizers.MaskedPyramidFeaturizer().to(device)
-                captioner = captioners.decoder(train, featurizer=featurizer)
+
+                if args.captioner != CAPTIONER_SAT:
+                    featurizer = featurizers.MaskedPyramidFeaturizer()
+                else:
+                    featurizer = featurizers.MaskedImagePyramidFeaturizer()
+                featurizer.to(device)
+
+                features = None
+                if args.captioner != CAPTIONER_SAT_WF:
+                    features = featurizer.map(train,
+                                              num_workers=args.num_workers,
+                                              device=device)
+
+                annotator = None
+                if args.captioner in (CAPTIONER_SAT_WF, CAPTIONER_SAT_MF_WF):
+                    annotator = annotators.WordAnnotator.fit(
+                        train,
+                        featurizer=featurizer,
+                        features=features,
+                        num_workers=args.num_workers,
+                        device=device)
+
+                if args.captioner in (CAPTIONER_SAT, CAPTIONER_SAT_MF):
+                    captioner = captioners.decoder(train,
+                                                   featurizer=featurizer)
+                else:
+                    captioner = captioners.decoder(
+                        train,
+                        annotator=annotator,
+                        featurizer=None
+                        if args.captioner == CAPTIONER_SAT_WF else featurizer)
                 captioner.fit(train, device=device)
                 captioner.eval()
                 captions = captioner.predict(annotations, device=device)
+
+            # Pretokenize the captions for efficiency.
             tokenized = tuple(nlp.pipe(captions))
 
+            # Begin the experiments! For each one, we will ablate neurons in
+            # order of some criterion and measure drops in validation accuracy.
             for experiment in args.experiments:
                 print('\n-------- BEGIN EXPERIMENT: '
-                      f'{model_name}/{dataset_name}/{experiment} '
+                      f'{cnn_name}/{dataset_name}/{experiment} '
                       '--------')
 
+                # When ablating random neurons, do it a few times to denoise.
                 if experiment == EXPERIMENT_RANDOM:
                     trials = args.n_random_trials
                 else:
@@ -329,12 +373,12 @@ def main() -> None:
                     for fraction in np.arange(0, 1, args.abalation_step_size):
                         ablated = indices[:int(fraction * len(indices))]
                         accuracy = ablate_and_test(
-                            model,
+                            cnn,
                             dataset,
                             annotations,
                             ablated,
                             num_workers=args.num_workers,
-                            display_progress_as='test ablated model '
+                            display_progress_as='test ablated cnn '
                             f'(cond={experiment}, '
                             f'frac={fraction:.2f})',
                             device=device)
@@ -342,11 +386,11 @@ def main() -> None:
                             annotations,
                             captions,
                             ablated,
-                            condition=f'{model_name}/{dataset_name}/'
+                            condition=f'{cnn_name}/{dataset_name}/'
                             f'{experiment}',
                             k=args.wandb_n_samples)
                         wandb.log({
-                            'model': model_name,
+                            'model': cnn_name,
                             'dataset': dataset_name,
                             'experiment': experiment,
                             'n_ablated': len(ablated),
