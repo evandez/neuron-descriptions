@@ -130,12 +130,14 @@ def create_wandb_images(dissected: AnyTopImagesDataset,
     return images
 
 
+EXPERIMENT_NOTHING = 'nothing'
 EXPERIMENT_OBJECT_WORDS = 'object-words'
 EXPERIMENT_SPATIAL_RELATION = 'spatial-relation'
 EXPERIMENT_MANY_WORDS = 'many-words'
 EXPERIMENT_LARGE_EMBEDDING_DIFFERENCE = 'experiment-large-embedding-difference'
-EXPERIMENTS = (EXPERIMENT_OBJECT_WORDS, EXPERIMENT_SPATIAL_RELATION,
-               EXPERIMENT_MANY_WORDS, EXPERIMENT_LARGE_EMBEDDING_DIFFERENCE)
+EXPERIMENTS = (EXPERIMENT_NOTHING, EXPERIMENT_OBJECT_WORDS,
+               EXPERIMENT_SPATIAL_RELATION, EXPERIMENT_MANY_WORDS,
+               EXPERIMENT_LARGE_EMBEDDING_DIFFERENCE)
 
 MODELS = (lv.zoo.KEY_ALEXNET, lv.zoo.KEY_RESNET152)
 DATASETS = (lv.zoo.KEY_IMAGENET, lv.zoo.KEY_PLACES365)
@@ -271,7 +273,9 @@ def main() -> None:
                 print('\n-------- BEGIN EXPERIMENT: '
                       f'{model_name}/{dataset_name}/{experiment} '
                       '--------')
-                if experiment == EXPERIMENT_OBJECT_WORDS:
+                if experiment == EXPERIMENT_NOTHING:
+                    indices = []
+                elif experiment == EXPERIMENT_OBJECT_WORDS:
                     assert object_synset is not None
                     indices = [
                         index for index, tokens in enumerate(tokenized)
@@ -331,6 +335,9 @@ def main() -> None:
                     'accuracy': accuracy,
                     'samples': samples,
                 })
+
+                if experiment == EXPERIMENT_NOTHING:
+                    continue
 
                 for trial in range(args.n_random_trials):
                     indices = random.sample(range(len(annotations)),
