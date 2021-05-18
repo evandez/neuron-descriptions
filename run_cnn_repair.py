@@ -10,6 +10,7 @@ from lv import datasets
 from lv.dissection import dissect, zoo
 from lv.models import captioners, featurizers
 from lv.utils import training
+from third_party.netdissect import renormalize
 
 import torch
 import wandb
@@ -186,12 +187,18 @@ for experiment in args.experiments:
         # Now that we have the trained model, dissect it on the validation set.
         dissection_root = args.out_root / f'{zoo.KEY_RESNET18}-{experiment}'
         for layer in tqdm(layers, desc='dissect resnet18'):
-            dissect.sequential(model,
-                               val,
-                               layer=layer,
-                               results_dir=dissection_root,
-                               num_workers=args.num_workers,
-                               device=device)
+            dissect.sequential(
+                model,
+                val,
+                layer=layer,
+                results_dir=dissection_root,
+                num_workers=args.num_workers,
+                device=device,
+                # TODO(evandez): Remove need for these arguments...
+                image_size=224,
+                renormalizer=renormalize.renormalizer(source='imagenet',
+                                                      target='byte'),
+            )
 
         # Now find spurious neurons and cut them out.
         dissected = datasets.TopImagesDataset(dissection_root)
