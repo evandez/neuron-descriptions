@@ -117,7 +117,7 @@ for model in args.models:
     featurizer: Optional[featurizers.Featurizer]
     featurizer = featurizers_by_model.get(model)
     for experiment in args.experiments or EXPERIMENTS.keys():
-        print(f'-------- BEGIN EXPERIMENT: {model}/{experiment} --------')
+        print(f'\n-------- BEGIN EXPERIMENT: {model}/{experiment} --------')
 
         # Have to handle within-network and across-* experiments differently.
         splits = EXPERIMENTS[experiment]

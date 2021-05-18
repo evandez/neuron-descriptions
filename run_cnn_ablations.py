@@ -244,7 +244,7 @@ def main() -> None:
             tokenized = tuple(nlp.pipe(captions))
 
             for experiment in args.experiments:
-                print('-------- BEGIN EXPERIMENT: '
+                print('\n-------- BEGIN EXPERIMENT: '
                       f'{model_name}/{dataset_name}/{experiment} '
                       '--------')
                 if experiment == EXPERIMENT_OBJECT_WORDS:

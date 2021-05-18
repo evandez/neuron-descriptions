@@ -125,7 +125,7 @@ captioner.fit(annotations, device=device)
 
 for experiment in args.experiments:
     for version in args.versions:
-        print(f'-------- BEGIN EXPERIMENT: {experiment}/{version} --------')
+        print(f'\n-------- BEGIN EXPERIMENT: {experiment}/{version} --------')
 
         # Start by training the classifier on spurious data.
         dataset = zoo.dataset(experiment,
