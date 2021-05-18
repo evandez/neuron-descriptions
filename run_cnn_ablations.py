@@ -240,7 +240,8 @@ def main() -> None:
 
     for dataset_name in args.datasets:
         dataset = lv.dissection.zoo.dataset(dataset_name,
-                                            path=args.datasets_root / 'val')
+                                            path=args.datasets_root /
+                                            dataset_name / 'val')
         for model_name in args.models:
             model, *_ = lv.dissection.zoo.model(model_name, dataset_name)
             model.eval()
