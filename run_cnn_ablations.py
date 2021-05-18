@@ -167,7 +167,7 @@ def main() -> None:
         '--datasets',
         choices=DATASETS,
         default=DATASETS,
-        helps='dataset model(s) trained on (default: imagenet, places365)')
+        help='dataset model(s) trained on (default: imagenet, places365)')
     parser.add_argument('--experiments',
                         nargs='+',
                         choices=EXPERIMENTS,
