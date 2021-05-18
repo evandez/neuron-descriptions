@@ -20,11 +20,13 @@ parser.add_argument('--experiments',
                     nargs='+',
                     choices=EXPERIMENTS,
                     help='experiments to run (default: all)')
-parser.add_argument('--datasets',
-                    default=('alexnet/imagenet', 'alexnet/places365',
-                             'resnet152/imagenet', 'resnet152/places365'),
-                    nargs='+',
-                    help='training datasets (default: all datasets)')
+parser.add_argument(
+    '--datasets',
+    default=(zoo.KEY_ALEXNET_IMAGENET, zoo.KEY_ALEXNET_PLACES365,
+             zoo.KEY_RESNET152_IMAGENET, zoo.KEY_RESNET152_PLACES365,
+             zoo.KEY_BIGGAN_IMAGENET, zoo.KEY_BIGGAN_PLACES365),
+    nargs='+',
+    help='training datasets (default: all datasets)')
 parser.add_argument('--datasets-root',
                     type=pathlib.Path,
                     help='root dir for datasets (default: .zoo/datasets)')

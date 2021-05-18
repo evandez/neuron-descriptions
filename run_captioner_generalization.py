@@ -13,16 +13,14 @@ DatasetNames = Sequence[str]
 Splits = Tuple[DatasetNames, ...]
 
 EXPERIMENTS: Mapping[str, Splits] = {
-    'within-network': (
-        (
-            'alexnet/imagenet',
-            'alexnet/places365',
-            'resnet152/imagenet',
-            'resnet152/places365',
-            # TODO(evandez): Uncomment when data is available.
-            # 'biggan/imagenet'
-            # 'biggan/places365',
-        ),),
+    'within-network': ((
+        'alexnet/imagenet',
+        'alexnet/places365',
+        'resnet152/imagenet',
+        'resnet152/places365',
+        'biggan/imagenet'
+        'biggan/places365',
+    ),),
     'across-network': (
         ('alexnet/imagenet', 'alexnet/places365'),
         ('resnet152/imagenet', 'resnet152/places365'),
@@ -31,26 +29,23 @@ EXPERIMENTS: Mapping[str, Splits] = {
         (
             'alexnet/imagenet',
             'resnet152/imagenet',
-            # TODO(evandez): Uncomment once available.
-            # 'biggan/imagenet',
+            'biggan/imagenet',
         ),
         (
             'alexnet/places365',
             'resnet152/places365',
-            # TODO(evandez): Uncomment once available.
-            # 'biggan/places365',
+            'biggan/places365',
         ),
     ),
-    # TODO(evandez): Uncomment once available.
-    # 'across-task': (
-    #     (
-    #         'alexnet/imagenet',
-    #         'alexnet/places365',
-    #         'resnet152/imagenet',
-    #         'resnet152/places365',
-    #     ),
-    #     ('biggan/imagenet', 'biggan/places365'),
-    # ),
+    'across-task': (
+        (
+            'alexnet/imagenet',
+            'alexnet/places365',
+            'resnet152/imagenet',
+            'resnet152/places365',
+        ),
+        ('biggan/imagenet', 'biggan/places365'),
+    ),
 }
 
 SAT = 'sat'

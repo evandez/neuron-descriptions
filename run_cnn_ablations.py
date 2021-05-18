@@ -156,15 +156,13 @@ TRAIN = {
         lv.zoo.KEY_RESNET152_IMAGENET,
         lv.zoo.KEY_RESNET152_PLACES365,
         lv.zoo.KEY_BIGGAN_IMAGENET,
-        # TOOD(evandez): Uncomment once ready.
-        # lv.zoo.KEY_BIGGAN_PLACES365,
+        lv.zoo.KEY_BIGGAN_PLACES365,
     ),
     lv.zoo.KEY_RESNET152: (
         lv.zoo.KEY_ALEXNET_IMAGENET,
         lv.zoo.KEY_ALEXNET_PLACES365,
         lv.zoo.KEY_BIGGAN_IMAGENET,
-        # TOOD(evandez): Uncomment once ready.
-        # lv.zoo.KEY_BIGGAN_PLACES365,
+        lv.zoo.KEY_BIGGAN_PLACES365,
     ),
 }
 
