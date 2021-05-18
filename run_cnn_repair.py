@@ -184,7 +184,7 @@ for experiment in args.experiments:
                 break
 
         # Now that we have the trained model, dissect it on the validation set.
-        dissection_root = args.out_dir / f'{zoo.KEY_RESNET18}-{experiment}'
+        dissection_root = args.out_root / f'{zoo.KEY_RESNET18}-{experiment}'
         for layer in tqdm(layers, desc='dissect resnet18'):
             dissect.sequential(model,
                                val,
