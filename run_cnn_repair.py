@@ -199,9 +199,27 @@ for experiment in args.experiments:
                 renormalizer=renormalize.renormalizer(source='imagenet',
                                                       target='byte'),
             )
+        dissected = datasets.TopImagesDataset(dissection_root)
+
+        # Compute its baseline accuracy on the test set.
+        accuracy = run_cnn_ablations.ablate_and_test(
+            model,
+            test,
+            dissected,
+            (),
+            display_progress_as='test resnet18',
+            device=device,
+        )
+        wandb.log({
+            'experiment': experiment,
+            'version': version,
+            'condition': 'baseline',
+            'trial': 1,
+            'neurons': 0,
+            'accuracy': accuracy,
+        })
 
         # Now find spurious neurons and cut them out.
-        dissected = datasets.TopImagesDataset(dissection_root)
         captions = captioner.predict(dissected, device=device)
         indices = [
             index for index, caption in enumerate(captions)
