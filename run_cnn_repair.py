@@ -187,7 +187,7 @@ for experiment in args.experiments:
         dissection_root = args.out_dir / f'{zoo.KEY_RESNET18}-{experiment}'
         for layer in layers:
             dissect.sequential(model,
-                               test,
+                               val,
                                layer=layer,
                                results_dir=dissection_root,
                                device=device)
