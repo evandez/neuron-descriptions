@@ -241,6 +241,11 @@ def main() -> None:
                name=args.wandb_name,
                entity=args.wandb_entity,
                group=args.wandb_group,
+               config={
+                   'captioner': args.captioner,
+                   'ablation_step_size': args.ablation_step_size,
+                   'n_random_trials': args.n_random_trials,
+               },
                dir=args.wandb_dir)
 
     device = 'cuda' if args.cuda else 'cpu'

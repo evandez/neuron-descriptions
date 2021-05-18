@@ -126,6 +126,10 @@ wandb.init(project=args.wandb_project,
            name=args.wandb_name,
            entity=args.wandb_entity,
            group=args.wandb_group,
+           config={
+               'captioner': args.captioner,
+               'n_random_trials': args.n_random_trials,
+           },
            dir=args.wandb_dir)
 
 device = 'cuda' if args.cuda else 'cpu'
