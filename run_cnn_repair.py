@@ -177,8 +177,8 @@ for experiment in args.experiments:
                                           targets.to(device)).item()
             val_loss /= len(val_loader)
 
-            progress.set_description(f'{desc} (train_loss={train_loss}, '
-                                     f'val_loss={val_loss}')
+            progress.set_description(f'{desc} [train_loss={train_loss:.3f}, '
+                                     f'val_loss={val_loss:.3f}]')
 
             if stopper(val_loss):
                 break
