@@ -212,7 +212,8 @@ for experiment in args.experiments:
             test,
             dissected,
             indices,
-            display_progress_as=f'ablate text neurons (n={len(indices)})')
+            display_progress_as=f'ablate text neurons (n={len(indices)})',
+            device=device)
         samples = run_cnn_ablations.create_wandb_images(
             dissected,
             captions,
@@ -238,7 +239,8 @@ for experiment in args.experiments:
                 dissected,
                 indices,
                 display_progress_as=f'ablate random '
-                f'(trial={trial + 1}, n={len(indices)})')
+                f'(trial={trial + 1}, n={len(indices)})',
+                device=device)
             samples = run_cnn_ablations.create_wandb_images(
                 dissected,
                 captions,

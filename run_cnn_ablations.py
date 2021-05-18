@@ -3,13 +3,13 @@ import argparse
 import collections
 import pathlib
 import random
-from typing import Callable, Sequence, Sized, Union, cast
+from typing import Callable, Optional, Sequence, Sized, Union, cast
 
 import lv.dissection.zoo
 import lv.zoo
 from lv import datasets
 from lv.models import captioners, featurizers
-from lv.utils.typing import StrSequence
+from lv.utils.typing import Device, StrSequence
 from third_party.netdissect import nethook
 
 import nltk
@@ -52,7 +52,8 @@ def ablate_and_test(model: nn.Module,
                     dissected: AnyTopImagesDataset,
                     indices: Sequence[int],
                     batch_size: int = 64,
-                    display_progress_as: str = 'ablate and test') -> float:
+                    display_progress_as: str = 'ablate and test',
+                    device: Optional[Device] = None) -> float:
     """Ablate the given neurons and test the model on the given dataset.
 
     Args:
@@ -64,6 +65,8 @@ def ablate_and_test(model: nn.Module,
             Defaults to 64.
         display_progress_as (str, optional): String to show on progress bar.
             Defaults to 'ablate and test'.
+        device (Optional[Device], optional): Send images to this device.
+            Defaults to None.
 
     Returns:
         float: Test accuracy.
@@ -86,6 +89,8 @@ def ablate_and_test(model: nn.Module,
         for batch in tqdm(loader, desc=display_progress_as):
             assert len(batch) == 2, 'weird dataset batch?'
             images, targets = batch
+            images = images.to(device)
+            targets = targets.to(device)
             with torch.no_grad():
                 predictions = model(images)
             correct += predictions.argmax(dim=-1).eq(targets).sum().item()
@@ -288,7 +293,8 @@ def main() -> None:
                     dataset,
                     annotations,
                     indices,
-                    display_progress_as=f'ablate {experiment}')
+                    display_progress_as=f'ablate {experiment}',
+                    device=device)
                 key = f'{experiment}/{model_name}/{dataset_name}'
                 samples = create_wandb_images(annotations,
                                               captions,
@@ -314,7 +320,8 @@ def main() -> None:
                         dataset,
                         annotations,
                         indices,
-                        display_progress_as=f'ablate random (t={trial + 1})')
+                        display_progress_as=f'ablate random (t={trial + 1})',
+                        device=device)
                     samples = create_wandb_images(annotations,
                                                   captions,
                                                   indices,
