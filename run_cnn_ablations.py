@@ -167,7 +167,7 @@ def main() -> None:
         '--datasets',
         choices=DATASETS,
         default=DATASETS,
-        help='dataset model(s) trained on (default: imagenet, places365)')
+        helpg='dataset model(s) trained on (default: imagenet, places365)')
     parser.add_argument('--experiments',
                         nargs='+',
                         choices=EXPERIMENTS,
@@ -175,6 +175,7 @@ def main() -> None:
                         help='experiments to run (default: all)')
     parser.add_argument('--datasets-root',
                         type=pathlib.Path,
+                        default='.zoo/datasets',
                         help='root dir for datasets (default: .zoo/datasets)')
     parser.add_argument('--max-ablation',
                         type=float,
@@ -223,14 +224,14 @@ def main() -> None:
     nlp = spacy.load('en_core_web_lg')
     object_synset = None
     if EXPERIMENT_OBJECT_WORDS in args.experiments:
-        nltk.download('wordnet')
-        nlp.add_pipe(wordnet_annotator.WordnetAnnotator(lang=nlp.lang),
-                     after='tagger')
+        nltk.download('wordnet', quiet=True)
+        nltk.download('omw', quiet=True)
+        nlp.add_pipe('spacy_wordnet', after='tagger')
         object_synset = wordnet.synset('object.n.01')
 
     for dataset_name in args.datasets:
         dataset = lv.dissection.zoo.dataset(dataset_name,
-                                            path=args.datasets_root)
+                                            path=args.datasets_root / 'val')
         for model_name in args.models:
             model, *_ = lv.dissection.zoo.model(model_name, dataset_name)
             model.eval()
