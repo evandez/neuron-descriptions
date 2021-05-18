@@ -92,7 +92,7 @@ def ablate_and_test(model: nn.Module,
             images = images.to(device)
             targets = targets.to(device)
             with torch.no_grad():
-                predictions = model(images)
+                predictions = instrumented(images)
             correct += predictions.argmax(dim=-1).eq(targets).sum().item()
     return correct / len(cast(Sized, dataset))
 
