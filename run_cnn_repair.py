@@ -42,6 +42,10 @@ parser.add_argument('--versions',
                     default=VERSIONS,
                     nargs='+',
                     help='version(s) of each dataset to use')
+parser.add_argument('--cnn',
+                    choices=(lv.zoo.KEY_ALEXNET, zoo.KEY_RESNET18),
+                    default=lv.zoo.KEY_ALEXNET,
+                    help='cnn architecture to repair')
 parser.add_argument(
     '--n-random-trials',
     type=int,
@@ -147,7 +151,7 @@ for experiment in args.experiments:
                                      num_workers=args.num_workers,
                                      batch_size=args.batch_size)
 
-        model, layers, _ = zoo.model(zoo.KEY_RESNET18,
+        model, layers, _ = zoo.model(args.cnn,
                                      zoo.KEY_IMAGENET,
                                      pretrained=False)
         model.to(device)
@@ -155,7 +159,7 @@ for experiment in args.experiments:
         criterion = nn.CrossEntropyLoss()
         stopper = training.EarlyStopping(patience=args.patience)
 
-        desc = f'train {zoo.KEY_RESNET18}'
+        desc = f'train {args.cnn}'
         progress = tqdm(range(args.epochs), desc=desc)
         for _ in progress:
             model.train()
@@ -185,7 +189,7 @@ for experiment in args.experiments:
                 break
 
         # Now that we have the trained model, dissect it on the validation set.
-        dissection_root = args.out_root / experiment / version / 'resnet18'
+        dissection_root = args.out_root / experiment / version / args.cnn
         for layer in layers:
             dissect.sequential(
                 model,
@@ -208,7 +212,7 @@ for experiment in args.experiments:
             dissected,
             (),
             num_workers=args.num_workers,
-            display_progress_as='test resnet18',
+            display_progress_as=f'test {args.cnn}',
             device=device,
         )
         wandb.log({
