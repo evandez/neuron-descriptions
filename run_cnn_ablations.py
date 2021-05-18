@@ -141,17 +141,17 @@ MODELS = (lv.zoo.KEY_ALEXNET, lv.zoo.KEY_RESNET152)
 DATASETS = (lv.zoo.KEY_IMAGENET, lv.zoo.KEY_PLACES365)
 TRAIN = {
     lv.zoo.KEY_ALEXNET: (
-        # TOOD(evandez): Uncomment once ready.
         lv.zoo.KEY_RESNET152_IMAGENET,
-        # lv.zoo.KEY_RESNET152_PLACES365,
-        # lv.zoo.KEY_BIGGAN_IMAGENET,
+        lv.zoo.KEY_RESNET152_PLACES365,
+        lv.zoo.KEY_BIGGAN_IMAGENET,
+        # TOOD(evandez): Uncomment once ready.
         # lv.zoo.KEY_BIGGAN_PLACES365,
     ),
     lv.zoo.KEY_RESNET152: (
-        # TOOD(evandez): Uncomment once ready.
         lv.zoo.KEY_ALEXNET_IMAGENET,
-        # lv.zoo.KEY_ALEXNET_PLACES365,
-        # lv.zoo.KEY_BIGGAN_IMAGENET,
+        lv.zoo.KEY_ALEXNET_PLACES365,
+        lv.zoo.KEY_BIGGAN_IMAGENET,
+        # TOOD(evandez): Uncomment once ready.
         # lv.zoo.KEY_BIGGAN_PLACES365,
     ),
 }
