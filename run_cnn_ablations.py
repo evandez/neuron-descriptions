@@ -1,4 +1,4 @@
-"""Run CNN editing experiments."""
+"""Run CNN ablation experiments."""
 import argparse
 import collections
 import pathlib
@@ -13,6 +13,7 @@ from lv.utils.typing import Device, StrSequence
 from third_party.netdissect import nethook
 
 import nltk
+import numpy as np
 import spacy
 import torch
 import wandb
@@ -130,14 +131,23 @@ def create_wandb_images(dissected: AnyTopImagesDataset,
     return images
 
 
-EXPERIMENT_NOTHING = 'nothing'
-EXPERIMENT_OBJECT_WORDS = 'object-words'
-EXPERIMENT_SPATIAL_RELATION = 'spatial-relation'
-EXPERIMENT_MANY_WORDS = 'many-words'
-EXPERIMENT_LARGE_EMBEDDING_DIFFERENCE = 'experiment-large-embedding-difference'
-EXPERIMENTS = (EXPERIMENT_NOTHING, EXPERIMENT_OBJECT_WORDS,
-               EXPERIMENT_SPATIAL_RELATION, EXPERIMENT_MANY_WORDS,
-               EXPERIMENT_LARGE_EMBEDDING_DIFFERENCE)
+EXPERIMENT_RANDOM = 'random'
+EXPERIMENT_N_OBJECT_WORDS = 'n-object-words'
+EXPERIMENT_N_SPATIAL_RELATIONS = 'n-spatial-relations'
+EXPERIMENT_CAPTION_LENGTH = 'caption-length'
+EXPERIMENT_MAX_WORD_DIFFERENCE = 'max-word-difference'
+EXPERIMENTS = (EXPERIMENT_RANDOM, EXPERIMENT_N_OBJECT_WORDS,
+               EXPERIMENT_N_SPATIAL_RELATIONS, EXPERIMENT_CAPTION_LENGTH,
+               EXPERIMENT_MAX_WORD_DIFFERENCE)
+
+SPATIAL_RELATIONS = frozenset({
+    'left',
+    'right',
+    'above',
+    'under',
+    'around',
+    'center',
+})
 
 MODELS = (lv.zoo.KEY_ALEXNET, lv.zoo.KEY_RESNET152)
 DATASETS = (lv.zoo.KEY_IMAGENET, lv.zoo.KEY_PLACES365)
@@ -161,7 +171,8 @@ TRAIN = {
 
 def main() -> None:
     """Run the script."""
-    parser = argparse.ArgumentParser(description='run cnn editing experiments')
+    parser = argparse.ArgumentParser(
+        description='run cnn ablation experiments')
     parser.add_argument('--models',
                         choices=MODELS,
                         default=MODELS,
@@ -180,10 +191,11 @@ def main() -> None:
                         type=pathlib.Path,
                         default='.zoo/datasets',
                         help='root dir for datasets (default: .zoo/datasets)')
-    parser.add_argument('--max-ablation',
-                        type=float,
-                        default=.1,
-                        help='max fraction of neurons to ablate (default: .1)')
+    parser.add_argument(
+        '--ablation-step-size',
+        type=float,
+        default=.05,
+        help='fraction of neurons to delete at each step (default: .05)')
     parser.add_argument(
         '--n-random-trials',
         type=int,
@@ -226,7 +238,7 @@ def main() -> None:
 
     nlp = spacy.load('en_core_web_lg')
     object_synset = None
-    if EXPERIMENT_OBJECT_WORDS in args.experiments:
+    if EXPERIMENT_N_OBJECT_WORDS in args.experiments:
         nltk.download('wordnet', quiet=True)
         nltk.download('omw', quiet=True)
 
@@ -251,7 +263,6 @@ def main() -> None:
             annotations = lv.zoo.datasets(f'{model_name}/{dataset_name}',
                                           path=args.datasets_root)
             assert isinstance(annotations, datasets.AnnotatedTopImagesDataset)
-            ablatable = int(args.max_ablation * len(annotations))
 
             if args.ground_truth:
                 captions: StrSequence = []
@@ -273,98 +284,76 @@ def main() -> None:
                 print('\n-------- BEGIN EXPERIMENT: '
                       f'{model_name}/{dataset_name}/{experiment} '
                       '--------')
-                if experiment == EXPERIMENT_NOTHING:
-                    indices = []
-                elif experiment == EXPERIMENT_OBJECT_WORDS:
-                    assert object_synset is not None
-                    indices = [
-                        index for index, tokens in enumerate(tokenized)
-                        if any(object_synset in synset.lowest_common_hypernyms(
-                            object_synset)
-                               for token in tokens
-                               for synset in token._.wordnet.synsets())
-                    ]
-                elif experiment == EXPERIMENT_SPATIAL_RELATION:
-                    indices = [
-                        index for index, tokens in enumerate(tokenized)
-                        if any(token.lemma_.lower() in
-                               {'left', 'right', 'above', 'under', 'around'}
-                               for token in tokens)
-                    ]
-                elif experiment == EXPERIMENT_MANY_WORDS:
-                    indices = sorted(range(len(captions)),
-                                     key=lambda index: len(tokenized[index]),
-                                     reverse=True)
-                    indices = indices[:ablatable]
+
+                if experiment == EXPERIMENT_RANDOM:
+                    trials = args.n_random_trials
                 else:
-                    assert experiment == EXPERIMENT_LARGE_EMBEDDING_DIFFERENCE
-                    scores = torch.zeros(len(captions))
-                    for index, tokens in enumerate(tokenized):
-                        vectors = torch.stack([
-                            torch.from_numpy(token.vector) for token in tokens
-                        ])
-                        distances = vectors[:, None] - vectors[None, :]
-                        distances = (distances**2).sum(dim=-1)
-                        scores[index] = distances.max()
-                    indices = scores.topk(k=ablatable).indices.tolist()
+                    trials = 1
 
-                if len(indices) > ablatable:
-                    indices = random.sample(indices, k=ablatable)
+                for trial in range(trials):
+                    if experiment == EXPERIMENT_RANDOM:
+                        scores = torch.rand(len(captions)).tolist()
+                    elif experiment == EXPERIMENT_N_OBJECT_WORDS:
+                        assert object_synset is not None
+                        scores = [
+                            sum(object_synset in
+                                synset.lowest_common_hypernyms(object_synset)
+                                for token in tokens
+                                for synset in token._.wordnet.synsets())
+                            for tokens in tokenized
+                        ]
+                    elif experiment == EXPERIMENT_N_SPATIAL_RELATIONS:
+                        scores = [
+                            sum(token.lemma_.lower() in SPATIAL_RELATIONS
+                                for token in tokens)
+                            for tokens in tokenized
+                        ]
+                    elif experiment == EXPERIMENT_CAPTION_LENGTH:
+                        scores = [len(tokens) for tokens in tokenized]
+                    else:
+                        assert experiment == EXPERIMENT_MAX_WORD_DIFFERENCE
+                        scores = []
+                        for index, tokens in enumerate(tokenized):
+                            vectors = torch.stack([
+                                torch.from_numpy(token.vector)
+                                for token in tokens
+                            ])
+                            distances = vectors[:, None] - vectors[None, :]
+                            distances = (distances**2).sum(dim=-1)
+                            score = distances.max().item()
+                            scores.append(score)
 
-                accuracy = ablate_and_test(
-                    model,
-                    dataset,
-                    annotations,
-                    indices,
-                    num_workers=args.num_workers,
-                    display_progress_as=f'ablate {experiment}',
-                    device=device)
-                key = f'{experiment}/{model_name}/{dataset_name}'
-                samples = create_wandb_images(annotations,
-                                              captions,
-                                              indices,
-                                              condition=f'{key}/text',
-                                              k=args.wandb_n_samples)
-                wandb.log({
-                    'model': model_name,
-                    'dataset': dataset_name,
-                    'experiment': experiment,
-                    'condition': 'text',
-                    'trial': 1,
-                    'neurons': len(indices),
-                    'accuracy': accuracy,
-                    'samples': samples,
-                })
-
-                if experiment == EXPERIMENT_NOTHING:
-                    continue
-
-                for trial in range(args.n_random_trials):
-                    indices = random.sample(range(len(annotations)),
-                                            k=len(indices))
-                    accuracy = ablate_and_test(
-                        model,
-                        dataset,
-                        annotations,
-                        indices,
-                        num_workers=args.num_workers,
-                        display_progress_as=f'ablate random (t={trial + 1})',
-                        device=device)
-                    samples = create_wandb_images(annotations,
-                                                  captions,
-                                                  indices,
-                                                  condition=f'{key}/random',
-                                                  k=args.wandb_n_samples)
-                    wandb.log({
-                        'model': model_name,
-                        'dataset': dataset_name,
-                        'experiment': experiment,
-                        'condition': 'random',
-                        'trial': trial + 1,
-                        'neurons': len(indices),
-                        'accuracy': accuracy,
-                        'samples': samples,
-                    })
+                    indices = sorted(range(len(captions)),
+                                     key=lambda i: scores[i],
+                                     reverse=True)
+                    for fraction in np.arange(0, 1, args.abalation_step_size):
+                        ablated = indices[:int(fraction * len(indices))]
+                        accuracy = ablate_and_test(
+                            model,
+                            dataset,
+                            annotations,
+                            ablated,
+                            num_workers=args.num_workers,
+                            display_progress_as='test ablated model '
+                            f'(cond={experiment}, '
+                            f'frac={fraction:.2f})',
+                            device=device)
+                        samples = create_wandb_images(
+                            annotations,
+                            captions,
+                            ablated,
+                            condition=f'{model_name}/{dataset_name}/'
+                            f'{experiment}',
+                            k=args.wandb_n_samples)
+                        wandb.log({
+                            'model': model_name,
+                            'dataset': dataset_name,
+                            'experiment': experiment,
+                            'n_ablated': len(ablated),
+                            'trial': trial,
+                            'accuracy': accuracy,
+                            'samples': samples,
+                        })
 
 
 # Guard this script behind whether it's invoked, since it is imported.
