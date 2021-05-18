@@ -244,7 +244,7 @@ def main() -> None:
                                             dataset_name / 'val')
         for model_name in args.models:
             model, *_ = lv.dissection.zoo.model(model_name, dataset_name)
-            model.eval()
+            model.to(device).eval()
 
             annotations = lv.zoo.datasets(f'{model_name}/{dataset_name}',
                                           path=args.datasets_root)
