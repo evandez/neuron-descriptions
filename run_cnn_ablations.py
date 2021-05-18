@@ -52,6 +52,7 @@ def ablate_and_test(model: nn.Module,
                     dissected: AnyTopImagesDataset,
                     indices: Sequence[int],
                     batch_size: int = 64,
+                    num_workers: int = 0,
                     display_progress_as: str = 'ablate and test',
                     device: Optional[Device] = None) -> float:
     """Ablate the given neurons and test the model on the given dataset.
@@ -63,6 +64,8 @@ def ablate_and_test(model: nn.Module,
         indices (Sequence[int]): The indices of neurons to ablate.
         batch_size (int, optional): Batch size for evaluation.
             Defaults to 64.
+        num_workers (int, optional): Number of workers for loading test data.
+            Defaults to 0.
         display_progress_as (str, optional): String to show on progress bar.
             Defaults to 'ablate and test'.
         device (Optional[Device], optional): Send images to this device.
@@ -186,6 +189,11 @@ def main() -> None:
     parser.add_argument('--ground-truth',
                         action='store_true',
                         help='use ground truth captions')
+    parser.add_argument(
+        '--num-workers',
+        type=int,
+        default=16,
+        help='number of worker threads to load data with (default: 16)')
     parser.add_argument('--cuda', action='store_true', help='use cuda device')
     parser.add_argument('--wandb-project',
                         default='lv',
@@ -293,6 +301,7 @@ def main() -> None:
                     dataset,
                     annotations,
                     indices,
+                    num_workers=args.num_workers,
                     display_progress_as=f'ablate {experiment}',
                     device=device)
                 key = f'{experiment}/{model_name}/{dataset_name}'
@@ -320,6 +329,7 @@ def main() -> None:
                         dataset,
                         annotations,
                         indices,
+                        num_workers=args.num_workers,
                         display_progress_as=f'ablate random (t={trial + 1})',
                         device=device)
                     samples = create_wandb_images(annotations,

@@ -65,8 +65,8 @@ parser.add_argument(
 parser.add_argument(
     '--num-workers',
     type=int,
-    default=32,
-    help='number of worker threads to load data with (default: 32)')
+    default=16,
+    help='number of worker threads to load data with (default: 16)')
 parser.add_argument('--batch-size',
                     type=int,
                     default=128,
@@ -185,7 +185,7 @@ for experiment in args.experiments:
                 break
 
         # Now that we have the trained model, dissect it on the validation set.
-        dissection_root = args.out_root / f'{zoo.KEY_RESNET18}-{experiment}'
+        dissection_root = args.out_root / experiment / version / 'resnet18'
         for layer in layers:
             dissect.sequential(
                 model,
@@ -207,6 +207,7 @@ for experiment in args.experiments:
             test,
             dissected,
             (),
+            num_workers=args.num_workers,
             display_progress_as='test resnet18',
             device=device,
         )
@@ -230,6 +231,7 @@ for experiment in args.experiments:
             test,
             dissected,
             indices,
+            num_workers=args.num_workers,
             display_progress_as=f'ablate text neurons (n={len(indices)})',
             device=device)
         samples = run_cnn_ablations.create_wandb_images(
@@ -256,6 +258,7 @@ for experiment in args.experiments:
                 test,
                 dissected,
                 indices,
+                num_workers=args.num_workers,
                 display_progress_as=f'ablate random '
                 f'(trial={trial + 1}, n={len(indices)})',
                 device=device)
