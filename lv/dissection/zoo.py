@@ -225,14 +225,14 @@ def dissection_datasets() -> zoo.DatasetConfigs:
         KEY_SPURIOUS_IMAGENET:
             zoo.DatasetConfig(datasets.ImageFolder,
                               transform=transforms.Compose([
-                                  transforms.Resize(224),
+                                  transforms.Resize((224, 224)),
                                   transforms.ToTensor(),
                                   renormalize.NORMALIZER['imagenet']
                               ])),
         KEY_SPURIOUS_PLACES365:
             zoo.DatasetConfig(datasets.ImageFolder,
                               transform=transforms.Compose([
-                                  transforms.Resize(224),
+                                  transforms.Resize((224, 224)),
                                   transforms.ToTensor(),
                                   renormalize.NORMALIZER['imagenet']
                               ])),
