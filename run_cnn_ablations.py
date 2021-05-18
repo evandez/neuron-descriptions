@@ -17,6 +17,7 @@ import spacy
 import torch
 import wandb
 from nltk.corpus import wordnet
+from spacy import language
 from spacy_wordnet import wordnet_annotator
 from torch import nn
 from torch.utils import data
@@ -226,6 +227,14 @@ def main() -> None:
     if EXPERIMENT_OBJECT_WORDS in args.experiments:
         nltk.download('wordnet', quiet=True)
         nltk.download('omw', quiet=True)
+
+        # Redefine spacy factory.
+        # TODO(evandez): Figure out a way to not do this.
+        @language.Language.factory('spacy_wordnet',
+                                   default_config={'lang': 'en'})
+        def _(_nlp, _name, lang):
+            return wordnet_annotator.WordnetAnnotator(lang=lang)
+
         nlp.add_pipe('spacy_wordnet', after='tagger')
         object_synset = wordnet.synset('object.n.01')
 
