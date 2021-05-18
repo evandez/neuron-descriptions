@@ -23,11 +23,11 @@ VERSIONS = ('original', 'spurious')
 
 ANNOTATIONS = (
     lv.zoo.KEY_ALEXNET_IMAGENET,
+    lv.zoo.KEY_ALEXNET_PLACES365,
+    lv.zoo.KEY_RESNET152_IMAGENET,
+    lv.zoo.KEY_RESNET152_PLACES365,
+    lv.zoo.KEY_BIGGAN_IMAGENET,
     # TODO(evandez): Uncomment once ready.
-    # lv.zoo.KEY_ALEXNET_PLACES365,
-    # lv.zoo.KEY_RESNET152_IMAGENET,
-    # lv.zoo.KEY_RESNET152_PLACES365,
-    # lv.zoo.KEY_BIGGAN_IMAGENET,
     # lv.zoo.KEY_BIGGAN_PLACES365,
 )
 
