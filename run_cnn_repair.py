@@ -190,6 +190,7 @@ for experiment in args.experiments:
                                val,
                                layer=layer,
                                results_dir=dissection_root,
+                               num_workers=args.num_workers,
                                device=device)
 
         # Now find spurious neurons and cut them out.
