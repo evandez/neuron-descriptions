@@ -206,7 +206,7 @@ def main() -> None:
     parser.add_argument(
         '--ablation-step-size',
         type=float,
-        default=.05,
+        default=.1,
         help='fraction of neurons to delete at each step (default: .05)')
     parser.add_argument(
         '--n-random-trials',
