@@ -18,7 +18,11 @@ from torch import nn, optim
 from torch.utils import data
 from tqdm.auto import tqdm
 
-EXPERIMENTS = (zoo.KEY_SPURIOUS_IMAGENET, zoo.KEY_SPURIOUS_PLACES365)
+EXPERIMENTS = (
+    zoo.KEY_SPURIOUS_IMAGENET,
+    # TODO(evandez): Figure out what to do with this one.
+    # zoo.KEY_SPURIOUS_PLACES365,
+)
 VERSIONS = ('original', 'spurious')
 
 ANNOTATIONS = (
