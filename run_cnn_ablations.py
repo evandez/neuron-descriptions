@@ -382,6 +382,7 @@ def main() -> None:
                             num_workers=args.num_workers,
                             display_progress_as='test ablated cnn '
                             f'(cond={experiment}, '
+                            f'trial={trial + 1}, '
                             f'frac={fraction:.2f})',
                             device=device)
                         samples = create_wandb_images(
@@ -396,7 +397,7 @@ def main() -> None:
                             'dataset': dataset_name,
                             'experiment': experiment,
                             'n_ablated': len(ablated),
-                            'trial': trial,
+                            'trial': trial + 1,
                             'accuracy': accuracy,
                             'samples': samples,
                         })
