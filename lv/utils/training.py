@@ -1,4 +1,12 @@
 """Utilities for training models."""
+import pathlib
+from typing import Any, cast
+
+from lv.utils.typing import PathLike
+
+from torch.utils import data
+from torchvision import datasets
+from tqdm import tqdm
 
 
 class EarlyStopping:
@@ -39,3 +47,45 @@ class EarlyStopping:
             self.num_bad += 1
 
         return self.num_bad > self.patience
+
+
+class PreloadedImageFolder(datasets.ImageFolder):
+    """An ImageFolder that preloads all the images."""
+
+    def __init__(self,
+                 root: PathLike,
+                 *args: Any,
+                 num_workers: int = 0,
+                 display_progress: bool = True,
+                 **kwargs: Any):
+        """Preload the dataset.
+
+        The *args and **kwargs are forwarded to the superclass constructor.
+
+        Args:
+            root (PathLike): Dataset root.
+            num_workers (data.Dataset): Passed to `data.DataLoader` while
+                images are being cahced.
+            display_progress (bool, optional): Display progress as dataset
+                is being loaded.
+
+        """
+        super().__init__(str(root), *args, **kwargs)
+
+        self.cached_images = []
+        self.cached_labels = []
+
+        loader = data.DataLoader(cast(data.Dataset, self),
+                                 num_workers=num_workers)
+        if display_progress:
+            root = pathlib.Path(root)
+            loader = tqdm(loader,
+                          desc=f'preload {root.parent.name}/{root.name}')
+
+        for images, labels in loader:
+            self.cached_images.extend(images)
+            self.cached_labels.extend(labels)
+
+    def __getitem__(self, index):
+        """Access image and label from cache."""
+        return self.cached_images[index], self.cached_labels[index]
