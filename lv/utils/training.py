@@ -50,7 +50,7 @@ class EarlyStopping:
 
 
 # TODO(evandez): This really isn't a very elegant solution to the threading
-# problem of ImageFolder, as it loads the iamges in serial and this is very
+# problem of ImageFolder, as it loads the images in serial and this is very
 # slow for any dataset worth its muster. Better to figure out why threading
 # causes so many problems and fix that.
 class PreloadedImageFolder(data.Dataset):
