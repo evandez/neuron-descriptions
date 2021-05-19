@@ -1,6 +1,6 @@
 """Utilities for training models."""
 import pathlib
-from typing import Any, cast
+from typing import Any, Tuple, cast
 
 from lv.utils.typing import PathLike
 
@@ -49,7 +49,7 @@ class EarlyStopping:
         return self.num_bad > self.patience
 
 
-class PreloadedImageFolder(datasets.ImageFolder):
+class PreloadedImageFolder(data.Dataset):
     """An ImageFolder that preloads all the images."""
 
     def __init__(self,
@@ -70,13 +70,12 @@ class PreloadedImageFolder(datasets.ImageFolder):
                 is being loaded.
 
         """
-        super().__init__(str(root), *args, **kwargs)
+        self.dataset = datasets.ImageFolder(str(root), *args, **kwargs)
 
         self.cached_images = []
         self.cached_labels = []
 
-        loader = data.DataLoader(cast(data.Dataset, self),
-                                 num_workers=num_workers)
+        loader = data.DataLoader(self.dataset, num_workers=num_workers)
         if display_progress:
             root = pathlib.Path(root)
             loader = tqdm(loader,
@@ -86,6 +85,18 @@ class PreloadedImageFolder(datasets.ImageFolder):
             self.cached_images.extend(images)
             self.cached_labels.extend(labels)
 
-    def __getitem__(self, index):
-        """Access image and label from cache."""
+    def __getitem__(self, index: int) -> Tuple[Any, Any]:
+        """Access image and label from cache.
+
+        Args:
+            index (int): Index of the sample.
+
+        Returns:
+            Tuple[Any, Any]: The image and label.
+
+        """
         return self.cached_images[index], self.cached_labels[index]
+
+    def __len__(self) -> int:
+        """Return the number of samples in the dataset."""
+        return len(self.dataset)
