@@ -83,8 +83,8 @@ parser.add_argument(
 parser.add_argument(
     '--num-workers',
     type=int,
-    default=16,
-    help='number of worker threads to load data with (default: 16)')
+    default=64,
+    help='number of worker threads to load data with (default: 64)')
 parser.add_argument('--batch-size',
                     type=int,
                     default=128,
