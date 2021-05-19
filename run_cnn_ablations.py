@@ -397,7 +397,7 @@ def main() -> None:
                             'model': cnn_name,
                             'dataset': dataset_name,
                             'experiment': experiment,
-                            'n_ablated': len(ablated),
+                            'frac_ablated': fraction,
                             'trial': trial + 1,
                             'accuracy': accuracy,
                             'samples': samples,
