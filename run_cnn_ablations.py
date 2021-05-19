@@ -217,8 +217,8 @@ def main() -> None:
     parser.add_argument(
         '--num-workers',
         type=int,
-        default=16,
-        help='number of worker threads to load data with (default: 16)')
+        default=64,
+        help='number of worker threads to load data with (default: 64)')
     parser.add_argument('--cuda', action='store_true', help='use cuda device')
     parser.add_argument('--wandb-project',
                         default='lv',
