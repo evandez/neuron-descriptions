@@ -1,6 +1,6 @@
 """Utilities for training models."""
 import pathlib
-from typing import Any, Tuple, cast
+from typing import Any, Tuple
 
 from lv.utils.typing import PathLike
 
