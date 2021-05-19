@@ -16,7 +16,7 @@ import torch
 import wandb
 from torch import nn, optim
 from torch.utils import data
-from tqdm.auto import tqdm
+from tqdm import tqdm
 
 EXPERIMENTS = (
     zoo.KEY_SPURIOUS_IMAGENET,

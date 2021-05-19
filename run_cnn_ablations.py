@@ -22,7 +22,7 @@ from spacy import language
 from spacy_wordnet import wordnet_annotator
 from torch import nn
 from torch.utils import data
-from tqdm.auto import tqdm
+from tqdm import tqdm
 
 
 def zero(units: Sequence[int]) -> Callable[[torch.Tensor], torch.Tensor]:
