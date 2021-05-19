@@ -372,7 +372,7 @@ def main() -> None:
                     indices = sorted(range(len(captions)),
                                      key=lambda i: scores[i],
                                      reverse=True)
-                    for fraction in np.arange(0, 1, args.abalation_step_size):
+                    for fraction in np.arange(0, 1, args.ablation_step_size):
                         ablated = indices[:int(fraction * len(indices))]
                         accuracy = ablate_and_test(
                             cnn,
