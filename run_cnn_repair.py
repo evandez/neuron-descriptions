@@ -146,16 +146,13 @@ else:
 
 features = None
 if args.captioner != CAPTIONER_SAT_WF:
-    features = featurizer.map(annotations,
-                              num_workers=args.num_workers,
-                              device=device)
+    features = featurizer.map(annotations, device=device)
 
 annotator = None
 if args.captioner in (CAPTIONER_SAT_WF, CAPTIONER_SAT_MF_WF):
     annotator = annotators.WordAnnotator.fit(annotations,
                                              featurizer=featurizer,
                                              features=features,
-                                             num_workers=args.num_workers,
                                              device=device)
 
 if args.captioner in (CAPTIONER_SAT, CAPTIONER_SAT_MF):
@@ -168,7 +165,6 @@ else:
 
 captioner.fit(annotations,
               features=features,
-              num_workers=args.num_workers,
               display_progress_as=f'train {args.captioner}',
               device=device)
 
