@@ -58,7 +58,7 @@ parser.add_argument('--captioner',
                     help='captioning model to use (default: sat+mf)')
 parser.add_argument('--cnn',
                     choices=(lv.zoo.KEY_ALEXNET, zoo.KEY_RESNET18),
-                    default=lv.zoo.KEY_ALEXNET,
+                    default=zoo.KEY_RESNET18,
                     help='cnn architecture to repair')
 parser.add_argument(
     '--n-random-trials',
