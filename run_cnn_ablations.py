@@ -297,9 +297,7 @@ def main() -> None:
 
                 features = None
                 if args.captioner != CAPTIONER_SAT_WF:
-                    features = featurizer.map(train,
-                                              num_workers=args.num_workers,
-                                              device=device)
+                    features = featurizer.map(train, device=device)
 
                 annotator = None
                 if args.captioner in (CAPTIONER_SAT_WF, CAPTIONER_SAT_MF_WF):
@@ -307,7 +305,6 @@ def main() -> None:
                         train,
                         featurizer=featurizer,
                         features=features,
-                        num_workers=args.num_workers,
                         device=device)
 
                 if args.captioner in (CAPTIONER_SAT, CAPTIONER_SAT_MF):
