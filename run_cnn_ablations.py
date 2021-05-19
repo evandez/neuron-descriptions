@@ -203,10 +203,18 @@ def main() -> None:
                         type=pathlib.Path,
                         default='.zoo/datasets',
                         help='root dir for datasets (default: .zoo/datasets)')
+    parser.add_argument('--ablation-min',
+                        type=float,
+                        default=0,
+                        help='min fraction of neurons to ablate')
+    parser.add_argument('--ablation-max',
+                        type=float,
+                        default=.1,
+                        help='max fraction of neurons to ablate')
     parser.add_argument(
         '--ablation-step-size',
         type=float,
-        default=.1,
+        default=.02,
         help='fraction of neurons to delete at each step (default: .05)')
     parser.add_argument(
         '--n-random-trials',
@@ -372,7 +380,9 @@ def main() -> None:
                     indices = sorted(range(len(captions)),
                                      key=lambda i: scores[i],
                                      reverse=True)
-                    for fraction in np.arange(0, 1, args.ablation_step_size):
+                    fractions = np.arange(args.ablation_min, args.ablation_max,
+                                          args.ablation_step_size)
+                    for fraction in fractions:
                         ablated = indices[:int(fraction * len(indices))]
                         accuracy = ablate_and_test(
                             cnn,
