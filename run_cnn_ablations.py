@@ -205,7 +205,7 @@ def main() -> None:
                         help='min fraction of neurons to ablate')
     parser.add_argument('--ablation-max',
                         type=float,
-                        default=.1,
+                        default=.2,
                         help='max fraction of neurons to ablate')
     parser.add_argument(
         '--ablation-step-size',
