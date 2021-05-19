@@ -55,7 +55,6 @@ class PreloadedImageFolder(data.Dataset):
     def __init__(self,
                  root: PathLike,
                  *args: Any,
-                 num_workers: int = 0,
                  display_progress: bool = True,
                  **kwargs: Any):
         """Preload the dataset.
@@ -64,8 +63,6 @@ class PreloadedImageFolder(data.Dataset):
 
         Args:
             root (PathLike): Dataset root.
-            num_workers (data.Dataset): Passed to `data.DataLoader` while
-                images are being cahced.
             display_progress (bool, optional): Display progress as dataset
                 is being loaded.
 
@@ -75,15 +72,16 @@ class PreloadedImageFolder(data.Dataset):
         self.cached_images = []
         self.cached_labels = []
 
-        loader = data.DataLoader(self.dataset, num_workers=num_workers)
+        indices = range(len(self.dataset))
         if display_progress:
             root = pathlib.Path(root)
-            loader = tqdm(loader,
-                          desc=f'preload {root.parent.name}/{root.name}')
+            indices = tqdm(indices,
+                           desc=f'preload {root.parent.name}/{root.name}')
 
-        for images, labels in loader:
-            self.cached_images.extend(images)
-            self.cached_labels.extend(labels)
+        for index in indices:
+            image, label = self.dataset[index]
+            self.cached_images.append(image)
+            self.cached_labels.append(label)
 
     def __getitem__(self, index: int) -> Tuple[Any, Any]:
         """Access image and label from cache.
