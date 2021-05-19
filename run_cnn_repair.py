@@ -235,7 +235,6 @@ for experiment in args.experiments:
                 val,
                 layer=layer,
                 results_dir=dissection_root,
-                num_workers=0,
                 device=device,
                 # TODO(evandez): Remove need for these arguments...
                 image_size=224,
