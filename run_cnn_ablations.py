@@ -9,6 +9,7 @@ import lv.dissection.zoo
 import lv.zoo
 from lv import datasets
 from lv.models import annotators, captioners, featurizers
+from lv.utils import training
 from lv.utils.typing import Device, StrSequence
 from third_party.netdissect import nethook
 
@@ -54,7 +55,6 @@ def ablate_and_test(model: nn.Module,
                     dissected: AnyTopImagesDataset,
                     indices: Sequence[int],
                     batch_size: int = 64,
-                    num_workers: int = 0,
                     display_progress_as: str = 'ablate and test',
                     device: Optional[Device] = None) -> float:
     """Ablate the given neurons and test the model on the given dataset.
@@ -66,8 +66,6 @@ def ablate_and_test(model: nn.Module,
         indices (Sequence[int]): The indices of neurons to ablate.
         batch_size (int, optional): Batch size for evaluation.
             Defaults to 64.
-        num_workers (int, optional): Number of workers for loading test data.
-            Defaults to 0.
         display_progress_as (str, optional): String to show on progress bar.
             Defaults to 'ablate and test'.
         device (Optional[Device], optional): Send images to this device.
@@ -90,9 +88,7 @@ def ablate_and_test(model: nn.Module,
             instrumented.edit_layer(layer, rule=zero(sorted(units)))
 
         correct = 0
-        loader = data.DataLoader(dataset,
-                                 num_workers=num_workers,
-                                 batch_size=batch_size)
+        loader = data.DataLoader(dataset, batch_size=batch_size)
         for batch in tqdm(loader, desc=display_progress_as):
             assert len(batch) == 2, 'weird dataset batch?'
             images, targets = batch
@@ -222,11 +218,6 @@ def main() -> None:
         default=5,
         help='for each experiment, delete an equal number of random '
         'neurons and retest this many times (default: 5)')
-    parser.add_argument(
-        '--num-workers',
-        type=int,
-        default=64,
-        help='number of worker threads to load data with (default: 64)')
     parser.add_argument('--cuda', action='store_true', help='use cuda device')
     parser.add_argument('--wandb-project',
                         default='lv',
@@ -275,9 +266,10 @@ def main() -> None:
         object_synset = wordnet.synset('object.n.01')
 
     for dataset_name in args.datasets:
-        dataset = lv.dissection.zoo.dataset(dataset_name,
-                                            path=args.datasets_root /
-                                            dataset_name / 'val')
+        dataset = lv.dissection.zoo.dataset(
+            dataset_name,
+            path=args.datasets_root / dataset_name / 'val',
+            factory=training.PreloadedImageFolder)
         for cnn_name in args.cnns:
             cnn, *_ = lv.dissection.zoo.model(cnn_name, dataset_name)
             cnn.to(device).eval()
@@ -389,7 +381,6 @@ def main() -> None:
                             dataset,
                             annotations,
                             ablated,
-                            num_workers=args.num_workers,
                             display_progress_as='test ablated cnn '
                             f'(cond={experiment}, '
                             f'trial={trial + 1}, '

@@ -80,11 +80,6 @@ parser.add_argument(
     type=pathlib.Path,
     default='train-spurious-cnn',
     help='output directory to write models and dissection data (default: ".")')
-parser.add_argument(
-    '--num-workers',
-    type=int,
-    default=64,
-    help='number of worker threads to load data with (default: 64)')
 parser.add_argument('--batch-size',
                     type=int,
                     default=128,
@@ -180,21 +175,20 @@ for experiment in args.experiments:
         # Start by training the classifier on spurious data.
         dataset = zoo.dataset(experiment,
                               path=args.datasets_root / experiment / version /
-                              'train')
+                              'train',
+                              factory=training.PreloadedImageFolder)
         test = zoo.dataset(experiment,
                            path=args.datasets_root / experiment / version /
-                           'test')
+                           'test',
+                           factory=training.PreloadedImageFolder)
         size = len(cast(Sized, dataset))
         val_size = int(args.hold_out * size)
         train_size = size - val_size
         train, val = data.random_split(dataset, (train_size, val_size))
         train_loader = data.DataLoader(train,
                                        shuffle=True,
-                                       num_workers=args.num_workers,
                                        batch_size=args.batch_size)
-        val_loader = data.DataLoader(val,
-                                     num_workers=args.num_workers,
-                                     batch_size=args.batch_size)
+        val_loader = data.DataLoader(val, batch_size=args.batch_size)
 
         model, layers, _ = zoo.model(args.cnn,
                                      zoo.KEY_IMAGENET,
@@ -241,7 +235,7 @@ for experiment in args.experiments:
                 val,
                 layer=layer,
                 results_dir=dissection_root,
-                num_workers=args.num_workers,
+                num_workers=0,
                 device=device,
                 # TODO(evandez): Remove need for these arguments...
                 image_size=224,
@@ -256,7 +250,6 @@ for experiment in args.experiments:
             test,
             dissected,
             (),
-            num_workers=args.num_workers,
             display_progress_as=f'test {args.cnn}',
             device=device,
         )
@@ -280,7 +273,6 @@ for experiment in args.experiments:
             test,
             dissected,
             indices,
-            num_workers=args.num_workers,
             display_progress_as=f'ablate text neurons (n={len(indices)})',
             device=device)
         samples = run_cnn_ablations.create_wandb_images(
@@ -307,7 +299,6 @@ for experiment in args.experiments:
                 test,
                 dissected,
                 indices,
-                num_workers=args.num_workers,
                 display_progress_as=f'ablate random '
                 f'(trial={trial + 1}, n={len(indices)})',
                 device=device)
