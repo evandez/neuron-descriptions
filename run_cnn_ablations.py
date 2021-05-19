@@ -90,7 +90,9 @@ def ablate_and_test(model: nn.Module,
             instrumented.edit_layer(layer, rule=zero(sorted(units)))
 
         correct = 0
-        loader = data.DataLoader(dataset, batch_size=batch_size)
+        loader = data.DataLoader(dataset,
+                                 num_workers=num_workers,
+                                 batch_size=batch_size)
         for batch in tqdm(loader, desc=display_progress_as):
             assert len(batch) == 2, 'weird dataset batch?'
             images, targets = batch
