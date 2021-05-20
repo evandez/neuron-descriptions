@@ -25,6 +25,11 @@ EXPERIMENTS = (
 )
 VERSIONS = ('original', 'spurious')
 
+CONDITION_NOTHING = 'ablate-nothing'
+CONDITION_TEXT = 'ablate-text'
+CONDITION_RANDOM = 'ablate-random'
+CONDITIONS = (CONDITION_NOTHING, CONDITION_TEXT, CONDITION_RANDOM)
+
 ANNOTATIONS = (
     lv.zoo.KEY_ALEXNET_IMAGENET,
     lv.zoo.KEY_ALEXNET_PLACES365,
@@ -52,6 +57,11 @@ parser.add_argument('--versions',
                     default=VERSIONS,
                     nargs='+',
                     help='version(s) of each dataset to use')
+parser.add_argument('--conditions',
+                    choices=CONDITIONS,
+                    default=CONDITIONS,
+                    nargs='+',
+                    help='condition(s) to test under (default: all)')
 parser.add_argument('--captioner',
                     choices=CAPTIONERS,
                     default=CAPTIONER_SAT_MF,
@@ -235,6 +245,7 @@ for experiment in args.experiments:
                 val,
                 layer=layer,
                 results_dir=dissection_root,
+                clear_results_dir=True,
                 device=device,
                 # TODO(evandez): Remove need for these arguments...
                 image_size=224,
@@ -242,77 +253,52 @@ for experiment in args.experiments:
                                                       target='byte'),
             )
         dissected = datasets.TopImagesDataset(dissection_root)
-
-        # Compute its baseline accuracy on the test set.
-        accuracy = run_cnn_ablations.ablate_and_test(
-            model,
-            test,
-            dissected,
-            (),
-            display_progress_as=f'test {args.cnn}',
-            device=device,
-        )
-        wandb.log({
-            'experiment': experiment,
-            'version': version,
-            'condition': 'ablate-nothing',
-            'trial': 1,
-            'n_ablated': 0,
-            'accuracy': accuracy,
-        })
-
-        # Now find spurious neurons and cut them out.
         captions = captioner.predict(dissected, device=device)
-        indices = [
+        texts = [
             index for index, caption in enumerate(captions)
             if 'text' in caption
         ]
-        accuracy = run_cnn_ablations.ablate_and_test(
-            model,
-            test,
-            dissected,
-            indices,
-            display_progress_as=f'ablate text neurons (n={len(indices)})',
-            device=device)
-        samples = run_cnn_ablations.create_wandb_images(
-            dissected,
-            captions,
-            indices,
-            condition=f'{experiment}/{version}/text',
-            k=args.wandb_n_samples)
-        wandb.log({
-            'experiment': experiment,
-            'version': version,
-            'condition': 'ablate-text',
-            'trial': 1,
-            'n_ablated': len(indices),
-            'accuracy': accuracy,
-            'samples': samples,
-        })
 
-        # Repeat the experiment on random neurons so we have a baseline.
-        for trial in range(args.n_random_trials):
-            indices = random.sample(range(len(dissected)), k=len(indices))
-            accuracy = run_cnn_ablations.ablate_and_test(
-                model,
-                test,
-                dissected,
-                indices,
-                display_progress_as=f'ablate random '
-                f'(trial={trial + 1}, n={len(indices)})',
-                device=device)
-            samples = run_cnn_ablations.create_wandb_images(
-                dissected,
-                captions,
-                indices,
-                condition=f'{experiment}/{version}/random',
-                k=args.wandb_n_samples)
-            wandb.log({
-                'experiment': experiment,
-                'version': version,
-                'condition': 'ablate-random',
-                'trial': trial + 1,
-                'n_ablated': len(indices),
-                'accuracy': accuracy,
-                'samples': samples,
-            })
+        # Compute its baseline accuracy on the test set.
+        for condition in args.conditions:
+            if condition == CONDITION_RANDOM:
+                trials = args.n_random_trials
+            else:
+                trials = 1
+
+            for trial in range(trials):
+                if condition == CONDITION_NOTHING:
+                    indices = []
+                elif condition == CONDITION_TEXT:
+                    indices = texts
+                else:
+                    assert condition == CONDITION_RANDOM
+                    indices = random.sample(range(len(dissected)),
+                                            k=len(texts))
+
+                accuracy = run_cnn_ablations.ablate_and_test(
+                    model,
+                    test,
+                    dissected,
+                    indices,
+                    display_progress_as='test ablated cnn '
+                    f'(exp={experiment}, '
+                    f'ver={version}, '
+                    f'cond={condition}, '
+                    f'trial={trial + 1})',
+                    device=device,
+                )
+                samples = run_cnn_ablations.create_wandb_images(
+                    dissected,
+                    captions,
+                    indices,
+                    condition=f'{experiment}/{version}/{condition}/{trial}',
+                    k=args.wandb_n_samples)
+                wandb.log({
+                    'experiment': experiment,
+                    'version': version,
+                    'condition': condition,
+                    'trial': trial,
+                    'n_ablated': len(indices),
+                    'accuracy': accuracy,
+                })
