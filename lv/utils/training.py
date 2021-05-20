@@ -1,6 +1,6 @@
 """Utilities for training models."""
 import pathlib
-from typing import Any, Tuple
+from typing import Any, Sized, Tuple, cast
 
 from lv.utils.typing import PathLike
 
@@ -47,6 +47,37 @@ class EarlyStopping:
             self.num_bad += 1
 
         return self.num_bad > self.patience
+
+
+def random_split(dataset: data.Dataset,
+                 hold_out: float = .1) -> Tuple[data.Dataset, data.Dataset]:
+    """Randomly split the dataset into a train and val set.
+
+    Args:
+        dataset (data.Dataset): The full dataset.
+        hold_out (float, optional): Fraction of data to hold out for the
+            val set. Defaults to .1.
+
+    Returns:
+        Tuple[data.Dataset, data.Dataset]: The train and val sets.
+
+    """
+    if hold_out <= 0 or hold_out >= 1:
+        raise ValueError(f'hold_out must be in (0, 1), got {hold_out}')
+
+    size = len(cast(Sized, dataset))
+    val_size = int(hold_out * size)
+    train_size = size - val_size
+
+    for name, size in (('train', train_size), ('val', val_size)):
+        if size == 0:
+            raise ValueError(f'hold_out={hold_out} causes {name} set size '
+                             'to be zero')
+
+    splits = data.random_split(dataset, (train_size, val_size))
+    assert len(splits) == 2
+    train, val = splits
+    return train, val
 
 
 # TODO(evandez): This really isn't a very elegant solution to the threading
