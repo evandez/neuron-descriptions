@@ -2,21 +2,15 @@
 import argparse
 import pathlib
 import random
-from typing import Sized, cast
 
 import lv.zoo
-import run_cnn_ablations
 from lv import datasets
 from lv.dissection import dissect, zoo
-from lv.models import annotators, captioners, featurizers
-from lv.utils import training
+from lv.models import annotators, captioners, classifiers, featurizers
+from lv.utils import logging, training
 from third_party.netdissect import renormalize
 
-import torch
 import wandb
-from torch import nn, optim
-from torch.utils import data
-from tqdm import tqdm
 
 EXPERIMENTS = (
     zoo.KEY_SPURIOUS_IMAGENET,
@@ -191,57 +185,26 @@ for experiment in args.experiments:
                            path=args.datasets_root / experiment / version /
                            'test',
                            factory=training.PreloadedImageFolder)
-        size = len(cast(Sized, dataset))
-        val_size = int(args.hold_out * size)
-        train_size = size - val_size
-        train, val = data.random_split(dataset, (train_size, val_size))
-        train_loader = data.DataLoader(train,
-                                       shuffle=True,
-                                       batch_size=args.batch_size)
-        val_loader = data.DataLoader(val, batch_size=args.batch_size)
+        train, val = training.random_split(dataset, hold_out=args.hold_out)
 
-        model, layers, _ = zoo.model(args.cnn,
-                                     zoo.KEY_IMAGENET,
-                                     pretrained=False)
-        model.to(device)
-        optimizer = optim.Adam(model.parameters(), lr=args.lr)
-        criterion = nn.CrossEntropyLoss()
-        stopper = training.EarlyStopping(patience=args.patience)
-
-        desc = f'train {args.cnn}'
-        progress = tqdm(range(args.epochs), desc=desc)
-        for _ in progress:
-            model.train()
-            train_loss = 0.
-            for images, targets in train_loader:
-                predictions = model(images.to(device))
-                loss = criterion(predictions, targets.to(device))
-                loss.backward()
-                optimizer.step()
-                optimizer.zero_grad()
-                train_loss += loss.item()
-            train_loss /= len(train_loader)
-
-            model.eval()
-            val_loss = 0.
-            for images, targets in val_loader:
-                with torch.no_grad():
-                    predictions = model(images.to(device))
-                    val_loss += criterion(predictions,
-                                          targets.to(device)).item()
-            val_loss /= len(val_loader)
-
-            progress.set_description(f'{desc} [train_loss={train_loss:.3f}, '
-                                     f'val_loss={val_loss:.3f}]')
-
-            if stopper(val_loss):
-                break
+        cnn, layers, _ = zoo.model(args.cnn,
+                                   zoo.KEY_IMAGENET,
+                                   pretrained=False)
+        cnn = classifiers.ImageClassifier(cnn).to(device)
+        cnn.fit(train,
+                hold_out=val,
+                batch_size=args.batch_size,
+                max_epochs=args.epochs,
+                patience=args.patience,
+                optimizer_kwargs={'lr': args.lr},
+                device=device,
+                display_progress_as=f'train {args.cnn}')
 
         # Now that we have the trained model, dissect it on the validation set.
         dissection_root = args.out_root / experiment / version / args.cnn
         for layer in layers:
             dissect.sequential(
-                model,
+                cnn,
                 val,
                 layer=layer,
                 results_dir=dissection_root,
@@ -276,11 +239,9 @@ for experiment in args.experiments:
                     indices = random.sample(range(len(dissected)),
                                             k=len(texts))
 
-                accuracy = run_cnn_ablations.ablate_and_test(
-                    model,
+                accuracy = cnn.accuracy(
                     test,
-                    dissected,
-                    indices,
+                    ablate=dissected.units(indices),
                     display_progress_as='test ablated cnn '
                     f'(exp={experiment}, '
                     f'ver={version}, '
@@ -288,12 +249,14 @@ for experiment in args.experiments:
                     f'trial={trial + 1})',
                     device=device,
                 )
-                samples = run_cnn_ablations.create_wandb_images(
+                samples = logging.random_neuron_wandb_images(
                     dissected,
                     captions,
-                    indices,
-                    condition=f'{experiment}/{version}/{condition}/{trial}',
-                    k=args.wandb_n_samples)
+                    indices=indices,
+                    k=args.wandb_n_samples,
+                    exp=experiment,
+                    ver=version,
+                    cond=condition)
                 wandb.log({
                     'experiment': experiment,
                     'version': version,
