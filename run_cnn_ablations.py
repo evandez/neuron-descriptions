@@ -41,8 +41,15 @@ SPATIAL_RELATIONS = frozenset({
     'center',
 })
 
-CNNS = (lv.zoo.KEY_ALEXNET, lv.zoo.KEY_RESNET152)
-DATASETS = (lv.zoo.KEY_IMAGENET, lv.zoo.KEY_PLACES365)
+CNNS = (
+    lv.zoo.KEY_ALEXNET,
+    lv.zoo.KEY_RESNET152,
+)
+DATASETS = (
+    lv.zoo.KEY_IMAGENET,
+    # TODO(evandez): Figure out why this crashes.
+    # lv.zoo.KEY_PLACES365,
+)
 TRAIN = {
     lv.zoo.KEY_ALEXNET: (
         lv.zoo.KEY_RESNET152_IMAGENET,
