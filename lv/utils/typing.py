@@ -5,6 +5,7 @@ from typing import AbstractSet, List, Tuple, Union
 import torch
 
 Layer = Union[int, str]
+Unit = Tuple[Layer, int]
 
 PathLike = Union[str, pathlib.Path]
 
