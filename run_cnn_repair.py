@@ -10,6 +10,7 @@ from lv.models import annotators, captioners, classifiers, featurizers
 from lv.utils import logging, training
 from third_party.netdissect import renormalize
 
+import numpy as np
 import wandb
 
 EXPERIMENTS = (
@@ -19,10 +20,9 @@ EXPERIMENTS = (
 )
 VERSIONS = ('original', 'spurious')
 
-CONDITION_NOTHING = 'ablate-nothing'
 CONDITION_TEXT = 'ablate-text'
 CONDITION_RANDOM = 'ablate-random'
-CONDITIONS = (CONDITION_NOTHING, CONDITION_TEXT, CONDITION_RANDOM)
+CONDITIONS = (CONDITION_TEXT, CONDITION_RANDOM)
 
 ANNOTATIONS = (
     lv.zoo.KEY_ALEXNET_IMAGENET,
@@ -106,6 +106,19 @@ parser.add_argument('--lr',
                     type=float,
                     default=1e-4,
                     help='learning rate (default: 1e-4)')
+parser.add_argument('--ablation-min',
+                    type=float,
+                    default=0,
+                    help='min fraction of neurons to ablate (default: 0)')
+parser.add_argument('--ablation-max',
+                    type=float,
+                    default=1,
+                    help='max fraction of neurons to ablate (default: 1)')
+parser.add_argument(
+    '--ablation-step-size',
+    type=float,
+    default=.1,
+    help='fraction of additional neurons to ablate at each step (default: .1)')
 parser.add_argument('--cuda', action='store_true', help='use cuda device')
 parser.add_argument('--wandb-project',
                     default='lv',
@@ -230,38 +243,43 @@ for experiment in args.experiments:
                 trials = 1
 
             for trial in range(trials):
-                if condition == CONDITION_NOTHING:
-                    indices = []
-                elif condition == CONDITION_TEXT:
+                if condition == CONDITION_TEXT:
                     indices = texts
                 else:
                     assert condition == CONDITION_RANDOM
                     indices = random.sample(range(len(dissected)),
                                             k=len(texts))
 
-                accuracy = cnn.accuracy(
-                    test,
-                    ablate=dissected.units(indices),
-                    display_progress_as='test ablated cnn '
-                    f'(exp={experiment}, '
-                    f'ver={version}, '
-                    f'cond={condition}, '
-                    f'trial={trial + 1})',
-                    device=device,
-                )
-                samples = logging.random_neuron_wandb_images(
-                    dissected,
-                    captions,
-                    indices=indices,
-                    k=args.wandb_n_samples,
-                    exp=experiment,
-                    ver=version,
-                    cond=condition)
-                wandb.log({
-                    'experiment': experiment,
-                    'version': version,
-                    'condition': condition,
-                    'trial': trial,
-                    'n_ablated': len(indices),
-                    'accuracy': accuracy,
-                })
+                fractions = np.arange(args.ablation_min, args.ablation_max,
+                                      args.ablation_step_size)
+                for fraction in fractions:
+                    ablated = indices[:int(fraction * len(indices))]
+                    accuracy = cnn.accuracy(
+                        test,
+                        ablate=dissected.units(ablated),
+                        display_progress_as=f'test ablated {args.cnn} '
+                        f'(exp={experiment}, '
+                        f'ver={version}, '
+                        f'cond={condition}, '
+                        f'trial={trial + 1}, '
+                        f'frac={fraction})',
+                        device=device,
+                    )
+                    samples = logging.random_neuron_wandb_images(
+                        dissected,
+                        captions,
+                        indices=ablated,
+                        k=args.wandb_n_samples,
+                        exp=experiment,
+                        ver=version,
+                        cond=condition,
+                        frac=fraction)
+                    wandb.log({
+                        'experiment': experiment,
+                        'version': version,
+                        'condition': condition,
+                        'trial': trial,
+                        'frac_ablated': fraction,
+                        'n_ablated': len(ablated),
+                        'accuracy': accuracy,
+                    })
