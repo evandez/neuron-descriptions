@@ -4,7 +4,7 @@ import csv
 import pathlib
 from typing import Any, Iterable, NamedTuple, Optional, Sequence, Union
 
-from lv.utils.typing import Layer, PathLike
+from lv.utils.typing import Layer, PathLike, Unit
 from third_party.netdissect import renormalize
 
 import numpy
@@ -188,6 +188,32 @@ class TopImagesDataset(data.Dataset):
                          images=self.images_by_layer[layer][unit],
                          masks=self.masks_by_layer[layer][unit])
 
+    def unit(self, index: int) -> Unit:
+        """Return the unit at the given index.
+
+        Args:
+            index (int): Sample index.
+
+        Returns:
+            Unit: Layer and unit number.
+
+        """
+        sample = self[index]
+        return sample.layer, sample.unit
+
+    def units(self, indices: Sequence[int]) -> Sequence[Unit]:
+        """Return the units at the given indices.
+
+        Args:
+            indices (Sequence[int]): Sample indices.
+
+        Returns:
+            Sequence[Unit]: Layer and unit numbers.
+
+        """
+        units = [self.unit(index) for index in indices]
+        return tuple(units)
+
     @property
     def k(self) -> int:
         """Return the "k" in "top-k images"."""
@@ -341,6 +367,32 @@ class AnnotatedTopImagesDataset(data.Dataset):
             raise KeyError(f'no annotated top images for: {key}')
         sample = self.samples_by_layer_unit[key]
         return sample
+
+    def unit(self, index: int) -> Unit:
+        """Return the unit at the given index.
+
+        Args:
+            index (int): Sample index.
+
+        Returns:
+            Unit: Layer and unit number.
+
+        """
+        sample = self[index]
+        return sample.layer, sample.unit
+
+    def units(self, indices: Sequence[int]) -> Sequence[Unit]:
+        """Return the units at the given indices.
+
+        Args:
+            indices (Sequence[int]): Sample indices.
+
+        Returns:
+            Sequence[Unit]: Layer and unit numbers.
+
+        """
+        units = [self.unit(index) for index in indices]
+        return tuple(units)
 
     @property
     def k(self) -> int:
