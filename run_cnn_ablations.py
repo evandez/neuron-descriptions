@@ -28,6 +28,10 @@ EXPERIMENTS = (EXPERIMENT_RANDOM, EXPERIMENT_N_OBJECT_WORDS,
                EXPERIMENT_N_SPATIAL_RELATIONS, EXPERIMENT_CAPTION_LENGTH,
                EXPERIMENT_MAX_WORD_DIFFERENCE)
 
+ORDER_INCREASING = 'increasing'
+ORDER_DECREASING = 'decreasing'
+ORDERS = (ORDER_DECREASING, ORDER_INCREASING)
+
 SPATIAL_RELATIONS = frozenset({
     'left',
     'right',
@@ -81,6 +85,11 @@ parser.add_argument('--experiments',
                     choices=EXPERIMENTS,
                     default=EXPERIMENTS,
                     help='experiments to run (default: all)')
+parser.add_argument('--orders',
+                    nargs='+',
+                    choices=ORDERS,
+                    default=ORDERS,
+                    help='ablation orders to try (default: all)')
 parser.add_argument('--datasets-root',
                     type=pathlib.Path,
                     default='.zoo/datasets',
@@ -250,36 +259,41 @@ for dataset_name in args.datasets:
                         score = distances.max().item()
                         scores.append(score)
 
-                indices = sorted(range(len(captions)),
-                                 key=lambda i: scores[i],
-                                 reverse=True)
-                fractions = np.arange(args.ablation_min, args.ablation_max,
-                                      args.ablation_step_size)
-                for fraction in fractions:
-                    ablated = indices[:int(fraction * len(indices))]
-                    accuracy = cnn.accuracy(
-                        dataset,
-                        ablate=annotations.units(ablated),
-                        display_progress_as='test ablated cnn '
-                        f'(cond={experiment}, '
-                        f'trial={trial + 1}, '
-                        f'frac={fraction:.2f})',
-                        device=device)
-                    samples = logging.random_neuron_wandb_images(
-                        annotations,
-                        captions,
-                        indices=ablated,
-                        k=args.wandb_n_samples,
-                        cnn=cnn_name,
-                        data=dataset_name,
-                        experiment=experiment,
-                        frac=fraction)
-                    wandb.log({
-                        'model': cnn_name,
-                        'dataset': dataset_name,
-                        'experiment': experiment,
-                        'frac_ablated': fraction,
-                        'trial': trial + 1,
-                        'accuracy': accuracy,
-                        'samples': samples,
-                    })
+                for order in args.orders:
+                    indices = sorted(range(len(captions)),
+                                     key=lambda i: scores[i],
+                                     reverse=order == ORDER_DECREASING)
+                    fractions = np.arange(args.ablation_min, args.ablation_max,
+                                          args.ablation_step_size)
+                    for fraction in fractions:
+                        ablated = indices[:int(fraction * len(indices))]
+                        accuracy = cnn.accuracy(
+                            dataset,
+                            ablate=annotations.units(ablated),
+                            display_progress_as='test ablated cnn '
+                            f'(cond={experiment}, '
+                            f'trial={trial + 1}, '
+                            f'order={order}, '
+                            f'frac={fraction:.2f})',
+                            device=device)
+                        samples = logging.random_neuron_wandb_images(
+                            annotations,
+                            captions,
+                            indices=ablated,
+                            k=args.wandb_n_samples,
+                            cnn=cnn_name,
+                            data=dataset_name,
+                            exp=experiment,
+                            order=order,
+                            frac=fraction)
+                        wandb.log({
+                            'cnn': cnn_name,
+                            'dataset': dataset_name,
+                            'experiment': experiment,
+                            'trial': trial + 1,
+                            'order': order,
+                            'frac_ablated': fraction,
+                            'n_ablated': len(ablated),
+                            'accuracy': accuracy,
+                            'samples': samples,
+                        })
