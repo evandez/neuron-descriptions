@@ -49,7 +49,7 @@ class LanguageModel(nn.Module):
                             dropout=dropout,
                             batch_first=True)
         self.output = nn.Sequential(nn.Linear(hidden_size, len(indexer)),
-                                    nn.LogSoftmax())
+                                    nn.LogSoftmax(dim=-1))
 
     def forward(self,
                 inputs: torch.Tensor,
