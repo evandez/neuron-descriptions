@@ -467,8 +467,8 @@ class Decoder(serialize.SerializableModule):
         # If necessary, compute LM initial hidden state and cell value.
         h_lm, c_lm = None, None
         if self.lm is not None:
-            h_lm = h.new_zeros(batch_size, self.lm.hidden_size)
-            c_lm = c.new_zeros(batch_size, self.lm.hidden_size)
+            h_lm = h.new_zeros(self.lm.layers, batch_size, self.lm.hidden_size)
+            c_lm = c.new_zeros(self.lm.layers, batch_size, self.lm.hidden_size)
 
         # Begin decoding.
         currents = tokens.new_empty(batch_size).fill_(self.indexer.start_index)
