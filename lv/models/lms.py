@@ -186,10 +186,7 @@ class LanguageModel(nn.Module):
 
         # Prepare training data.
         dataset = SequenceDataset(dataset, annotation_index=annotation_index)
-        size = len(cast(Sized, dataset))
-        val_size = int(hold_out * size)
-        train_size = size - val_size
-        train, val = data.random_split(dataset, (train_size, val_size))
+        train, val = training.random_split(dataset, hold_out=hold_out)
         train_loader = data.DataLoader(train,
                                        batch_size=batch_size,
                                        shuffle=True)
