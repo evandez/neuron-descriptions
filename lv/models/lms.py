@@ -107,6 +107,8 @@ class LanguageModel(nn.Module):
         """
         if device is not None:
             self.to(device)
+        self.eval()
+
         indices = self.indexer(sequences,
                                start=True,
                                stop=True,
