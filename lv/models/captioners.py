@@ -2,7 +2,7 @@
 from typing import (Any, Mapping, NamedTuple, Optional, Sequence, Sized, Tuple,
                     Type, TypeVar, Union, cast, overload)
 
-from lv.models import annotators, featurizers, vectors
+from lv.models import annotators, featurizers, lms, vectors
 from lv.utils import lang, serialize, training
 from lv.utils.typing import Device, StrSequence
 
@@ -251,6 +251,7 @@ class Decoder(serialize.SerializableModule):
                  indexer: lang.Indexer,
                  featurizer_v: Optional[featurizers.Featurizer] = None,
                  featurizer_w: Optional[WordFeaturizer] = None,
+                 lm: Optional[lms.LanguageModel] = None,
                  copy: bool = False,
                  embedding_size: int = 128,
                  hidden_size: int = 512,
@@ -266,6 +267,9 @@ class Decoder(serialize.SerializableModule):
             featurizer_w (Optional[WordFeaturizer], optional): Word featurizer.
                 If this is not set, `featurizer_v` must be. By default, only
                 visual features are used.
+            lm (Optional[lms.LanguageModel], optional): Language model. Changes
+                decoding to use PMI [p(caption | image) / p(caption)] instead
+                of likelihood [p(caption | image)].
             copy (bool, optional): Use a copy mechanism in the model.
                 Defaults to False.
             embedding_size (int, optional): Size of previous-word embeddings
@@ -303,6 +307,7 @@ class Decoder(serialize.SerializableModule):
         self.indexer = indexer
         self.featurizer_v = featurizer_v
         self.featurizer_w = featurizer_w
+        self.lm = lm
         self.copy = copy
         self.embedding_size = embedding_size
         self.hidden_size = hidden_size
@@ -459,6 +464,12 @@ class Decoder(serialize.SerializableModule):
         )
         h, c = self.init_h(pooled), self.init_c(pooled)
 
+        # If necessary, compute LM initial hidden state and cell value.
+        h_lm, c_lm = None, None
+        if self.lm is not None:
+            h_lm = h.new_zeros(batch_size, self.lm.hidden_size)
+            c_lm = c.new_zeros(batch_size, self.lm.hidden_size)
+
         # Begin decoding.
         currents = tokens.new_empty(batch_size).fill_(self.indexer.start_index)
         for time in range(length):
@@ -498,6 +509,13 @@ class Decoder(serialize.SerializableModule):
             inputs = torch.cat((embeddings, gated), dim=-1)
             h, c = self.lstm(inputs, (h, c))
             logprobs[:, time] = log_p_w = self.output(h)
+
+            if self.lm is not None:
+                assert h_lm is not None and c_lm is not None
+                inputs_lm = self.lm.embedding(currents)[None]
+                _, (h_lm, c_lm) = self.lm.lstm(inputs_lm, (h_lm, c_lm))
+                log_p_w_lm = self.lm.output(h_lm)
+                logprobs[:, time] = log_p_w - log_p_w_lm
 
             # If copy mechanism is enabled, apply it.
             if self.copy_gate is not None:
@@ -916,6 +934,7 @@ class Decoder(serialize.SerializableModule):
 def decoder(dataset: data.Dataset,
             featurizer: Optional[featurizers.Featurizer] = None,
             annotator: Optional[annotators.WordAnnotator] = None,
+            lm: Optional[lms.LanguageModel] = None,
             annotation_index: int = 4,
             indexer_kwargs: Optional[Mapping[str, Any]] = None,
             word_featurizer_kwargs: Optional[Mapping[str, Any]] = None,
@@ -929,6 +948,8 @@ def decoder(dataset: data.Dataset,
             Defaults to None.
         annotator (Optional[annotators.WordAnnotator], optional): Word
             annotation model. Must set this or `featurizer`, or both.
+            Defaults to None.
+        lm (Optional[lms.LanguageModel], optional): Language model.
             Defaults to None.
         annotation_index (int, optional): Index of language annotations in
             dataset samples. Defaults to 4 to be compatible with
@@ -976,4 +997,5 @@ def decoder(dataset: data.Dataset,
     return Decoder(indexer,
                    featurizer_v=featurizer_v,
                    featurizer_w=featurizer_w,
+                   lm=lm,
                    **kwargs)
