@@ -51,35 +51,21 @@ class LanguageModel(nn.Module):
         self.output = nn.Sequential(nn.Linear(hidden_size, len(indexer)),
                                     nn.LogSoftmax(dim=-1))
 
-    def forward(self,
-                inputs: torch.Tensor,
-                reduce: bool = False) -> torch.Tensor:
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         """Compute the log probability of the given sequence.
 
         Args:
             inputs (torch.Tensor): The sequence. Should have shape
                 (batch_size, length) and have type `torch.long`.
-            reduce (bool, optional): Instead of returning probability for
-                each token, return log probability of whole sequence.
-                Defaults to False.
 
         Returns:
             torch.Tensor: Shape (batch_size, length, vocab_size) tensor of
-                log probabilites for each token if `reduce=False`, other shape
-                (batch_size,) tensor of log probabilities for whole sequences.
+                log probabilites for each token.
 
         """
         embeddings = self.embedding(inputs)
         hiddens, _ = self.lstm(embeddings)
         lps = self.output(hiddens)
-        if reduce:
-            batch_size, length, _ = lps.shape
-            batch_idx = torch.arange(batch_size).repeat_interleave(length)
-            seq_idx = torch.arange(batch_size).repeat(length)
-            word_idx = inputs.flatten()
-            lps = lps[batch_idx, seq_idx, word_idx]
-            lps = lps.view(batch_size, length)
-            lps = lps.sum(dim=-1)
         return lps
 
     def predict(
@@ -101,30 +87,41 @@ class LanguageModel(nn.Module):
                 with this message if set. Defaults to 'compute lm probs'.
 
         Returns:
-            torch.Tensor: Shape (len(sequences),) tensor containing logprob
-                for each sequence.
+            torch.Tensor: Shape (len(sequences),) tensor containing the
+                probability for each sequence.
 
         """
         if device is not None:
             self.to(device)
         self.eval()
 
-        indices = self.indexer(sequences,
-                               start=True,
-                               stop=True,
-                               pad=True,
-                               unk=True)
-        dataset = data.TensorDataset(torch.tensor(indices, device=device))
-        loader = data.DataLoader(dataset, batch_size=batch_size)
+        # Oh you know, just misusing DataLoader. Fight me!
+        loader = data.DataLoader(
+            sequences,  # type: ignore
+            batch_size=batch_size)
         if display_progress_as is not None:
             loader = tqdm(loader, desc=display_progress_as)
 
-        outputs = []
-        for (inputs,) in loader:
+        logprobs = []
+        for batch in loader:
+            inputs = torch.tensor(self.indexer(batch,
+                                               start=True,
+                                               stop=False,
+                                               pad=True,
+                                               unk=True),
+                                  device=device)
             with torch.no_grad():
-                lps = self(inputs, reduce=True)
-            outputs.append(lps)
-        return torch.cat(outputs)
+                outputs = self(inputs, reduce=True)
+
+            targets = self.indexer(batch,
+                                   start=False,
+                                   stop=True,
+                                   pad=False,
+                                   unk=True)
+            for output, target in zip(outputs, targets):
+                logprob = output[:len(target), target].sum()
+                logprobs.append(logprob)
+        return torch.exp(torch.cat(logprobs))
 
     def fit(self,
             dataset: data.Dataset,
@@ -199,6 +196,22 @@ class LanguageModel(nn.Module):
         criterion = nn.NLLLoss(ignore_index=self.indexer.pad_index)
         stopper = training.EarlyStopping(patience=patience)
 
+        def lossify(sequences):
+            inputs = torch.tensor(self.indexer(sequences,
+                                               start=True,
+                                               stop=False,
+                                               pad=True,
+                                               unk=True),
+                                  device=device)
+            targets = torch.tensor(self.indexer(sequences,
+                                                start=False,
+                                                stop=True,
+                                                pad=True,
+                                                unk=True),
+                                   device=device)
+            predictions = self(inputs)
+            return criterion(predictions.permute(0, 2, 1), targets)
+
         progress = range(max_epochs)
         if display_progress_as is not None:
             progress = tqdm(progress, desc=display_progress_as)
@@ -208,10 +221,7 @@ class LanguageModel(nn.Module):
             self.train()
             train_loss = 0.
             for sequences in train_loader:
-                inputs = torch.tensor(self.indexer(sequences, pad=True),
-                                      device=device)
-                predictions = self(inputs).permute(0, 2, 1)
-                loss = criterion(predictions[:, :, :-1], inputs[:, 1:])
+                loss = lossify(sequences)
                 loss.backward()
                 optimizer.step()
                 optimizer.zero_grad()
@@ -221,11 +231,8 @@ class LanguageModel(nn.Module):
             self.eval()
             val_loss = 0.
             for sequences in val_loader:
-                inputs = torch.tensor(self.indexer(sequences, pad=True),
-                                      device=device)
                 with torch.no_grad():
-                    predictions = self(inputs).permute(0, 2, 1)
-                    loss = criterion(predictions[:, :, :-1], inputs[:, 1:])
+                    loss = lossify(sequences)
                 val_loss += loss.item()
             val_loss /= len(val_loader)
 
