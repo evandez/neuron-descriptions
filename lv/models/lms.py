@@ -119,7 +119,7 @@ class LanguageModel(nn.Module):
                                    pad=False,
                                    unk=True)
             for output, target in zip(outputs, targets):
-                logprob = output[:len(target), target].sum()
+                logprob = output[torch.arange(len(target)), target].sum()
                 logprobs.append(logprob.item())
         return torch.exp(torch.tensor(logprobs, device=device))
 
