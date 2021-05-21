@@ -120,8 +120,8 @@ class LanguageModel(nn.Module):
                                    unk=True)
             for output, target in zip(outputs, targets):
                 logprob = output[:len(target), target].sum()
-                logprobs.append(logprob)
-        return torch.exp(torch.cat(logprobs))
+                logprobs.append(logprob.item())
+        return torch.exp(torch.tensor(logprobs, device=device))
 
     def fit(self,
             dataset: data.Dataset,
