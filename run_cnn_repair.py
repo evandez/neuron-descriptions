@@ -1,5 +1,6 @@
 """Train a CNN on spurious images with the class label in the corner."""
 import argparse
+import copy
 import pathlib
 import random
 
@@ -254,7 +255,19 @@ for experiment in args.experiments:
                                       args.ablation_step_size)
                 for fraction in fractions:
                     ablated = indices[:int(fraction * len(indices))]
-                    accuracy = cnn.accuracy(
+                    copied = copy.deepcopy(cnn)
+                    copied.fit(train,
+                               hold_out=val,
+                               batch_size=args.batch_size,
+                               max_epochs=args.epochs,
+                               patience=args.patience,
+                               optimizer_kwargs={'lr': args.lr},
+                               ablate=dissected.units(ablated),
+                               layers=['fc'] if args.cnn == zoo.KEY_RESNET18
+                               else ['fc6', 'fc7', 'linear8'],
+                               device=device,
+                               display_progress_as=f'fine tune {args.cnn}')
+                    accuracy = copied.accuracy(
                         test,
                         ablate=dissected.units(ablated),
                         display_progress_as=f'test ablated {args.cnn} '
