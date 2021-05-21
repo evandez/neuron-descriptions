@@ -305,7 +305,7 @@ class Decoder(serialize.SerializableModule):
         if copy:
             if featurizer_w is None:
                 raise ValueError('must set featurizer_w if copy=True')
-            elif featurizer_w.annotator.indexer.unique <= indexer.unique:
+            elif not featurizer_w.annotator.indexer.unique <= indexer.unique:
                 raise ValueError(
                     'when using a copy mechanism, annotator vocab must be a '
                     'subset of indexer vocab, but indexer is missing words: '
