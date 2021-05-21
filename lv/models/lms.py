@@ -212,7 +212,7 @@ class LanguageModel(nn.Module):
                 inputs = torch.tensor(self.indexer(sequences, pad=True),
                                       device=device)
                 predictions = self(inputs)
-                loss = criterion(predictions, inputs)
+                loss = criterion(predictions.permute(0, 2, 1), inputs)
                 loss.backward()
                 optimizer.step()
                 optimizer.zero_grad()
@@ -225,7 +225,7 @@ class LanguageModel(nn.Module):
                 inputs = torch.tensor(self.indexer(sequences, pad=True),
                                       device=device)
                 with torch.no_grad():
-                    loss = criterion(predictions, inputs)
+                    loss = criterion(predictions.permute(0, 2, 1), inputs)
                 val_loss += loss.item()
             val_loss /= len(val_loader)
 
