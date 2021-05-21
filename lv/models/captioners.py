@@ -381,6 +381,7 @@ class Decoder(serialize.SerializableModule):
                 masks: torch.Tensor,
                 length: int = ...,
                 strategy: Strategy = ...,
+                pmi: bool = ...,
                 **kwargs: Any) -> DecoderOutput:
         """Decode captions for the given top images and masks.
 
@@ -396,6 +397,7 @@ class Decoder(serialize.SerializableModule):
                 values will be used as inputs at each time step, so it should
                 have shape (batch_size, length). Other options include 'greedy'
                 and 'sample'. Defaults to 'greedy'.
+            pmi (bool, optional): Use PMI decoding. Defaults to True.
 
         Returns:
             DecoderOutput: Decoder outputs.
@@ -417,7 +419,7 @@ class Decoder(serialize.SerializableModule):
                 masks=None,
                 length=15,
                 strategy=STRATEGY_GREEDY,
-                pmi: bool = True,
+                pmi=True,
                 **kwargs):
         """Implement both overloads."""
         if isinstance(strategy, str) and strategy not in STRATEGIES:
@@ -426,7 +428,7 @@ class Decoder(serialize.SerializableModule):
         batch_size = len(images)
 
         # If necessary, obtain visual features.
-        features_v: Optional[torch.Tensor] = None
+        features_v = None
         if self.featurizer_v is not None:
             if masks is not None:
                 images = images.view(-1, 3, *images.shape[-2:])
@@ -438,8 +440,8 @@ class Decoder(serialize.SerializableModule):
             features_v = features_v.view(batch_size, -1, self.feature_v_size)
 
         # Obtain word features from word annotator or ground truth captions.
-        features_w: Optional[torch.Tensor] = None
-        words: Optional[Sequence[StrSequence]] = None
+        features_w = None
+        words = None
         if self.featurizer_w is not None:
             if features_v is not None:
                 features_w, words = self.featurizer_w(features_v, **kwargs)
