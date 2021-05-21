@@ -111,7 +111,7 @@ class LanguageModel(nn.Module):
                                                unk=True),
                                   device=device)
             with torch.no_grad():
-                outputs = self(inputs, reduce=True)
+                outputs = self(inputs)
 
             targets = self.indexer(batch,
                                    start=False,
