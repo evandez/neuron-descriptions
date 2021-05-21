@@ -3,7 +3,7 @@ import collections
 from typing import Any, Mapping, Optional, Sequence, Sized, Type, Union, cast
 
 from lv.utils import ablations, training
-from lv.utils.typing import Device, Unit
+from lv.utils.typing import Device, Layer, Unit
 
 import torch
 from torch import nn, optim
@@ -35,6 +35,7 @@ class ImageClassifier(nn.Sequential):
             optimizer_kwargs: Optional[Mapping[str, Any]] = None,
             num_workers: int = 0,
             ablate: Optional[Sequence[Unit]] = None,
+            layers: Optional[Sequence[Layer]] = None,
             device: Optional[Device] = None,
             display_progress_as: Optional[str] = 'train classifer') -> None:
         """Train the classifier on the given dataset.
@@ -63,6 +64,7 @@ class ImageClassifier(nn.Sequential):
                 `torch.utils.data.DataLoader`. Defaults to 0.
             ablate (Optional[Sequence[Unit]], optional): Ablate these neurons
                 when training. Defaults to None.
+            layers (Optional[Sequence[Layer]], optional) Layers to optimize.
             device (Optional[Device], optional): Send this model and all
                 tensors to this device. Defaults to None.
             display_progress_as (Optional[str], optional): Show a progress bar
@@ -88,7 +90,14 @@ class ImageClassifier(nn.Sequential):
                                      batch_size=batch_size,
                                      num_workers=num_workers)
 
-        optimizer = optimizer_t(self.parameters(), **optimizer_kwargs)
+        if layers is None:
+            parameters = list(self.parameters())
+        else:
+            parameters = []
+            for layer in layers:
+                parameters += list(self[layer].parameters())
+
+        optimizer = optimizer_t(parameters, **optimizer_kwargs)
         criterion = nn.CrossEntropyLoss()
         stopper = training.EarlyStopping(patience=patience)
 
