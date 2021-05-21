@@ -417,6 +417,7 @@ class Decoder(serialize.SerializableModule):
                 masks=None,
                 length=15,
                 strategy=STRATEGY_GREEDY,
+                pmi: bool = True,
                 **kwargs):
         """Implement both overloads."""
         if isinstance(strategy, str) and strategy not in STRATEGIES:
@@ -474,7 +475,7 @@ class Decoder(serialize.SerializableModule):
 
         # If necessary, compute LM initial hidden state and cell value.
         h_lm, c_lm = None, None
-        if self.lm is not None:
+        if self.lm is not None and pmi:
             h_lm = h.new_zeros(self.lm.layers, batch_size, self.lm.hidden_size)
             c_lm = c.new_zeros(self.lm.layers, batch_size, self.lm.hidden_size)
 
@@ -518,7 +519,7 @@ class Decoder(serialize.SerializableModule):
             h, c = self.lstm(inputs, (h, c))
             logprobs[:, time] = log_p_w = self.output(h)
 
-            if self.lm is not None:
+            if self.lm is not None and pmi:
                 assert h_lm is not None and c_lm is not None
                 with torch.no_grad():
                     inputs_lm = self.lm.embedding(currents)[:, None]
@@ -849,7 +850,8 @@ class Decoder(serialize.SerializableModule):
                     features_v,
                     length=length,
                     strategy=targets,
-                    captions=captions if use_ground_truth_words else None)
+                    captions=captions if use_ground_truth_words else None,
+                    pmi=False)
 
                 loss = criterion(outputs.logprobs.permute(0, 2, 1), targets)
 
@@ -877,7 +879,8 @@ class Decoder(serialize.SerializableModule):
                         features_v,
                         length=length,
                         strategy=targets,
-                        captions=captions if use_ground_truth_words else None)
+                        captions=captions if use_ground_truth_words else None,
+                        pmi=False)
                     loss = criterion(outputs.logprobs.permute(0, 2, 1),
                                      targets)
                 val_loss += loss.item()
