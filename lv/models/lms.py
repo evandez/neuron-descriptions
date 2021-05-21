@@ -79,7 +79,7 @@ class LanguageModel(nn.Module):
             word_idx = inputs.flatten()
             lps = lps[batch_idx, seq_idx, word_idx]
             lps = lps.view(batch_size, length)
-            lps = lps.sum(dum=-1)
+            lps = lps.sum(dim=-1)
         return lps
 
     def predict(
