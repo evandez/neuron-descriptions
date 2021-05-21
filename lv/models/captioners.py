@@ -514,7 +514,7 @@ class Decoder(serialize.SerializableModule):
                 assert h_lm is not None and c_lm is not None
                 inputs_lm = self.lm.embedding(currents)[:, None]
                 _, (h_lm, c_lm) = self.lm.lstm(inputs_lm, (h_lm, c_lm))
-                log_p_w_lm = self.lm.output(h_lm)
+                log_p_w_lm = self.lm.output(h_lm[-1])
                 logprobs[:, time] = log_p_w - log_p_w_lm
 
             # If copy mechanism is enabled, apply it.
