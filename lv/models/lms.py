@@ -225,6 +225,7 @@ class LanguageModel(nn.Module):
                 inputs = torch.tensor(self.indexer(sequences, pad=True),
                                       device=device)
                 with torch.no_grad():
+                    predictions = self(inputs)
                     loss = criterion(predictions.permute(0, 2, 1), inputs)
                 val_loss += loss.item()
             val_loss /= len(val_loader)
