@@ -217,7 +217,7 @@ class LanguageModel(nn.Module):
                 optimizer.step()
                 optimizer.zero_grad()
                 train_loss += loss.item()
-            train_loss / len(train_loader)
+            train_loss /= len(train_loader)
 
             self.eval()
             val_loss = 0.
