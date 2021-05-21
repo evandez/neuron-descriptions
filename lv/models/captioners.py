@@ -294,6 +294,14 @@ class Decoder(serialize.SerializableModule):
             raise ValueError('must set at least one of '
                              'featurizer_v and featurizer_w')
 
+        if lm is not None:
+            cap_vocab = indexer.vocab.unique
+            lm_vocab = lm.indexer.vocab.unique
+            if lm_vocab != cap_vocab:
+                raise ValueError('lm and captioner have different vocabs;'
+                                 f'lm missing {cap_vocab - lm_vocab} and '
+                                 f'cap missing {lm_vocab - cap_vocab}')
+
         if copy:
             if featurizer_w is None:
                 raise ValueError('must set featurizer_w if copy=True')
