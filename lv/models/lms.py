@@ -239,8 +239,7 @@ class LanguageModel(nn.Module):
                 break
 
 
-def lm(self,
-       dataset: data.Dataset,
+def lm(dataset: data.Dataset,
        annotation_index: int = 4,
        indexer_kwargs: Optional[Mapping[str, Any]] = None,
        **kwargs: Any) -> LanguageModel:
