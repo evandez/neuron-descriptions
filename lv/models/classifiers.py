@@ -95,7 +95,11 @@ class ImageClassifier(nn.Sequential):
         else:
             parameters = []
             for layer in layers:
-                parameters += list(self[layer].parameters())
+                if isinstance(layer, str):
+                    submodule = getattr(self, layer)
+                else:
+                    submodule = self[layer]
+                parameters += list(submodule.parameters())
 
         optimizer = optimizer_t(parameters, **optimizer_kwargs)
         criterion = nn.CrossEntropyLoss()
