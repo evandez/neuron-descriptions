@@ -6,7 +6,6 @@ from lv.models import annotators, featurizers, lms, vectors
 from lv.utils import lang, serialize, training
 from lv.utils.typing import Device, StrSequence
 
-import numpy
 import rouge
 import sacrebleu
 import torch
