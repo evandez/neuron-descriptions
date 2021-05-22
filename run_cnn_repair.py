@@ -90,8 +90,9 @@ parser.add_argument('--datasets-root',
 parser.add_argument(
     '--out-root',
     type=pathlib.Path,
-    default='train-spurious-cnn',
-    help='output directory to write models and dissection data (default: ".")')
+    default='cnn-repair',
+    help='output directory to write models and dissection data '
+    '(default: "./cnn-repair")')
 parser.add_argument('--batch-size',
                     type=int,
                     default=128,
