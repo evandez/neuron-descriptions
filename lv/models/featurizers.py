@@ -1,5 +1,6 @@
 """Models that map images and masks to features."""
-from typing import Any, Callable, Mapping, Optional, Sequence, Tuple, Union
+from typing import (Any, Callable, Mapping, Optional, Sequence, Tuple, Union,
+                    overload)
 
 from lv.ext.torchvision import models
 from lv.utils import serialize
@@ -14,17 +15,39 @@ from tqdm.auto import tqdm
 
 
 class Featurizer(nn.Module):
-    """An abstract module mapping images and masks to features."""
+    """An abstract module mapping images (and optionally masks) to features."""
 
     feature_shape: Tuple[int, ...]
 
+    @overload
+    def forward(self, images: torch.Tensor, **kwargs: Any) -> torch.Tensor:
+        """Featurize the given images.
+
+        Equivalent to featurizing the images where the masks are all 1s.
+
+        Args:
+            images (torch.Tensor): The images to featurizer. Should have
+                shape (batch_size, 3, height, width).
+
+        Returns:
+            torch.Tensor: The image features. Will have shape
+                (batch_size, *feature_shape).
+
+        """
+        ...
+
+    @overload
     def forward(self, images: torch.Tensor, masks: torch.Tensor,
                 **kwargs: Any) -> torch.Tensor:
-        """Compute masked image features."""
+        ...
+
+    def forward(self, images, masks=None, **kwargs):
+        """Abstract forward function corresponding to both overloads."""
         raise NotImplementedError
 
     def map(self,
             dataset: data.Dataset,
+            mask: bool = True,
             image_index: Union[int, str] = -3,
             mask_index: Union[int, str] = -2,
             batch_size: int = 128,
@@ -39,6 +62,9 @@ class Featurizer(nn.Module):
         Args:
             dataset (data.Dataset): The dataset to featurize. Should return
                 a sequence or mapping of values.
+            mask (bool, optional): Try to read masks from batch and pass them
+                to the featurizer. Setting this to False is equivalent to
+                setting masks to be all 1s. Defaults to True.
             image_index (int, optional): Index of image in each dataset
                 sample. Defaults to -3 to be compatible with
                 AnnotatedTopImagesDataset.
@@ -77,16 +103,17 @@ class Featurizer(nn.Module):
                 raise ValueError(f'non-tensor images: {type(images).__name__}')
             if device is not None:
                 images = images.to(device)
+            inputs = [images.view(-1, *images.shape[-3:])]
 
-            masks = batch[mask_index]
-            if not isinstance(masks, torch.Tensor):
-                raise ValueError(f'non-tensor masks: {type(masks).__name__}')
-            if device is not None:
-                masks = masks.to(device)
-
-            # Flatten the inputs.
-            inputs = (images.view(-1, *images.shape[-3:]),
-                      masks.view(-1, *masks.shape[-3:]))
+            masks = None
+            if mask:
+                masks = batch[mask_index]
+                if not isinstance(masks, torch.Tensor):
+                    raise ValueError(
+                        f'non-tensor masks: {type(masks).__name__}')
+                if device is not None:
+                    masks = masks.to(device)
+                inputs.append(masks.view(-1, *masks.shape[-3:]))
 
             with torch.no_grad():
                 features = self(*inputs, **kwargs)
@@ -99,10 +126,82 @@ class Featurizer(nn.Module):
         return data.TensorDataset(torch.cat(mapped))
 
 
-FeaturizerFactory = Callable[..., nn.Sequential]
-FeaturizerLayers = Sequence[str]
-FeatureSize = int
-FeaturizerConfig = Tuple[FeaturizerFactory, FeaturizerLayers, FeatureSize]
+ClassifierFactory = Callable[..., nn.Sequential]
+ClassifierLayers = Sequence[str]
+ClassifierNumFeatures = int
+ClassifierFeatureSize = int
+ImageFeaturizerConfig = Tuple[ClassifierFactory, ClassifierLayers,
+                              ClassifierNumFeatures, ClassifierFeatureSize]
+
+
+class ImageFeaturizer(Featurizer):
+    """Featurizes images using convolutional features from a pretrained CNN."""
+
+    def __init__(self, config: str = 'resnet18', **kwargs: Any):
+        """Initialize the featurizer.
+
+        Keyword arguments are forwarded to the constructor of the underlying
+        classifier model.
+
+        Args:
+            config (str, optional): The featurizer config to use.
+                See `ImageFeaturizer.configs` for options.
+                Defaults to 'resnet18'.
+
+        """
+        super().__init__()
+
+        configs = ImageFeaturizer.configs()
+        if config not in configs:
+            raise ValueError(f'featurizer not supported: {config}')
+
+        self.config = config
+        self.kwargs = kwargs
+        self.kwargs.setdefault('pretrained', True)
+
+        factory, layers, n_features, feature_size = configs[config]
+        assert len(layers) == 1, 'multiple layers?'
+        layer, = layers
+
+        self.featurizer = nethook.InstrumentedModel(factory(**self.kwargs))
+        self.featurizer.retain_layer(layer)
+        self.featurizer.eval()
+
+        self.layer = layer
+        self.feature_shape = (n_features, feature_size)
+
+        # We will manually normalize input images. This just makes life easier.
+        mean, std = renormalize.OFFSET_SCALE['imagenet']
+        self.register_buffer('mean', torch.tensor(mean).view(1, 3, 1, 1))
+        self.register_buffer('std', torch.tensor(std).view(1, 3, 1, 1))
+
+    def forward(self, images, masks=None, normalize=True, **_):
+        """Featurize the images."""
+        if masks is None:
+            masks = images.new_ones(len(images), 1, *images.shape[2:])
+        if normalize:
+            images = (images - self.mean) / self.std
+
+        self.featurizer(images)
+        features = self.featurizer.retained_layer(self.layer)
+        features = features.permute(0, 2, 3, 1)
+        features = features.reshape(len(images), *self.feature_shape)
+        return features
+
+    def map(self, *args, mask=False, image_index=0, **kwargs):
+        """Override `Featurizer.map`, but change defaults for single image."""
+        return super().map(*args, mask=mask, image_index=image_index, **kwargs)
+
+    @staticmethod
+    def configs() -> Mapping[str, ImageFeaturizerConfig]:
+        """Return the support configs mapped to their names."""
+        return {
+            'resnet18': (models.resnet18_seq, ('layer4',), 49, 512),
+        }
+
+
+MaskedPyramidFeaturizerConfig = Tuple[ClassifierFactory, ClassifierLayers,
+                                      ClassifierFeatureSize]
 
 
 class MaskedPyramidFeaturizer(Featurizer, serialize.SerializableModule):
@@ -148,27 +247,10 @@ class MaskedPyramidFeaturizer(Featurizer, serialize.SerializableModule):
         self.register_buffer('mean', torch.tensor(mean).view(1, 3, 1, 1))
         self.register_buffer('std', torch.tensor(std).view(1, 3, 1, 1))
 
-    def forward(self,
-                images: torch.Tensor,
-                masks: torch.Tensor,
-                normalize: bool = True,
-                **_: Any) -> torch.Tensor:
-        """Construct masked image features.
-
-        Args:
-            images (torch.Tensor): The images. Expected shape is
-                (batch_size, 3, height, width).
-            masks (torch.Tensor): The image masks. Expected shape is
-                (batch_size, 1, height, width).
-            normalize (bool, optional): If set, normalize images in the way
-                that torchvision ImageNet models expect.
-
-        Returns:
-            torch.Tensor: Image features. Will have shape
-                (batch_size, feature_size). Exact feature_size depends on
-                the config.
-
-        """
+    def forward(self, images, masks=None, normalize=True, **_: Any):
+        """Construct masked features."""
+        if masks is None:
+            masks = images.new_ones(len(images), 1, *images.shape[2:])
         if normalize:
             images = (images - self.mean) / self.std
 
@@ -221,7 +303,7 @@ class MaskedPyramidFeaturizer(Featurizer, serialize.SerializableModule):
         return properties
 
     @staticmethod
-    def configs() -> Mapping[str, FeaturizerConfig]:
+    def configs() -> Mapping[str, MaskedPyramidFeaturizerConfig]:
         """Return the support configs mapped to their names."""
         return {
             'alexnet': (
@@ -240,7 +322,7 @@ class MaskedPyramidFeaturizer(Featurizer, serialize.SerializableModule):
 class MaskedImagePyramidFeaturizer(MaskedPyramidFeaturizer):
     """Same as MaskedPyramidFeaturizer, but images are masked, not features."""
 
-    def forward(self, images, masks, **kwargs):
+    def forward(self, images, masks=None, **kwargs):
         """Mask the images and then compute pyramid features."""
-        masked = images * masks
-        return super().forward(masked, torch.ones_like(masks), **kwargs)
+        return super().forward(images * masks if masks is not None else images,
+                               **kwargs)
