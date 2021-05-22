@@ -295,4 +295,5 @@ for experiment in args.experiments:
                         'frac_ablated': fraction,
                         'n_ablated': len(ablated),
                         'accuracy': accuracy,
+                        'samples': samples,
                     })
