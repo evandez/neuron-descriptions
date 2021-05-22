@@ -658,6 +658,7 @@ class Decoder(serialize.SerializableModule):
 
     def predict(self,
                 dataset: data.Dataset,
+                mask: bool = True,
                 image_index: int = 2,
                 mask_index: int = 3,
                 batch_size: int = 16,
@@ -672,6 +673,8 @@ class Decoder(serialize.SerializableModule):
 
         Args:
             dataset (data.Dataset): The dataset of images/masks.
+            mask (bool, optional): Use masks when computing features. Exact
+                behavior depends on the featurizer. Defaults to True.
             image_index (int, optional): Index of images in dataset samples.
                 Defaults to 2 to be compatible with AnnotatedTopImagesDataset.
             mask_index (int, optional): Index of masks in dataset samples.
@@ -698,6 +701,7 @@ class Decoder(serialize.SerializableModule):
         if features is None:
             features = self.featurizer_v_.map(
                 dataset,
+                mask=mask,
                 image_index=image_index,
                 mask_index=mask_index,
                 batch_size=batch_size,
@@ -724,6 +728,7 @@ class Decoder(serialize.SerializableModule):
 
     def fit(self,
             dataset: data.Dataset,
+            mask: bool = True,
             image_index: int = 2,
             mask_index: int = 3,
             annotation_index: int = 4,
@@ -743,6 +748,8 @@ class Decoder(serialize.SerializableModule):
 
         Args:
             dataset (data.Dataset): Dataset to train on.
+            mask (bool, optional): Use masks when computing features. Exact
+                behavior depends on the featurizer. Defaults to True.
             image_index (int, optional): Index of images in dataset samples.
                 Defaults to 2 to be compatible with AnnotatedTopImagesDataset.
             mask_index (int, optional): Index of masks in dataset samples.
@@ -785,6 +792,7 @@ class Decoder(serialize.SerializableModule):
             optimizer_kwargs = {}
         if features is None:
             features = self.featurizer_v_.map(dataset,
+                                              mask=mask,
                                               image_index=image_index,
                                               mask_index=mask_index,
                                               batch_size=batch_size,
