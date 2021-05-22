@@ -19,8 +19,14 @@ EXPERIMENTS = (
     # TODO(evandez): Figure out what to do with this one.
     # zoo.KEY_SPURIOUS_PLACES365,
 )
-VERSIONS = ('original', 'spurious-5', 'spurious-10', 'spurious-25',
-            'spurious-100')
+VERSIONS = (
+    # 'original',
+    'spurious-5',
+    'spurious-10',
+    'spurious-25',
+    # 'spurious-50',
+    # 'spurious-100',
+)
 
 CONDITION_TEXT = 'ablate-text'
 CONDITION_RANDOM = 'ablate-random'
