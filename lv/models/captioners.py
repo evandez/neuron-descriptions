@@ -324,7 +324,7 @@ class Decoder(serialize.SerializableModule):
 
         self.feature_v_size, self.attend_v = None, None
         if featurizer_v is not None:
-            self.feature_v_size = numpy.prod(featurizer_v.feature_shape).item()
+            self.feature_v_size = featurizer_v.feature_shape[-1]
             self.attend_v = Attention(hidden_size,
                                       self.feature_v_size,
                                       hidden_size=attention_hidden_size)
