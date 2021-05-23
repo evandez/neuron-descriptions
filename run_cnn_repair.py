@@ -11,7 +11,8 @@ from lv.models import annotators, captioners, classifiers, featurizers
 from lv.utils import logging, training
 from third_party.netdissect import renormalize
 
-import numpy as np
+import numpy
+import torch
 import wandb
 
 EXPERIMENTS = (
@@ -221,6 +222,8 @@ for experiment in args.experiments:
                 optimizer_kwargs={'lr': args.lr},
                 device=device,
                 display_progress_as=f'train {args.cnn}')
+        torch.save(cnn.state_dict(),
+                   args.out_dir / experiment / f'{args.cnn}-{version}.pth')
 
         # Now that we have the trained model, dissect it on the validation set.
         dissection_root = args.out_root / experiment / version / args.cnn
@@ -259,8 +262,8 @@ for experiment in args.experiments:
                     indices = random.sample(range(len(dissected)),
                                             k=len(texts))
 
-                fractions = np.arange(args.ablation_min, args.ablation_max,
-                                      args.ablation_step_size)
+                fractions = numpy.arange(args.ablation_min, args.ablation_max,
+                                         args.ablation_step_size)
                 for fraction in fractions:
                     ablated = indices[:int(fraction * len(indices))]
                     copied = copy.deepcopy(cnn)
