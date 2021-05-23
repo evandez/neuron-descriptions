@@ -61,7 +61,7 @@ parser.add_argument('--experiments',
 parser.add_argument('--models',
                     choices=MODELS,
                     nargs='+',
-                    default=(SAT_MF_WF,),
+                    default=(SAT_MF,),
                     help='captioning model to use')
 parser.add_argument('--datasets-root',
                     type=pathlib.Path,
