@@ -223,7 +223,7 @@ for experiment in args.experiments:
                 device=device,
                 display_progress_as=f'train {args.cnn}')
         torch.save(cnn.state_dict(),
-                   args.out_dir / experiment / f'{args.cnn}-{version}.pth')
+                   args.out_root / experiment / f'{args.cnn}-{version}.pth')
 
         # Now that we have the trained model, dissect it on the validation set.
         dissection_root = args.out_root / experiment / version / args.cnn
