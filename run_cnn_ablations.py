@@ -20,31 +20,49 @@ from spacy import language
 from spacy_wordnet import wordnet_annotator
 
 EXPERIMENT_RANDOM = 'random'
+
 EXPERIMENT_N_OBJECT_WORDS = 'n-object-words'
 EXPERIMENT_N_ABSTRACT_WORDS = 'n-abstract-words'
-EXPERIMENT_N_SPATIAL_RELATIONS = 'n-spatial-relations'
+EXPERIMENT_N_CAUSAL_AGENTS = 'n-causal-agents'
+EXPERIMENT_N_MATTERS = 'n-matters'
+EXPERIMENT_N_PROCESSES = 'n-processes'
+EXPERIMENT_N_SUBSTANCES = 'n-substances'
+EXPERIMENT_N_THINGS = 'n-things'
+
 EXPERIMENT_N_NOUNS = 'n-nouns'
 EXPERIMENT_N_VERBS = 'n-verbs'
 EXPERIMENT_N_ADPS = 'n-adpositions'
 EXPERIMENT_N_ADJS = 'n-adjectives'
+
 EXPERIMENT_CAPTION_LENGTH = 'caption-length'
 EXPERIMENT_MAX_WORD_DIFFERENCE = 'max-word-difference'
+EXPERIMENT_N_SPATIAL_RELATIONS = 'n-spatial-relations'
+
 EXPERIMENTS = (EXPERIMENT_RANDOM, EXPERIMENT_N_OBJECT_WORDS,
-               EXPERIMENT_N_ABSTRACT_WORDS, EXPERIMENT_N_SPATIAL_RELATIONS,
+               EXPERIMENT_N_ABSTRACT_WORDS, EXPERIMENT_N_CAUSAL_AGENTS,
+               EXPERIMENT_N_MATTERS, EXPERIMENT_N_PROCESSES,
+               EXPERIMENT_N_SUBSTANCES, EXPERIMENT_N_THINGS,
                EXPERIMENT_N_NOUNS, EXPERIMENT_N_VERBS, EXPERIMENT_N_ADPS,
                EXPERIMENT_N_ADJS, EXPERIMENT_CAPTION_LENGTH,
-               EXPERIMENT_MAX_WORD_DIFFERENCE)
+               EXPERIMENT_N_SPATIAL_RELATIONS, EXPERIMENT_MAX_WORD_DIFFERENCE)
 
+GROUP_RANDOM = 'random'
 GROUP_SEMANTIC = 'semantic'
 GROUP_SYNTACTIC = 'syntactic'
 GROUP_STRUCTURAL = 'structural'
-GROUP_RANDOM = 'random'
 
 EXPERIMENTS_BY_GROUP = {
+    GROUP_RANDOM:
+        frozenset({EXPERIMENT_RANDOM}),
     GROUP_SEMANTIC:
         frozenset({
             EXPERIMENT_N_ABSTRACT_WORDS,
             EXPERIMENT_N_OBJECT_WORDS,
+            EXPERIMENT_N_CAUSAL_AGENTS,
+            EXPERIMENT_N_MATTERS,
+            EXPERIMENT_N_PROCESSES,
+            EXPERIMENT_N_SUBSTANCES,
+            EXPERIMENT_N_THINGS,
         }),
     GROUP_SYNTACTIC:
         frozenset({
@@ -59,8 +77,6 @@ EXPERIMENTS_BY_GROUP = {
             EXPERIMENT_MAX_WORD_DIFFERENCE,
             EXPERIMENT_N_SPATIAL_RELATIONS,
         }),
-    GROUP_RANDOM:
-        frozenset({EXPERIMENT_RANDOM})
 }
 
 GROUPS_BY_EXPERIMENT = {
@@ -217,6 +233,11 @@ if set(experiments) & set(EXPERIMENTS_BY_GROUP[GROUP_SEMANTIC]):
     target_synsets = {
         EXPERIMENT_N_OBJECT_WORDS: wordnet.synset('object.n.01'),
         EXPERIMENT_N_ABSTRACT_WORDS: wordnet.synset('abstraction.n.01'),
+        EXPERIMENT_N_CAUSAL_AGENTS: wordnet.synset('causal_agent.n.01'),
+        EXPERIMENT_N_MATTERS: wordnet.synset('matter.n.03'),
+        EXPERIMENT_N_PROCESSES: wordnet.synset('process.n.06'),
+        EXPERIMENT_N_SUBSTANCES: wordnet.synset('substance.n.04'),
+        EXPERIMENT_N_THINGS: wordnet.synset('thing.n.12'),
     }
 
 for dataset_name in args.datasets:
