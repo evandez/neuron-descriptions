@@ -123,6 +123,7 @@ CAPTIONERS = (CAPTIONER_GT, CAPTIONER_SAT, CAPTIONER_SAT_MF, CAPTIONER_SAT_WF,
 
 parser = argparse.ArgumentParser(description='run cnn ablation experiments')
 parser.add_argument('--cnns',
+                    nargs='+',
                     choices=CNNS,
                     default=CNNS,
                     help='cnns to ablate (default: alexnet, resnet152)')
