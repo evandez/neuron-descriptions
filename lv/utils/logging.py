@@ -175,5 +175,5 @@ def wandb_dist_plot(values: Sequence[Any],
         dist = [(val, n / len(values)) for val, n in dist]
 
     table = wandb.Table(data=sorted(dist, key=lambda item: item[0]),
-                        columns=columns)
+                        columns=list(columns))
     return wandb.plot.bar(table, *columns, title=title)
