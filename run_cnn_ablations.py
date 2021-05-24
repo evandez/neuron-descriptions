@@ -25,15 +25,48 @@ EXPERIMENT_N_ABSTRACT_WORDS = 'n-abstract-words'
 EXPERIMENT_N_SPATIAL_RELATIONS = 'n-spatial-relations'
 EXPERIMENT_N_NOUNS = 'n-nouns'
 EXPERIMENT_N_VERBS = 'n-verbs'
-EXPERIMENT_N_ADPS = 'n-adps'
-EXPERIMENT_N_ADJECTIVES = 'n-adjectives'
+EXPERIMENT_N_ADPS = 'n-adpositions'
+EXPERIMENT_N_ADJS = 'n-adjectives'
 EXPERIMENT_CAPTION_LENGTH = 'caption-length'
 EXPERIMENT_MAX_WORD_DIFFERENCE = 'max-word-difference'
 EXPERIMENTS = (EXPERIMENT_RANDOM, EXPERIMENT_N_OBJECT_WORDS,
                EXPERIMENT_N_ABSTRACT_WORDS, EXPERIMENT_N_SPATIAL_RELATIONS,
                EXPERIMENT_N_NOUNS, EXPERIMENT_N_VERBS, EXPERIMENT_N_ADPS,
-               EXPERIMENT_N_ADJECTIVES, EXPERIMENT_CAPTION_LENGTH,
+               EXPERIMENT_N_ADJS, EXPERIMENT_CAPTION_LENGTH,
                EXPERIMENT_MAX_WORD_DIFFERENCE)
+
+GROUP_SEMANTIC = 'semantic'
+GROUP_SYNTACTIC = 'syntactic'
+GROUP_STRUCTURAL = 'structural'
+GROUP_RANDOM = 'random'
+
+EXPERIMENTS_BY_GROUP = {
+    GROUP_SEMANTIC:
+        frozenset({
+            EXPERIMENT_N_ABSTRACT_WORDS,
+            EXPERIMENT_N_OBJECT_WORDS,
+        }),
+    GROUP_SYNTACTIC:
+        frozenset({
+            EXPERIMENT_N_NOUNS,
+            EXPERIMENT_N_VERBS,
+            EXPERIMENT_N_ADPS,
+            EXPERIMENT_N_ADJS,
+        }),
+    GROUP_STRUCTURAL:
+        frozenset({
+            EXPERIMENT_CAPTION_LENGTH,
+            EXPERIMENT_MAX_WORD_DIFFERENCE,
+            EXPERIMENT_N_SPATIAL_RELATIONS,
+        }),
+    GROUP_RANDOM:
+        frozenset({EXPERIMENT_RANDOM})
+}
+
+GROUPS_BY_EXPERIMENT = {
+    experiment: group for group in EXPERIMENTS_BY_GROUP
+    for experiment in EXPERIMENTS_BY_GROUP[group]
+}
 
 ORDER_INCREASING = 'increasing'
 ORDER_DECREASING = 'decreasing'
@@ -99,6 +132,11 @@ parser.add_argument('--experiments',
                     choices=EXPERIMENTS,
                     default=EXPERIMENTS,
                     help='experiments to run (default: all)')
+parser.add_argument(
+    '--groups',
+    nargs='+',
+    choices=EXPERIMENTS_BY_GROUP.keys(),
+    help='experiment groups to run (default: whatever set by --experiments)')
 parser.add_argument('--orders',
                     nargs='+',
                     choices=ORDERS,
@@ -158,10 +196,14 @@ wandb.init(project=args.wandb_project,
 
 device = 'cuda' if args.cuda else 'cpu'
 
+experiments = set(args.experiments)
+if args.groups:
+    for group in args.groups:
+        experiments |= EXPERIMENTS_BY_GROUP[group]
+
 nlp = spacy.load('en_core_web_lg')
 object_synset, abstract_synset = None, None
-if (EXPERIMENT_N_OBJECT_WORDS in args.experiments or
-        EXPERIMENT_N_ABSTRACT_WORDS in args.experiments):
+if set(experiments) & set(EXPERIMENTS_BY_GROUP[GROUP_SEMANTIC]):
     nltk.download('wordnet', quiet=True)
     nltk.download('omw', quiet=True)
 
@@ -232,9 +274,11 @@ for dataset_name in args.datasets:
 
         # Begin the experiments! For each one, we will ablate neurons in
         # order of some criterion and measure drops in validation accuracy.
-        for experiment in args.experiments:
-            print('\n-------- BEGIN EXPERIMENT: '
-                  f'{cnn_name}/{dataset_name}/{experiment} '
+        for experiment in sorted(experiments,
+                                 key=lambda exp: GROUPS_BY_EXPERIMENT[exp]):
+            group = GROUPS_BY_EXPERIMENT[experiment]
+            print(f'\n-------- BEGIN EXPERIMENT: '
+                  f'{cnn_name}/{dataset_name}/{group}/{experiment} '
                   '--------')
 
             # When ablating random neurons, do it a few times to denoise.
@@ -244,59 +288,56 @@ for dataset_name in args.datasets:
                 trials = 1
 
             for trial in range(trials):
-                if experiment == EXPERIMENT_RANDOM:
+                # Group 1: Random ablations. Just choose random neurons.
+                if group == GROUP_RANDOM:
                     scores = torch.rand(len(captions)).tolist()
-                elif experiment == EXPERIMENT_N_OBJECT_WORDS:
-                    assert object_synset is not None
+
+                # Group 2: Semantic ablations. Pick the proper wordnet synset
+                # and score according to how many words in the caption belong
+                # to a synset descended from that one.
+                elif group == GROUP_SEMANTIC:
+                    target_synset = {
+                        EXPERIMENT_N_OBJECT_WORDS: object_synset,
+                        EXPERIMENT_N_ABSTRACT_WORDS: abstract_synset,
+                    }[experiment]
+                    assert target_synset is not None
                     scores = [
-                        sum(object_synset in synset.lowest_common_hypernyms(
-                            object_synset)
+                        sum(target_synset in synset.lowest_common_hypernyms(
+                            target_synset)
                             for token in tokens
                             for synset in token._.wordnet.synsets())
                         for tokens in tokenized
                     ]
-                elif experiment == EXPERIMENT_N_ABSTRACT_WORDS:
-                    assert abstract_synset is not None
+
+                # Group 2: Syntactic ablations. Count the number of times a POS
+                # apears in the caption.
+                elif group == GROUP_SYNTACTIC:
+                    pos = {
+                        EXPERIMENT_N_NOUNS: 'NOUN',
+                        EXPERIMENT_N_VERBS: 'VERB',
+                        EXPERIMENT_N_ADPS: 'ADP',
+                        EXPERIMENT_N_ADJS: 'ADK',
+                    }[experiment]
                     scores = [
-                        sum(abstract_synset in synset.lowest_common_hypernyms(
-                            abstract_synset)
-                            for token in tokens
-                            for synset in token._.wordnet.synsets())
+                        sum(token.pos_ == pos
+                            for token in tokens)
                         for tokens in tokenized
                     ]
+
+                # Group 3: Structural ablations. These are all quite different,
+                # so they get their own if branches. Ain't that neat?
                 elif experiment == EXPERIMENT_N_SPATIAL_RELATIONS:
+                    assert group == GROUP_STRUCTURAL
                     scores = [
                         sum(token.lemma_.lower() in SPATIAL_RELATIONS
                             for token in tokens)
                         for tokens in tokenized
                     ]
-                elif experiment == EXPERIMENT_N_NOUNS:
-                    scores = [
-                        sum(token.pos_ == 'NOUN'
-                            for token in tokens)
-                        for tokens in tokenized
-                    ]
-                elif experiment == EXPERIMENT_N_VERBS:
-                    scores = [
-                        sum(token.pos_ == 'VERB'
-                            for token in tokens)
-                        for tokens in tokenized
-                    ]
-                elif experiment == EXPERIMENT_N_ADPS:
-                    scores = [
-                        sum(token.pos_ == 'ADP'
-                            for token in tokens)
-                        for tokens in tokenized
-                    ]
-                elif experiment == EXPERIMENT_N_ADJECTIVES:
-                    scores = [
-                        sum(token.pos_ == 'ADJ'
-                            for token in tokens)
-                        for tokens in tokenized
-                    ]
                 elif experiment == EXPERIMENT_CAPTION_LENGTH:
+                    assert group == GROUP_STRUCTURAL
                     scores = [len(tokens) for tokens in tokenized]
                 else:
+                    assert group == GROUP_STRUCTURAL
                     assert experiment == EXPERIMENT_MAX_WORD_DIFFERENCE
                     scores = []
                     for index, tokens in enumerate(tokenized):
@@ -338,6 +379,7 @@ for dataset_name in args.datasets:
                         wandb.log({
                             'cnn': cnn_name,
                             'dataset': dataset_name,
+                            'group': group,
                             'experiment': experiment,
                             'trial': trial + 1,
                             'order': order,
