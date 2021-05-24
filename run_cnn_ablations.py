@@ -23,11 +23,15 @@ EXPERIMENT_RANDOM = 'random'
 EXPERIMENT_N_OBJECT_WORDS = 'n-object-words'
 EXPERIMENT_N_ABSTRACT_WORDS = 'n-abstract-words'
 EXPERIMENT_N_SPATIAL_RELATIONS = 'n-spatial-relations'
+EXPERIMENT_N_NOUNS = 'n-nouns'
+EXPERIMENT_N_VERBS = 'n-verbs'
+EXPERIMENT_N_ADPS = 'n-adps'
 EXPERIMENT_N_ADJECTIVES = 'n-adjectives'
 EXPERIMENT_CAPTION_LENGTH = 'caption-length'
 EXPERIMENT_MAX_WORD_DIFFERENCE = 'max-word-difference'
 EXPERIMENTS = (EXPERIMENT_RANDOM, EXPERIMENT_N_OBJECT_WORDS,
                EXPERIMENT_N_ABSTRACT_WORDS, EXPERIMENT_N_SPATIAL_RELATIONS,
+               EXPERIMENT_N_NOUNS, EXPERIMENT_N_VERBS, EXPERIMENT_N_ADPS,
                EXPERIMENT_N_ADJECTIVES, EXPERIMENT_CAPTION_LENGTH,
                EXPERIMENT_MAX_WORD_DIFFERENCE)
 
@@ -263,6 +267,24 @@ for dataset_name in args.datasets:
                 elif experiment == EXPERIMENT_N_SPATIAL_RELATIONS:
                     scores = [
                         sum(token.lemma_.lower() in SPATIAL_RELATIONS
+                            for token in tokens)
+                        for tokens in tokenized
+                    ]
+                elif experiment == EXPERIMENT_N_NOUNS:
+                    scores = [
+                        sum(token.pos_ == 'NOUN'
+                            for token in tokens)
+                        for tokens in tokenized
+                    ]
+                elif experiment == EXPERIMENT_N_VERBS:
+                    scores = [
+                        sum(token.pos_ == 'VERB'
+                            for token in tokens)
+                        for tokens in tokenized
+                    ]
+                elif experiment == EXPERIMENT_N_ADPS:
+                    scores = [
+                        sum(token.pos_ == 'ADP'
                             for token in tokens)
                         for tokens in tokenized
                     ]
