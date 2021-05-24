@@ -102,8 +102,8 @@ parser.add_argument('--experiments',
 parser.add_argument('--orders',
                     nargs='+',
                     choices=ORDERS,
-                    default=ORDERS,
-                    help='ablation orders to try (default: all)')
+                    default=(ORDER_DECREASING,),
+                    help='ablation orders to try (default: decreasing)')
 parser.add_argument('--datasets-root',
                     type=pathlib.Path,
                     default='.zoo/datasets',
