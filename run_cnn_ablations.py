@@ -387,9 +387,10 @@ for dataset_name in args.datasets:
                                           args.ablation_step_size)
                     for fraction in fractions:
                         ablated = indices[:int(fraction * len(indices))]
+                        units = annotations.units(ablated)
                         accuracy = cnn.accuracy(
                             dataset,
-                            ablate=annotations.units(ablated),
+                            ablate=units,
                             display_progress_as='test ablated cnn '
                             f'(cond={experiment}, '
                             f'trial={trial + 1}, '
@@ -406,6 +407,11 @@ for dataset_name in args.datasets:
                             exp=experiment,
                             order=order,
                             frac=fraction)
+                        layer_dist = logging.wandb_dist_plot(
+                            [str(layer) for layer, _ in units],
+                            columns=('layer', 'fraction'),
+                            title=f'distribution of layer ablated '
+                            f'({cnn_name}/{dataset_name}/{experiment})')
                         wandb.log({
                             'cnn': cnn_name,
                             'dataset': dataset_name,
@@ -417,4 +423,5 @@ for dataset_name in args.datasets:
                             'n_ablated': len(ablated),
                             'accuracy': accuracy,
                             'samples': samples,
+                            'layer_dist': layer_dist,
                         })
