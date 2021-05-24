@@ -202,7 +202,7 @@ if args.groups:
         experiments |= EXPERIMENTS_BY_GROUP[group]
 
 nlp = spacy.load('en_core_web_lg')
-object_synset, abstract_synset = None, None
+target_synsets = None
 if set(experiments) & set(EXPERIMENTS_BY_GROUP[GROUP_SEMANTIC]):
     nltk.download('wordnet', quiet=True)
     nltk.download('omw', quiet=True)
@@ -214,8 +214,10 @@ if set(experiments) & set(EXPERIMENTS_BY_GROUP[GROUP_SEMANTIC]):
         return wordnet_annotator.WordnetAnnotator(lang=lang)
 
     nlp.add_pipe('spacy_wordnet', after='tagger')
-    object_synset = wordnet.synset('object.n.01')
-    abstract_synset = wordnet.synset('abstraction.n.01')
+    target_synsets = {
+        EXPERIMENT_N_OBJECT_WORDS: wordnet.synset('object.n.01'),
+        EXPERIMENT_N_ABSTRACT_WORDS: wordnet.synset('abstraction.n.01'),
+    }
 
 for dataset_name in args.datasets:
     dataset = lv.dissection.zoo.dataset(dataset_name,
@@ -296,11 +298,8 @@ for dataset_name in args.datasets:
                 # and score according to how many words in the caption belong
                 # to a synset descended from that one.
                 elif group == GROUP_SEMANTIC:
-                    target_synset = {
-                        EXPERIMENT_N_OBJECT_WORDS: object_synset,
-                        EXPERIMENT_N_ABSTRACT_WORDS: abstract_synset,
-                    }[experiment]
-                    assert target_synset is not None
+                    assert target_synsets is not None
+                    target_synset = target_synsets[experiment]
                     scores = [
                         sum(target_synset in synset.lowest_common_hypernyms(
                             target_synset)
