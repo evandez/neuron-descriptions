@@ -18,6 +18,7 @@ import wandb
 from nltk.corpus import wordnet
 from spacy import language
 from spacy_wordnet import wordnet_annotator
+from tqdm import tqdm
 
 EXPERIMENT_RANDOM = 'random'
 
@@ -36,7 +37,7 @@ EXPERIMENT_N_ADJS = 'n-adjectives'
 
 EXPERIMENT_CAPTION_LENGTH = 'caption-length'
 EXPERIMENT_MAX_WORD_DIFFERENCE = 'max-word-difference'
-EXPERIMENT_N_SPATIAL_RELATIONS = 'n-spatial-relations'
+EXPERIMENT_PARSE_DEPTH = 'parse-depth'
 
 EXPERIMENTS = (EXPERIMENT_RANDOM, EXPERIMENT_N_OBJECT_WORDS,
                EXPERIMENT_N_ABSTRACT_WORDS, EXPERIMENT_N_CAUSAL_AGENTS,
@@ -44,7 +45,7 @@ EXPERIMENTS = (EXPERIMENT_RANDOM, EXPERIMENT_N_OBJECT_WORDS,
                EXPERIMENT_N_SUBSTANCES, EXPERIMENT_N_THINGS,
                EXPERIMENT_N_NOUNS, EXPERIMENT_N_VERBS, EXPERIMENT_N_ADPS,
                EXPERIMENT_N_ADJS, EXPERIMENT_CAPTION_LENGTH,
-               EXPERIMENT_N_SPATIAL_RELATIONS, EXPERIMENT_MAX_WORD_DIFFERENCE)
+               EXPERIMENT_MAX_WORD_DIFFERENCE, EXPERIMENT_PARSE_DEPTH)
 
 GROUP_RANDOM = 'random'
 GROUP_SEMANTIC = 'semantic'
@@ -75,7 +76,7 @@ EXPERIMENTS_BY_GROUP = {
         frozenset({
             EXPERIMENT_CAPTION_LENGTH,
             EXPERIMENT_MAX_WORD_DIFFERENCE,
-            EXPERIMENT_N_SPATIAL_RELATIONS,
+            EXPERIMENT_PARSE_DEPTH,
         }),
 }
 
@@ -87,15 +88,6 @@ GROUPS_BY_EXPERIMENT = {
 ORDER_INCREASING = 'increasing'
 ORDER_DECREASING = 'decreasing'
 ORDERS = (ORDER_DECREASING, ORDER_INCREASING)
-
-SPATIAL_RELATIONS = frozenset({
-    'left',
-    'right',
-    'above',
-    'under',
-    'around',
-    'center',
-})
 
 CNNS = (
     lv.zoo.KEY_ALEXNET,
@@ -346,16 +338,33 @@ for dataset_name in args.datasets:
 
                 # Group 3: Structural ablations. These are all quite different,
                 # so they get their own if branches. Ain't that neat?
-                elif experiment == EXPERIMENT_N_SPATIAL_RELATIONS:
-                    assert group == GROUP_STRUCTURAL
-                    scores = [
-                        sum(token.lemma_.lower() in SPATIAL_RELATIONS
-                            for token in tokens)
-                        for tokens in tokenized
-                    ]
                 elif experiment == EXPERIMENT_CAPTION_LENGTH:
                     assert group == GROUP_STRUCTURAL
                     scores = [len(tokens) for tokens in tokenized]
+
+                elif experiment == EXPERIMENT_PARSE_DEPTH:
+                    assert group == GROUP_STRUCTURAL
+
+                    scores = []
+                    for tokens in tqdm(tokenized, desc='compute parse depths'):
+                        root = None
+                        for token in tokens:
+                            if token.dep_ == 'ROOT':
+                                root = token
+                        assert root is not None
+
+                        deepest = 0
+                        frontier = [(root, 0)]
+                        while frontier:
+                            current, depth = frontier.pop()
+                            for child in current.children:
+                                frontier.append((child, depth + 1))
+
+                            if depth > deepest:
+                                deepest = depth
+
+                        scores.append(deepest)
+
                 else:
                     assert group == GROUP_STRUCTURAL
                     assert experiment == EXPERIMENT_MAX_WORD_DIFFERENCE
