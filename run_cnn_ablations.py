@@ -322,7 +322,7 @@ for dataset_name in args.datasets:
                         for tokens in tokenized
                     ]
 
-                # Group 2: Syntactic ablations. Count the number of times a POS
+                # Group 3: Syntactic ablations. Count the number of times a POS
                 # apears in the caption.
                 elif group == GROUP_SYNTACTIC:
                     pos = {
@@ -337,7 +337,7 @@ for dataset_name in args.datasets:
                         for tokens in tokenized
                     ]
 
-                # Group 3: Structural ablations. These are all quite different,
+                # Group 4: Structural ablations. These are all quite different,
                 # so they get their own if branches. Ain't that neat?
                 elif experiment == EXPERIMENT_CAPTION_LENGTH:
                     assert group == GROUP_STRUCTURAL
