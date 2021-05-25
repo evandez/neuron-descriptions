@@ -329,7 +329,7 @@ for dataset_name in args.datasets:
                         EXPERIMENT_N_NOUNS: 'NOUN',
                         EXPERIMENT_N_VERBS: 'VERB',
                         EXPERIMENT_N_ADPS: 'ADP',
-                        EXPERIMENT_N_ADJS: 'ADK',
+                        EXPERIMENT_N_ADJS: 'ADJ',
                     }[experiment]
                     scores = [
                         sum(token.pos_ == pos
