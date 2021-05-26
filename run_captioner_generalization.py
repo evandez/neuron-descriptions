@@ -12,8 +12,13 @@ from torch.utils import data
 DatasetNames = Sequence[str]
 Splits = Tuple[DatasetNames, ...]
 
+EXPERIMENT_WITHIN_NETWORK = 'within-network'
+EXPERIMENT_ACROSS_NETWORK = 'across-network'
+EXPERIMENT_ACROSS_DATASET = 'across-dataset'
+EXPERIMENT_ACROSS_TASK = 'across-task'
+EXPERIMENT_LEAVE_ONE_OUT = 'leave-one-out'
 EXPERIMENTS: Mapping[str, Splits] = {
-    'within-network': ((
+    EXPERIMENT_WITHIN_NETWORK: ((
         'alexnet/imagenet',
         'alexnet/places365',
         'resnet152/imagenet',
@@ -21,11 +26,11 @@ EXPERIMENTS: Mapping[str, Splits] = {
         'biggan/imagenet',
         'biggan/places365',
     ),),
-    'across-network': (
+    EXPERIMENT_ACROSS_NETWORK: (
         ('alexnet/imagenet', 'alexnet/places365'),
         ('resnet152/imagenet', 'resnet152/places365'),
     ),
-    'across-dataset': (
+    EXPERIMENT_ACROSS_DATASET: (
         (
             'alexnet/imagenet',
             'resnet152/imagenet',
@@ -37,7 +42,7 @@ EXPERIMENTS: Mapping[str, Splits] = {
             'biggan/places365',
         ),
     ),
-    'across-task': (
+    EXPERIMENT_ACROSS_TASK: (
         (
             'alexnet/imagenet',
             'alexnet/places365',
@@ -46,6 +51,14 @@ EXPERIMENTS: Mapping[str, Splits] = {
         ),
         ('biggan/imagenet', 'biggan/places365'),
     ),
+    EXPERIMENT_LEAVE_ONE_OUT: ((
+        'alexnet/imagenet',
+        'alexnet/places365',
+        'resnet152/imagenet',
+        'resnet152/places365',
+        'biggan/imagenet',
+        'biggan/places365',
+    ),)
 }
 
 SAT = 'sat'
@@ -121,8 +134,8 @@ for model in args.models:
             right = zoo.datasets(*splits[1], path=args.datasets_root)
             configs = [(left, right, *splits),
                        (right, left, *reversed(splits))]
-        else:
-            assert len(splits) == 1, 'weird splits?'
+        elif experiment == EXPERIMENT_WITHIN_NETWORK:
+            assert len(splits) == 1
             names, = splits
             configs = []
             for name in names:
@@ -132,6 +145,35 @@ for model in args.models:
                 train_size = size - test_size
                 split = data.random_split(dataset, (train_size, test_size))
                 configs.append((*split, (name,), (name,)))
+        else:
+            assert len(splits) == 1
+            assert experiment == EXPERIMENT_LEAVE_ONE_OUT
+
+            names, = splits
+
+            datasets_by_name = {}
+            for name in names:
+                dataset = zoo.datasets(name, path=args.datasets_root)
+                datasets_by_name[name] = dataset
+
+            unique = set(names)
+            configs = []
+            for name in unique:
+
+                test_keys = (name,)
+                test = datasets_by_name[name]
+
+                train_keys = unique - {name}
+                assert train_keys
+
+                train = None
+                for other in train_keys:
+                    if train is None:
+                        train = datasets_by_name[other]
+                    else:
+                        train += datasets_by_name[other]
+
+                configs.append((train, test, train_keys, test_keys))
 
         # For every train/test set, train the captioner, test it, and log.
         for train, test, train_keys, test_keys in configs:
