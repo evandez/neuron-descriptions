@@ -2,8 +2,8 @@
 import collections
 from typing import Any, List, NamedTuple, Sequence, Tuple
 
-from third_party.pretorched import layers
-from third_party.pretorched.gans import biggan
+from lv.third_party.pretorched import layers
+from lv.third_party.pretorched.gans import biggan
 
 import torch
 from torch import nn

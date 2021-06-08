@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.utils.model_zoo as model_zoo
 
-import third_party import pretorched
+from lv.third_party import pretorched
 
 pretrained_settings = {
     'trn': {

@@ -9,7 +9,7 @@
 import os
 from collections import defaultdict
 from typing import Dict
-from third_party.pretorched.gans.stylegan import RESOLUTIONS
+from lv.third_party.pretorched.gans.stylegan import RESOLUTIONS
 
 import numpy
 import torch

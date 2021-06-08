@@ -1,0 +1,2 @@
+[flake8]
+exclude = lv/third_party

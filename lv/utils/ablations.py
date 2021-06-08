@@ -3,8 +3,8 @@ import collections
 import contextlib
 from typing import Callable, ContextManager, Sequence
 
+from lv.third_party.netdissect import nethook
 from lv.utils.typing import Unit
-from third_party.netdissect import nethook
 
 import torch
 from torch import nn

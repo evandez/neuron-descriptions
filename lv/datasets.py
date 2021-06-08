@@ -4,8 +4,8 @@ import csv
 import pathlib
 from typing import Any, Iterable, NamedTuple, Optional, Sequence, Union
 
+from lv.third_party.netdissect import renormalize
 from lv.utils.typing import Layer, PathLike, Unit
-from third_party.netdissect import renormalize
 
 import numpy
 import torch

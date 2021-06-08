@@ -3,9 +3,9 @@ from typing import (Any, Callable, Mapping, Optional, Sequence, Tuple, Union,
                     overload)
 
 from lv.ext.torchvision import models
+from lv.third_party.netdissect import nethook, renormalize
 from lv.utils import serialize
 from lv.utils.typing import Device
-from third_party.netdissect import nethook, renormalize
 
 import torch
 from torch import nn

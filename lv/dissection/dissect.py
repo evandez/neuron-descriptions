@@ -5,8 +5,9 @@ from typing import Any, Callable, Optional
 
 from lv.dissection import transforms
 from lv.ext.netdissect import imgviz
+from lv.third_party.netdissect import (imgsave, nethook, pbar, renormalize,
+                                       tally)
 from lv.utils.typing import Device, Layer, PathLike, TensorPair
-from third_party.netdissect import imgsave, nethook, pbar, renormalize, tally
 
 import numpy
 import torch

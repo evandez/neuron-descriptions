@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.nn import init
 
-import third_party.pretorched.layers as layers
+import lv.third_party.pretorched.layers as layers
 
 
 class GBasicBlock(nn.Module):

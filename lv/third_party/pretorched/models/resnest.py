@@ -11,7 +11,7 @@ import torch.nn.functional as F
 from torch.nn import Conv2d, Module, ReLU
 from torch.nn.modules.utils import _pair
 
-from third_party.pretorched.models.torchvision_models import load_pretrained
+from lv.third_party.pretorched.models.torchvision_models import load_pretrained
 
 __all__ = ['SplAtConv2d', 'resnest50', 'resnest101', 'resnest200', 'resnest269']
 

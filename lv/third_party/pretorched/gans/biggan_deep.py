@@ -1,12 +1,3 @@
-"""biggan.py
-
-Implements BigGAN architecture from
-
-Large Scale GAN Training for High Fidelity Natural Image Synthesis by Andrew Brock, Jeff Donahue, and Karen Simonyan.
-
-Adapted from https://github.com/ajbrock/BigGAN-PyTorch.
-
-"""
 import functools
 import os
 
@@ -16,110 +7,62 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.nn import init
 
-import third_party.pretorched.layers as layers
+import lv.third_party.pretorched.layers as layers
+
+# BigGAN-deep: uses a different resblock and pattern
 
 
+# Architectures for G
+# Attention is passed in in the format '32_64' to mean applying an attention
+# block at both resolution 32x32 and 64x64. Just '64' will apply at 64x64.
+
+# Channel ratio is the ratio of
 class GBlock(nn.Module):
-    """Residual block for generator.
-
-    Note that this class assumes the kernel size and padding (and any other
-    settings) have been selected in the main generator module and passed in
-    through the conv_func arg. Similar rules apply with bn_func (the input
-    size [which is actually the number of channels of the conditional info] must
-    be preselected)
-
-    """
-
     def __init__(self, in_channels, out_channels,
-                 conv_func=nn.Conv2d,
-                 bn_func=layers.bn,
-                 activation=None,
-                 upsample=None):
-        super().__init__()
+                 conv_func=nn.Conv2d, bn_func=layers.bn, activation=None,
+                 upsample=None, channel_ratio=4):
+        super(GBlock, self).__init__()
 
         self.in_channels, self.out_channels = in_channels, out_channels
+        self.hidden_channels = self.in_channels // channel_ratio
         self.conv_func, self.bn_func = conv_func, bn_func
         self.activation = activation
+        # Conv layers
+        self.conv1 = self.conv_func(self.in_channels, self.hidden_channels,
+                                    kernel_size=1, padding=0)
+        self.conv2 = self.conv_func(self.hidden_channels, self.hidden_channels)
+        self.conv3 = self.conv_func(self.hidden_channels, self.hidden_channels)
+        self.conv4 = self.conv_func(self.hidden_channels, self.out_channels,
+                                    kernel_size=1, padding=0)
+        # Batchnorm layers
+        self.bn1 = self.bn_func(self.in_channels)
+        self.bn2 = self.bn_func(self.hidden_channels)
+        self.bn3 = self.bn_func(self.hidden_channels)
+        self.bn4 = self.bn_func(self.hidden_channels)
+        # upsample layers
         self.upsample = upsample
 
-        # Conv layers
-        self.conv1 = self.conv_func(self.in_channels, self.out_channels)
-        self.conv2 = self.conv_func(self.out_channels, self.out_channels)
-        self.learnable_sc = in_channels != out_channels or upsample
-        if self.learnable_sc:
-            self.conv_sc = self.conv_func(in_channels, out_channels,
-                                          kernel_size=1, padding=0)
-        # Batchnorm layers
-        self.bn1 = self.bn_func(in_channels)
-        self.bn2 = self.bn_func(out_channels)
-
     def forward(self, x, y):
-        h = self.activation(self.bn1(x, y))
+        # Project down to channel ratio
+        h = self.conv1(self.activation(self.bn1(x, y)))
+        # Apply next BN-ReLU
+        h = self.activation(self.bn2(h, y))
+        # Drop channels in x if necessary
+        if self.in_channels != self.out_channels:
+            x = x[:, :self.out_channels]
+        # Upsample both h and x at this point
         if self.upsample:
             h = self.upsample(h)
             x = self.upsample(x)
-        h = self.conv1(h)
-        h = self.activation(self.bn2(h, y))
+        # 3x3 convs
         h = self.conv2(h)
-        if self.learnable_sc:
-            x = self.conv_sc(x)
+        h = self.conv3(self.activation(self.bn3(h, y)))
+        # Final 1x1 conv
+        h = self.conv4(self.activation(self.bn4(h, y)))
         return h + x
 
 
-class DBlock(nn.Module):
-    """ Residual block for discriminator."""
-
-    def __init__(self, in_channels, out_channels, conv_func=layers.SNConv2d, wide=True,
-                 preactivation=False, activation=None, downsample=None,):
-        super().__init__()
-        self.in_channels, self.out_channels = in_channels, out_channels
-
-        # If using wide D (as in SA-GAN and BigGAN), change the channel pattern
-        self.hidden_channels = self.out_channels if wide else self.in_channels
-        self.conv_func = conv_func
-        self.preactivation = preactivation
-        self.activation = activation
-        self.downsample = downsample
-
-        # Conv layers
-        self.conv1 = self.conv_func(self.in_channels, self.hidden_channels)
-        self.conv2 = self.conv_func(self.hidden_channels, self.out_channels)
-        self.learnable_sc = True if (in_channels != out_channels) or downsample else False
-        if self.learnable_sc:
-            self.conv_sc = self.conv_func(in_channels, out_channels,
-                                          kernel_size=1, padding=0)
-
-    def shortcut(self, x):
-        if self.preactivation:
-            if self.learnable_sc:
-                x = self.conv_sc(x)
-            if self.downsample:
-                x = self.downsample(x)
-        else:
-            if self.downsample:
-                x = self.downsample(x)
-            if self.learnable_sc:
-                x = self.conv_sc(x)
-        return x
-
-    def forward(self, x):
-        if self.preactivation:
-            h = F.relu(x)  # This line *must* be an out-of-place ReLU or it will negatively affect the shortcut connection.
-        else:
-            h = x
-        h = self.conv1(h)
-        h = self.conv2(self.activation(h))
-        if self.downsample:
-            h = self.downsample(h)
-
-        return h + self.shortcut(x)
-
-
 def G_arch(ch=64, attention='64', ksize='333333', dilation='111111'):
-    """Architectures for G.
-    Attention is passed in in the format '32_64' to mean applying an attention
-    block at both resolution 32x32 and 64x64. Just '64' will apply at 64x64
-    """
     arch = {}
     arch[512] = {'in_channels': [ch * item for item in [16, 16, 8, 8, 4, 2, 1]],
                  'out_channels': [ch * item for item in [16, 8, 8, 4, 2, 1, 1]],
@@ -156,7 +99,7 @@ def G_arch(ch=64, attention='64', ksize='333333', dilation='111111'):
 
 
 class Generator(nn.Module):
-    def __init__(self, G_ch=64, dim_z=128, bottom_width=4, resolution=128,
+    def __init__(self, G_ch=64, G_depth=2, dim_z=128, bottom_width=4, resolution=128,
                  G_kernel_size=3, G_attn='64', n_classes=1000,
                  num_G_SVs=1, num_G_SV_itrs=1,
                  G_shared=True, shared_dim=0, hier=False,
@@ -167,9 +110,11 @@ class Generator(nn.Module):
                  G_init='ortho', skip_init=False, no_optim=False,
                  G_param='SN', norm_style='bn', verbose=False,
                  **kwargs):
-        super(Generator, self).__init__()
+        super().__init__()
         # Channel width mulitplier
         self.ch = G_ch
+        # Number of resblocks per stage
+        self.G_depth = G_depth
         # Dimensionality of the latent space
         self.dim_z = dim_z
         # The initial spatial dimensions
@@ -206,21 +151,10 @@ class Generator(nn.Module):
         self.SN_eps = SN_eps
         # fp16?
         self.fp16 = G_fp16
-        # Print out model information during init?
+        # Print model info during init?
         self.verbose = verbose
         # Architecture dict
         self.arch = G_arch(self.ch, self.attention)[resolution]
-
-        # If using hierarchical latents, adjust z
-        if self.hier:
-            # Number of places z slots into
-            self.num_slots = len(self.arch['in_channels']) + 1
-            self.z_chunk_size = (self.dim_z // self.num_slots)
-            # Recalculate latent dimensionality for even splitting into chunks
-            self.dim_z = self.z_chunk_size * self.num_slots
-        else:
-            self.num_slots = 1
-            self.z_chunk_size = 0
 
         # Which convs, batchnorms, and linear layers to use
         if self.G_param == 'SN':
@@ -244,7 +178,7 @@ class Generator(nn.Module):
                                          linear_func=bn_linear,
                                          cross_replica=self.cross_replica,
                                          mybn=self.mybn,
-                                         input_size=(self.shared_dim + self.z_chunk_size if self.G_shared
+                                         input_size=(self.shared_dim + self.dim_z if self.G_shared
                                                      else self.n_classes),
                                          norm_style=self.norm_style,
                                          eps=self.BN_eps)
@@ -252,10 +186,9 @@ class Generator(nn.Module):
         # Prepare model
         # If not using shared embeddings, self.shared is just a passthrough
         self.shared = (self.embedding_func(n_classes, self.shared_dim) if G_shared
-                       else nn.Identity())
+                       else layers.identity())
         # First linear layer
-        self.linear = self.linear_func(self.dim_z // self.num_slots,
-                                       self.arch['in_channels'][0] * (self.bottom_width ** 2))
+        self.linear = self.linear_func(self.dim_z + self.shared_dim, self.arch['in_channels'][0] * (self.bottom_width ** 2))
 
         # self.blocks is a doubly-nested list of modules, the outer loop intended
         # to be over blocks at a given resolution (resblocks and/or self-attention)
@@ -263,12 +196,13 @@ class Generator(nn.Module):
         self.blocks = []
         for index in range(len(self.arch['out_channels'])):
             self.blocks += [[GBlock(in_channels=self.arch['in_channels'][index],
-                                    out_channels=self.arch['out_channels'][index],
+                                    out_channels=self.arch['in_channels'][index] if g_index == 0 else self.arch['out_channels'][index],
                                     conv_func=self.conv_func,
                                     bn_func=self.bn_func,
                                     activation=self.activation,
                                     upsample=(functools.partial(F.interpolate, scale_factor=2)
-                                              if self.arch['upsample'][index] else None))]]
+                                              if self.arch['upsample'][index] and g_index == (self.G_depth - 1) else None))]
+                            for g_index in range(self.G_depth)]
 
             # If attention on this block, attach it to the end
             if self.arch['attention'][self.arch['resolution'][index]]:
@@ -335,6 +269,7 @@ class Generator(nn.Module):
     # already been passed through G.shared to enable easy class-wise
     # interpolation later. If we passed in the one-hot and then ran it through
     # G.shared in this forward function, it would be harder to handle.
+    # NOTE: The z vs y dichotomy here is for compatibility with not-y
     def forward(self, z, y, embed=False):
         if embed:
             if y.ndim > 1:
@@ -343,54 +278,95 @@ class Generator(nn.Module):
                 y = self.shared(y)
         # If hierarchical, concatenate zs and ys
         if self.hier:
-            zs = torch.split(z, self.z_chunk_size, 1)
-            z = zs[0]
-            ys = [torch.cat([y, item], 1) for item in zs[1:]]
-        else:
-            ys = [y] * len(self.blocks)
-
+            z = torch.cat([y, z], 1)
+            y = z
         # First linear layer
         h = self.linear(z)
         # Reshape
         h = h.view(h.size(0), -1, self.bottom_width, self.bottom_width)
-
         # Loop over blocks
         for index, blocklist in enumerate(self.blocks):
             # Second inner loop in case block has multiple layers
             for block in blocklist:
-                h = block(h, ys[index])
+                h = block(h, y)
 
         # Apply batchnorm-relu-conv-tanh at output
         return torch.tanh(self.output_layer(h))
 
-    @property
-    def z_dim(self):
-        return self.dim_z
+
+class DBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, conv_func=layers.SNConv2d, wide=True,
+                 preactivation=True, activation=None, downsample=None,
+                 channel_ratio=4):
+        super().__init__()
+        self.in_channels, self.out_channels = in_channels, out_channels
+        # If using wide D (as in SA-GAN and BigGAN), change the channel pattern
+        self.hidden_channels = self.out_channels // channel_ratio
+        self.conv_func = conv_func
+        self.preactivation = preactivation
+        self.activation = activation
+        self.downsample = downsample
+
+        # Conv layers
+        self.conv1 = self.conv_func(self.in_channels, self.hidden_channels,
+                                    kernel_size=1, padding=0)
+        self.conv2 = self.conv_func(self.hidden_channels, self.hidden_channels)
+        self.conv3 = self.conv_func(self.hidden_channels, self.hidden_channels)
+        self.conv4 = self.conv_func(self.hidden_channels, self.out_channels,
+                                    kernel_size=1, padding=0)
+
+        self.learnable_sc = True if (in_channels != out_channels) else False
+        if self.learnable_sc:
+            self.conv_sc = self.conv_func(in_channels, out_channels - in_channels,
+                                          kernel_size=1, padding=0)
+
+    def shortcut(self, x):
+        if self.downsample:
+            x = self.downsample(x)
+        if self.learnable_sc:
+            x = torch.cat([x, self.conv_sc(x)], 1)
+        return x
+
+    def forward(self, x):
+        # 1x1 bottleneck conv
+        h = self.conv1(F.relu(x))
+        # 3x3 convs
+        h = self.conv2(self.activation(h))
+        h = self.conv3(self.activation(h))
+        # relu before downsample
+        h = self.activation(h)
+        # downsample
+        if self.downsample:
+            h = self.downsample(h)
+        # final 1x1 conv
+        h = self.conv4(h)
+        return h + self.shortcut(x)
+
+# Discriminator architecture, same paradigm as G's above
 
 
 def D_arch(ch=64, attention='64', ksize='333333', dilation='111111'):
-    """Discriminator architecture, same paradigm as G's above."""
     arch = {}
-    arch[256] = {'in_channels': [3] + [ch * item for item in [1, 2, 4, 8, 8, 16]],
-                 'out_channels': [item * ch for item in [1, 2, 4, 8, 8, 16, 16]],
+    arch[256] = {'in_channels': [item * ch for item in [1, 2, 4, 8, 8, 16]],
+                 'out_channels': [item * ch for item in [2, 4, 8, 8, 16, 16]],
                  'downsample': [True] * 6 + [False],
                  'resolution': [128, 64, 32, 16, 8, 4, 4],
                  'attention': {2**i: 2**i in [int(item) for item in attention.split('_')]
                                for i in range(2, 8)}}
-    arch[128] = {'in_channels': [3] + [ch * item for item in [1, 2, 4, 8, 16]],
-                 'out_channels': [item * ch for item in [1, 2, 4, 8, 16, 16]],
+    arch[128] = {'in_channels': [item * ch for item in [1, 2, 4, 8, 16]],
+                 'out_channels': [item * ch for item in [2, 4, 8, 16, 16]],
                  'downsample': [True] * 5 + [False],
                  'resolution': [64, 32, 16, 8, 4, 4],
                  'attention': {2**i: 2**i in [int(item) for item in attention.split('_')]
                                for i in range(2, 8)}}
-    arch[64] = {'in_channels': [3] + [ch * item for item in [1, 2, 4, 8]],
-                'out_channels': [item * ch for item in [1, 2, 4, 8, 16]],
+    arch[64] = {'in_channels': [item * ch for item in [1, 2, 4, 8]],
+                'out_channels': [item * ch for item in [2, 4, 8, 16]],
                 'downsample': [True] * 4 + [False],
                 'resolution': [32, 16, 8, 4, 4],
                 'attention': {2**i: 2**i in [int(item) for item in attention.split('_')]
                               for i in range(2, 7)}}
-    arch[32] = {'in_channels': [3] + [item * ch for item in [4, 4, 4]],
-                'out_channels': [item * ch for item in [4, 4, 4, 4]],
+    arch[32] = {'in_channels': [item * ch for item in [4, 4, 4]],
+                'out_channels': [item * ch for item in [4, 4, 4]],
                 'downsample': [True, True, False, False],
                 'resolution': [16, 16, 16, 16],
                 'attention': {2**i: 2**i in [int(item) for item in attention.split('_')]
@@ -400,7 +376,7 @@ def D_arch(ch=64, attention='64', ksize='333333', dilation='111111'):
 
 class Discriminator(nn.Module):
 
-    def __init__(self, D_ch=64, D_wide=True, resolution=128,
+    def __init__(self, D_ch=64, D_wide=True, D_depth=2, resolution=128,
                  D_kernel_size=3, D_attn='64', n_classes=1000,
                  num_D_SVs=1, num_D_SV_itrs=1, D_activation=nn.ReLU(inplace=False),
                  D_lr=2e-4, D_B1=0.0, D_B2=0.999, adam_eps=1e-8,
@@ -411,6 +387,8 @@ class Discriminator(nn.Module):
         self.ch = D_ch
         # Use Wide D as in BigGAN and SA-GAN or skinny D as in SN-GAN?
         self.D_wide = D_wide
+        # How many resblocks per stage?
+        self.D_depth = D_depth
         # Resolution
         self.resolution = resolution
         # Kernel size
@@ -447,22 +425,26 @@ class Discriminator(nn.Module):
             self.embedding_func = functools.partial(layers.SNEmbedding,
                                                     num_svs=num_D_SVs, num_itrs=num_D_SV_itrs,
                                                     eps=self.SN_eps)
+
         # Prepare model
+        # Stem convolution
+        self.input_conv = self.conv_func(3, self.arch['in_channels'][0])
         # self.blocks is a doubly-nested list of modules, the outer loop intended
         # to be over blocks at a given resolution (resblocks and/or self-attention)
         self.blocks = []
         for index in range(len(self.arch['out_channels'])):
-            self.blocks += [[DBlock(in_channels=self.arch['in_channels'][index],
+            self.blocks += [[DBlock(in_channels=self.arch['in_channels'][index] if d_index == 0 else self.arch['out_channels'][index],
                                     out_channels=self.arch['out_channels'][index],
                                     conv_func=self.conv_func,
                                     wide=self.D_wide,
                                     activation=self.activation,
-                                    preactivation=(index > 0),
-                                    downsample=(nn.AvgPool2d(2) if self.arch['downsample'][index] else None))]]
+                                    preactivation=True,
+                                    downsample=(nn.AvgPool2d(2) if self.arch['downsample'][index] and d_index == 0 else None))
+                             for d_index in range(self.D_depth)]]
             # If attention on this block, attach it to the end
             if self.arch['attention'][self.arch['resolution'][index]]:
                 if self.verbose:
-                    print('Adding attention layer in D at resolution %d' % self.arch['resolution'][index])
+                    print('Adding attention layer in D at resolution {}'.format(self.arch['resolution'][index]))
                 self.blocks[-1] += [layers.Attention(self.arch['out_channels'][index],
                                                      self.conv_func)]
         # Turn self.blocks into a ModuleList so that it's all properly registered.
@@ -508,12 +490,11 @@ class Discriminator(nn.Module):
                 else:
                     print('Init style not recognized...')
                 self.param_count += sum([p.data.nelement() for p in module.parameters()])
-        if self.verbose:
-            print('Param count for D''s initialized parameters: %d' % self.param_count)
+        print('Param count for D''s initialized parameters: %d' % self.param_count)
 
     def forward(self, x, y=None):
-        # Stick x into h for cleaner for loops without flow control
-        h = x
+        # Run input conv
+        h = self.input_conv(x)
         # Loop over blocks
         for index, blocklist in enumerate(self.blocks):
             for block in blocklist:
@@ -526,12 +507,11 @@ class Discriminator(nn.Module):
         out = out + torch.sum(self.embed(y) * h, 1, keepdim=True)
         return out
 
+# Parallelized G_D to minimize cross-gpu communication
+# Without this, Generator outputs would get all-gathered and then rebroadcast.
+
 
 class G_D(nn.Module):
-    """Parallelized G_D to minimize cross-gpu communication.
-    Without this, Generator outputs would get all-gathered and then rebroadcast.
-    """
-
     def __init__(self, G, D):
         super().__init__()
         self.G = G
@@ -575,7 +555,6 @@ class G_D(nn.Module):
                 else:
                     return D_out
 
-
 root = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'weights')
 model_weights = {
     'imagenet': {
@@ -600,51 +579,33 @@ tfhub_urls = {
 model_urls = {
     'places365': {
         128: {
-            96: {
-                'D': os.path.join(root_url, 'biggan128_D_places365-8afb2a4d.pth'),
-                'G': os.path.join(root_url, 'biggan128_G_places365-43cd58c0.pth'),
-                'G_ema': os.path.join(root_url, 'biggan128_G_ema_places365-78c78abe.pth'),
-                'state_dict': os.path.join(root_url, 'biggan128_state_dict_places365-3d39f6bb.pth')
-            }},
-        256: {
-            96: {
-                'D': os.path.join(root_url, 'biggan256_D_ch96_places365-44bf2902.pth'),
-                'G': os.path.join(root_url, 'biggan256_G_ch96_places365-5adac787.pth'),
-                'G_ema': os.path.join(root_url, 'biggan256_G_ema_ch96_places365-ac277771.pth'),
-                'state_dict': os.path.join(root_url, 'biggan256_state_dict_ch96_places365-b4f6daf6.pth'),
-            },
-            128: {
-                'D': os.path.join(root_url, 'biggan256_D_ch128_places365-a6f7d3b6.pth'),
-                'G': os.path.join(root_url, 'biggan256_G_ch128_places365-47f6e48c.pth'),
-                'G_ema': os.path.join(root_url, 'biggan256_G_ema_ch128_places365-6fb66feb.pth'),
-                'state_dict': os.path.join(root_url, 'biggan256_state_dict_ch128_places365-7594847d.pth'),
-            }},
+            'D': os.path.join(root_url, ''),
+            'G': os.path.join(root_url, ''),
+            'G_ema': os.path.join(root_url, ''),
+            'state_dict': os.path.join(root_url, '')
+        },
     },
-    'imagenet': {
-        128: {
-            96: {
-                'D': os.path.join(root_url, 'biggan128_D_imagenet-9fd72e50.pth'),
-                'G': os.path.join(root_url, 'biggan128_G_imagenet-94e0b761.pth'),
-                'G_ema': os.path.join(root_url, 'biggan128_G_ema_imagenet-c9706dfb.pth'),
-                'state_dict': os.path.join(root_url, 'biggan128_state_dict_imagenet-4aad5089.pth'),
-            }},
+    'places365-challenge': {
+        256: {
+            'D': os.path.join(root_url, 'biggan_deep256_D_places365-challenge-c4fb8bfe.pth'),
+            'G': os.path.join(root_url, 'biggan_deep256_G_places365-challenge-1d2bae3c.pth'),
+            'G_ema': os.path.join(root_url, 'biggan_deep256_G_ema_places365-challenge-c3a49c8a.pth'),
+            'state_dict': os.path.join(root_url, 'biggan_deep256_state_dict_places365-challenge-dadfc659.pth')
+        }
     }
 }
 
 
-def BigGAN(resolution=256, pretrained='imagenet', load_ema=True, tfhub=True, ch=128, device=None):
+def BigGANDeep(resolution=256, pretrained='places365-challenge', load_ema=True):
 
-    if resolution == 128:
-        # Set default for now.
-        ch = 96
-
-    attn = {128: '64', 256: '128', 512: '64'}
-    dim_z = {128: 120, 256: 140, 512: 128}
+    attn = {128: '64', 256: '64', 512: '64'}
+    dim_z = {128: 128, 256: 128, 512: 128}
     config = {
         'G_param': 'SN', 'D_param': 'SN',
-        'G_ch': 96, 'D_ch': 96,
-        'D_wide': True, 'G_shared': True,
+        'G_ch': 128, 'D_ch': 128,
+        'G_shared': True,
         'shared_dim': 128, 'dim_z': dim_z[resolution],
+        'G_depth': 2, 'D_depth': 2,
         'hier': True, 'cross_replica': False,
         'mybn': False, 'G_activation': nn.ReLU(inplace=True),
         'G_attn': attn[resolution],
@@ -660,18 +621,11 @@ def BigGAN(resolution=256, pretrained='imagenet', load_ema=True, tfhub=True, ch=
 
     version = 'G_ema' if load_ema else 'G'
 
-    if tfhub and pretrained == 'imagenet':
-        url = tfhub_urls[pretrained][resolution]
-        weights = torch.hub.load_state_dict_from_url(url, map_location=device)
-        G = Generator(**config)
-        G.load_state_dict(weights, strict=False)
-        G.eval()
-        return G
-    elif pretrained is not None:
-        url = model_urls[pretrained][resolution][ch][version]
-        sd_url = model_urls[pretrained][resolution][ch]['state_dict']
-        weights = torch.hub.load_state_dict_from_url(url, map_location=device)
-        state_dict = torch.hub.load_state_dict_from_url(sd_url, map_location=device)
+    if pretrained is not None:
+        url = model_urls[pretrained][resolution][version]
+        sd_url = model_urls[pretrained][resolution]['state_dict']
+        weights = torch.hub.load_state_dict_from_url(url)
+        state_dict = torch.hub.load_state_dict_from_url(sd_url)
         G = Generator(**state_dict['config'])
         G.load_state_dict(weights, strict=False)
         G.eval()
