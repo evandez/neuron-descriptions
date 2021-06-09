@@ -168,7 +168,9 @@ class LanguageModel(nn.Module):
         # An anonymous wrapper dataset that uses just the sequences.
         class SequenceDataset(data.Dataset):
 
-            def __init__(self, dataset, annotation_index=4):
+            def __init__(self,
+                         dataset: data.Dataset,
+                         annotation_index: int = 4):
                 self.sequences = []
                 for index in range(len(cast(Sized, dataset))):
                     annotation = dataset[index][annotation_index]
@@ -177,10 +179,10 @@ class LanguageModel(nn.Module):
                     else:
                         self.sequences += annotation
 
-            def __getitem__(self, index):
+            def __getitem__(self, index: int) -> str:
                 return self.sequences[index]
 
-            def __len__(self):
+            def __len__(self) -> int:
                 return len(self.sequences)
 
         # Prepare training data.
@@ -196,7 +198,7 @@ class LanguageModel(nn.Module):
         criterion = nn.NLLLoss(ignore_index=self.indexer.pad_index)
         stopper = training.EarlyStopping(patience=patience)
 
-        def lossify(sequences):
+        def lossify(sequences: StrSequence) -> torch.Tensor:
             inputs = torch.tensor(self.indexer(sequences,
                                                start=True,
                                                stop=False,
