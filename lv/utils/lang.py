@@ -23,24 +23,35 @@ class Tokenizer(serialize.Serializable):
 
     @overload
     def __call__(self, texts: str) -> StrSequence:
+        """Tokenize the given text.
+
+        Args:
+            texts (str): The text.
+
+        Returns:
+            StrSequence: Tokenized text.
+
+        """
         ...
 
     @overload
     def __call__(self, texts: StrSequence) -> Sequence[StrSequence]:
-        ...
-
-    def __call__(self, texts):
-        """Tokenize the given texts.
+        """Tokenize all texts.
 
         Args:
-            texts (str or StrSequence): One or more text strings.
-                See overloads.
+            texts (StrSequence): One or more texts.
 
         Returns:
-            StrSequence or Sequence[StrSequence]: Tokenized strings.
-                See overloads.
+            Sequence[StrSequence]: Token sequences for each text.
 
         """
+        ...
+
+    def __call__(
+        self,
+        texts: Union[str, StrSequence],
+    ) -> Union[StrSequence, Sequence[StrSequence]]:
+        """Implement both oberloads."""
         tokenized = []
         for doc in self.nlp.pipe([texts] if isinstance(texts, str) else texts):
             tokens = []
@@ -56,11 +67,8 @@ class Tokenizer(serialize.Serializable):
             tokenized.append(tuple(tokens))
 
         if isinstance(texts, str):
-            tokenized, = tokenized
-        else:
-            tokenized = tuple(tokenized)
-
-        return tokenized
+            return tokenized[0]
+        return tuple(tokenized)
 
 
 def tokenizer(nlp: Optional[en.English] = None,
@@ -86,7 +94,7 @@ def tokenizer(nlp: Optional[en.English] = None,
 class Vocab(serialize.Serializable):
     """A data class that stores tokens and a corresponding tokenizer."""
 
-    tokens: Sequence[str]
+    tokens: StrSequence
 
     @overload
     def __getitem__(self, token: int) -> str:
@@ -127,7 +135,10 @@ class Vocab(serialize.Serializable):
         """
         ...
 
-    def __getitem__(self, token):
+    def __getitem__(
+        self,
+        token: Union[int, slice, str],
+    ) -> Union[str, StrSequence, int]:
         """Get the ID/string for the given token."""
         if isinstance(token, (int, slice)):
             return self.tokens[token]
@@ -162,7 +173,7 @@ class Vocab(serialize.Serializable):
         """Return the set of unique tokens."""
         return frozenset(self.ids)
 
-    def properties(self, **_):
+    def properties(self, **_: Any) -> Mapping[str, Any]:
         """Override `Serializable.properties`."""
         return {'tokens': self.tokens}
 
@@ -195,7 +206,7 @@ def vocab(texts: StrSequence,
     if ignore_in is not None:
         ignore_in = frozenset(ignore_in)
 
-    def ignore(token, count):
+    def ignore(token: str, count: int) -> bool:
         yn = ignore_rarer_than is not None and count <= ignore_rarer_than
         yn |= ignore_in is not None and token in ignore_in
         return yn
@@ -259,7 +270,7 @@ class Indexer(serialize.Serializable):
         ))
 
     @functools.cached_property
-    def tokens(self) -> Sequence[str]:
+    def tokens(self) -> StrSequence:
         """Return all tokens known by the indexer."""
         tokens = list(self.vocab.tokens)
         tokens += self.specials.values()
@@ -317,7 +328,10 @@ class Indexer(serialize.Serializable):
         """
         ...
 
-    def __getitem__(self, token):
+    def __getitem__(
+        self,
+        token: Union[int, slice, str],
+    ) -> Union[str, StrSequence, int]:
         """Get the ID/string for the given token."""
         if isinstance(token, (int, slice)):
             return self.tokens[token]
@@ -369,16 +383,19 @@ class Indexer(serialize.Serializable):
         """
         ...
 
-    def __call__(self, texts, **kwargs):
+    def __call__(
+        self,
+        texts: Union[str, StrSequence],
+        **kwargs: Any,
+    ) -> Union[Sequence[int], Sequence[Sequence[int]]]:
         """Implement all overloads."""
-        singleton = isinstance(texts, str)
-        tokenized = self.tokenize([texts] if singleton else texts)
+        tokenized = self.tokenize([texts] if isinstance(texts, str) else texts)
         indexed = self.index(tokenized, **kwargs)
-        return indexed[0] if singleton else indexed
+        return indexed[0] if isinstance(texts, str) else indexed
 
     @overload
     def index(self,
-              tokens: StrSequence,
+              tokenized: StrSequence,
               start: Optional[bool] = ...,
               stop: Optional[bool] = ...,
               pad: Optional[bool] = ...,
@@ -410,7 +427,7 @@ class Indexer(serialize.Serializable):
 
     @overload
     def index(self,
-              tokens: Sequence[StrSequence],
+              tokenized: Sequence[StrSequence],
               start: Optional[bool] = ...,
               stop: Optional[bool] = ...,
               pad: Optional[bool] = ...,
@@ -440,13 +457,15 @@ class Indexer(serialize.Serializable):
         """
         ...
 
-    def index(self,
-              tokenized,
-              start=None,
-              stop=None,
-              pad=None,
-              unk=None,
-              length=None):
+    def index(
+        self,
+        tokenized: Union[StrSequence, Sequence[StrSequence]],
+        start: Optional[bool] = None,
+        stop: Optional[bool] = None,
+        pad: Optional[bool] = None,
+        unk: Optional[bool] = None,
+        length: Optional[int] = None,
+    ) -> Union[Sequence[int], Sequence[Sequence[int]]]:
         """Implement all overloads."""
         if not tokenized:
             return ()
@@ -463,6 +482,8 @@ class Indexer(serialize.Serializable):
 
         indexed = []
         for tokens in [tokenized] if singleton else tokenized:
+            tokens = cast(StrSequence, tokens)
+
             indices = []
 
             if start:
@@ -490,11 +511,8 @@ class Indexer(serialize.Serializable):
             indexed.append(tuple(indices))
 
         if singleton:
-            indexed, = indexed
-        else:
-            indexed = tuple(indexed)
-
-        return indexed
+            return indexed[0]
+        return tuple(indexed)
 
     @overload
     def unindex(self,
@@ -553,31 +571,13 @@ class Indexer(serialize.Serializable):
         ...
 
     def unindex(self,
-                indexed,
+                indexed: Union[Sequence[int], Sequence[Sequence[int]]],
                 specials: bool = True,
                 start: bool = True,
                 stop: bool = True,
                 pad: bool = True,
-                unk: bool = True):
-        """Undo indexing on the sequence.
-
-        Args:
-            indices (Sequence[int] or Sequence[Sequence[int]]): The indexed
-                sequence.
-            specials (bool, optional): Include special tokens. If False,
-                overrides all other options below. Defaults to True.
-            start (bool, optional): Include start token. Defaults to True.
-            stop (bool, optional): Include stop token. Defaults to True.
-            pad (bool, optional): Include pad token. Defaults to True.
-            unk (bool, optional): Include unk token. Defaults to True.
-
-        Raises:
-            ValueError: If sequence contains an unknown index.
-
-        Returns:
-            StrSequence or Sequence[StrSequence]: Unindexed sequence.
-
-        """
+                unk: bool = True) -> Union[StrSequence, Sequence[StrSequence]]:
+        """Undo indexing on the sequence."""
         if not indexed:
             return ()
 
@@ -585,6 +585,8 @@ class Indexer(serialize.Serializable):
 
         unindexed = []
         for indices in [indexed] if singleton else indexed:
+            indices = cast(Sequence[int], indices)
+
             tokens = []
             for index in indices:
                 # First check if it's in the vocabulary.
@@ -610,11 +612,11 @@ class Indexer(serialize.Serializable):
         return tuple(unindexed)
 
     @overload
-    def reconstruct(self, indices: Sequence[int]) -> str:
+    def reconstruct(self, inputs: Sequence[int]) -> str:
         """Reconstruct text string from the indices.
 
         Args:
-            indices (Sequence[int]): The token indices.
+            inputs (Sequence[int]): The token indices.
 
         Returns:
             str: The text string.
@@ -626,11 +628,11 @@ class Indexer(serialize.Serializable):
         ...
 
     @overload
-    def reconstruct(self, indices: Sequence[Sequence[int]]) -> StrSequence:
+    def reconstruct(self, inputs: Sequence[Sequence[int]]) -> StrSequence:
         """Reconstruct text strings from each index sequence.
 
         Args:
-            indices (Sequence[Sequence[int]]): The index sequences.
+            inputs (Sequence[Sequence[int]]): The index sequences.
 
         Returns:
             StrSequence: The text strings.
@@ -642,11 +644,11 @@ class Indexer(serialize.Serializable):
         ...
 
     @overload
-    def reconstruct(self, tokens: StrSequence) -> str:
+    def reconstruct(self, inputs: StrSequence) -> str:
         """Reconstruct text string from the token sequence.
 
         Args:
-            tokens (StrSequence): The token sequence.
+            inputs (StrSequence): The token sequence.
 
         Returns:
             str: The text string.
@@ -658,11 +660,11 @@ class Indexer(serialize.Serializable):
         ...
 
     @overload
-    def reconstruct(self, tokens: Sequence[StrSequence]) -> StrSequence:
+    def reconstruct(self, inputs: Sequence[StrSequence]) -> StrSequence:
         """Reconstruct text strings from the token sequences.
 
         Args:
-            tokens (Sequence[StrSequence]): The token sequences.
+            inputs (Sequence[StrSequence]): The token sequences.
 
         Returns:
             StrSequence: The text strings.
@@ -673,7 +675,11 @@ class Indexer(serialize.Serializable):
         """
         ...
 
-    def reconstruct(self, inputs):
+    def reconstruct(
+        self,
+        inputs: Union[Sequence[int], Sequence[Sequence[int]], StrSequence,
+                      Sequence[StrSequence]],
+    ) -> Union[str, StrSequence]:
         """Implement all overloads of `reconstruct`."""
         if not inputs:
             raise ValueError('must provide at least one seq')
@@ -682,13 +688,15 @@ class Indexer(serialize.Serializable):
                 raise ValueError(f'input seq {index} is empty')
 
         if isinstance(inputs[0], str):
-            tokenized = [inputs]
+            tokenized = cast(Sequence[StrSequence], [inputs])
         elif isinstance(inputs[0], int):
+            inputs = cast(Sequence[int], inputs)
             tokenized = [self.unindex(inputs)]
         elif isinstance(inputs[0][0], str):
-            tokenized = inputs
+            tokenized = cast(Sequence[StrSequence], inputs)
         else:
             assert isinstance(inputs[0][0], int), 'unknown input type'
+            inputs = cast(Sequence[Sequence[int]], inputs)
             tokenized = self.unindex(inputs)
 
         texts = []
@@ -721,7 +729,7 @@ class Indexer(serialize.Serializable):
 
         return texts[0] if isinstance(inputs[0], (str, int)) else tuple(texts)
 
-    def properties(self, **_):
+    def properties(self, **_: Any) -> Mapping[str, Any]:
         """Override `Serializable.properties`."""
         return {
             'vocab': self.vocab,
@@ -734,8 +742,9 @@ class Indexer(serialize.Serializable):
         }
 
     @classmethod
-    def recurse(cls):
-        """Override `Serializable.recurse`."""
+    def resolve(cls, children: serialize.SerializableTypes,
+                **_: Any) -> serialize.ResolvedTypes:
+        """Override `Serializable.resolve`."""
         return {'vocab': Vocab, 'tokenize': Tokenizer}
 
 
