@@ -1,7 +1,7 @@
 """Models for annotating new, unseen neurons."""
 import dataclasses
-from typing import (Any, Mapping, Optional, Sequence, Tuple, Type, TypeVar,
-                    overload)
+from typing import (Any, Mapping, Optional, Sequence, Sized, Tuple, Type,
+                    TypeVar, cast, overload)
 
 from lv.models import featurizers
 from lv.utils import lang, training
@@ -187,12 +187,12 @@ class WordAnnotator(nn.Module):
 
         return WordAnnotations(probabilities, tuple(words), tuple(indices))
 
-    def score(self,
-              dataset: data.Dataset,
-              annotation_index: int = 4,
-              batch_size: int = 16,
-              threshold: float = .5,
-              **kwargs: Any) -> Tuple[float, WordAnnotations]:
+    def f1(self,
+           dataset: data.Dataset,
+           annotation_index: int = 4,
+           batch_size: int = 16,
+           threshold: float = .5,
+           **kwargs: Any) -> Tuple[float, WordAnnotations]:
         """Compute F1 score of this model on the given dataset.
 
         Args:
@@ -305,11 +305,9 @@ class WordAnnotator(nn.Module):
 
         return WordAnnotations(probabilities, tuple(words), tuple(indices))
 
-    @classmethod
     def fit(
-        cls: Type[WordAnnotatorT],
+        self,
         dataset: data.Dataset,
-        featurizer: featurizers.Featurizer,
         mask: bool = True,
         image_index: int = 2,
         mask_index: int = 3,
@@ -319,17 +317,15 @@ class WordAnnotator(nn.Module):
         patience: Optional[int] = None,
         optimizer_t: Type[optim.Optimizer] = optim.Adam,
         optimizer_kwargs: Optional[Mapping[str, Any]] = None,
-        indexer_kwargs: Optional[Mapping[str, Any]] = None,
         features: Optional[data.TensorDataset] = None,
         num_workers: int = 0,
         device: Optional[Device] = None,
         display_progress_as: Optional[str] = 'train word annotator',
-    ) -> WordAnnotatorT:
+    ) -> None:
         """Train a new WordAnnotator from scratch.
 
         Args:
             dataset (data.Dataset): Training dataset.
-            featurizer (featurizers.Featurizer): Image featurizer.
             mask (bool, optional): Use masks when computing features. Exact
                 behavior depends on the featurizer. Defaults to True.
             image_index (int, optional): Index of images in dataset samples.
@@ -350,8 +346,6 @@ class WordAnnotator(nn.Module):
                 Defaults to Adam.
             optimizer_kwargs (Optional[Mapping[str, Any]], optional): Optimizer
                 keyword arguments to pass at construction. Defaults to None.
-            indexer_kwargs (Optional[Mapping[str, Any]], optional): Indexer
-                keyword arguments to pass at construction. Defaults to None.
             features (Optional[data.TensorDataset], optional): Precomputed
                 image features. By default, computed from the full dataset.
             num_workers (int, optional): Number of workers for loading data.
@@ -362,16 +356,11 @@ class WordAnnotator(nn.Module):
                 with this key when training model.
                 Defaults to 'train word annotator'.
 
-        Returns:
-            WordAnnotatorT: The trained WordAnnotator.
-
         """
         if optimizer_kwargs is None:
             optimizer_kwargs = {}
-        if indexer_kwargs is None:
-            indexer_kwargs = {}
         if features is None:
-            features = featurizer.map(
+            features = self.featurizer.map(
                 dataset,
                 mask=mask,
                 image_index=image_index,
@@ -381,20 +370,13 @@ class WordAnnotator(nn.Module):
                 display_progress_as=display_progress_as and
                 'featurize dataset')
 
-        annotations = []
+        targets = torch.zeros(len(features),
+                              len(self.indexer.vocab),
+                              device=device)
         for index in range(len(features)):
             annotation = dataset[index][annotation_index]
             annotation = lang.join(annotation)
-            annotations.append(annotation)
-
-        # Useful default: ignore tokens that appear 1 time or less.
-        indexer_kwargs = dict(indexer_kwargs)
-        indexer_kwargs.setdefault('ignore_rarer_than', 1)
-        indexer = lang.indexer(annotations, **indexer_kwargs)
-
-        targets = torch.zeros(len(features), len(indexer.vocab), device=device)
-        for index, annotation in enumerate(annotations):
-            indices = indexer(annotation)
+            indices = self.indexer(annotation)
             targets[index, sorted(set(indices))] = 1
 
         features_loader = data.DataLoader(features,
@@ -404,8 +386,7 @@ class WordAnnotator(nn.Module):
                                          num_workers=num_workers,
                                          batch_size=batch_size)
 
-        model = cls(indexer, featurizer).to(device)
-        classifier = model.classifier.classifier
+        classifier = self.classifier.classifier
 
         optimizer_kwargs = dict(optimizer_kwargs)
         optimizer_kwargs.setdefault('lr', 1e-4)
@@ -446,4 +427,40 @@ class WordAnnotator(nn.Module):
             if stopper is not None and stopper(train_loss):
                 break
 
-        return model
+
+def word_annotator(dataset: data.Dataset,
+                   featurizer: featurizers.Featurizer,
+                   annotation_index: int = 4,
+                   indexer_kwargs: Optional[Mapping[str, Any]] = None,
+                   **kwargs: Any) -> WordAnnotator:
+    """Create a new word annotator from the given dataset and image featurizer.
+
+    Keyword arguments are forwarded to the constructor.
+
+    Args:
+        dataset (data.Dataset): Training dataset.
+        featurizer (featurizers.Featurizer): Image featurizer.
+        annotation_index (int, optional): Index of language annotations in
+            dataset samples. Defaults to 4 to be compatible with
+            AnnotatedTopImagesDataset.
+        indexer_kwargs (Optional[Mapping[str, Any]], optional): Indexer
+            keyword arguments to pass at construction. Defaults to None.
+
+    Returns:
+        WordAnnotator: The instantiated `WordAnnotator`.
+
+    """
+    if indexer_kwargs is None:
+        indexer_kwargs = {}
+
+    annotations = []
+    for index in range(len(cast(Sized, dataset))):
+        annotation = dataset[index][annotation_index]
+        annotation = lang.join(annotation)
+        annotations.append(annotation)
+
+    indexer_kwargs = dict(indexer_kwargs)
+    indexer_kwargs.setdefault('ignore_rarer_than', 1)
+    indexer = lang.indexer(annotations, **indexer_kwargs)
+
+    return WordAnnotator(indexer, featurizer, **kwargs)

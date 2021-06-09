@@ -111,29 +111,33 @@ def test_word_annotator_predict(word_annotator, dataset):
     assert_word_annotations_valid(actual, len(dataset))
 
 
-def test_word_annotator_score(word_annotator, dataset):
-    """Test WordAnnotator.score can process entire dataset."""
-    actual = word_annotator.score(dataset,
-                                  batch_size=BATCH_SIZE,
-                                  display_progress_as=None)
+def test_word_annotator_f1(word_annotator, dataset):
+    """Test WordAnnotator.f1 can process entire dataset."""
+    actual = word_annotator.f1(dataset,
+                               batch_size=BATCH_SIZE,
+                               display_progress_as=None)
     assert len(actual) == 2
     f1, predictions = actual
     assert f1 >= 0 and f1 <= 1
     assert_word_annotations_valid(predictions, len(dataset))
 
 
-def test_word_annotator_fit(dataset, featurizer):
+def test_word_annotator_fit(word_annotator, dataset):
     """Test WordAnnotator.fit can train from start to finish."""
-    actual = annotators.WordAnnotator.fit(
-        dataset,
-        featurizer,
-        max_epochs=1,
-        batch_size=BATCH_SIZE,
-        optimizer_kwargs={'lr': 1e-4},
-        indexer_kwargs={'ignore_in': ('foo',)},
-        display_progress_as=None)
-    # Just some basic assertions...
+    befores = tuple(word_annotator.parameters())
+    word_annotator.fit(dataset,
+                       max_epochs=1,
+                       batch_size=BATCH_SIZE,
+                       optimizer_kwargs={'lr': 1e-4},
+                       display_progress_as=None)
+    afters = tuple(word_annotator.parameters())
+    assert not all(
+        before.allclose(after) for before, after in zip(befores, afters))
+
+
+def test_word_annotator(dataset, featurizer):
+    """Test word_annotator instantiates a good annotator."""
+    actual = annotators.word_annotator(dataset, featurizer)
     assert actual.indexer is not None
-    assert actual.featurizer is featurizer
-    assert actual.classifier.feature_size == local.FEATURE_SIZE
-    assert not torch.isnan(actual.classifier.classifier.weight.data).any()
+    assert actual.featurizer is not None
+    assert actual.classifier is not None
