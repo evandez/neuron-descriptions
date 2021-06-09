@@ -41,7 +41,10 @@ class Featurizer(nn.Module):
                 **kwargs: Any) -> torch.Tensor:
         ...
 
-    def forward(self, images, masks=None, **kwargs):
+    def forward(self,
+                images: torch.Tensor,
+                masks: Optional[torch.Tensor] = None,
+                **kwargs: Any) -> torch.Tensor:
         """Abstract forward function corresponding to both overloads."""
         raise NotImplementedError
 
@@ -175,10 +178,14 @@ class ImageFeaturizer(Featurizer):
         self.register_buffer('mean', torch.tensor(mean).view(1, 3, 1, 1))
         self.register_buffer('std', torch.tensor(std).view(1, 3, 1, 1))
 
-    def forward(self, images, masks=None, normalize=True, **_):
+    def forward(self,
+                images: torch.Tensor,
+                masks: Optional[torch.Tensor] = None,
+                normalize: bool = True,
+                **_: Any) -> torch.Tensor:
         """Featurize the images."""
         if masks is None:
-            masks = images.new_ones(len(images), 1, *images.shape[2:])
+            masks = images.new_ones((len(images), 1, *images.shape[2:]))
         if normalize:
             images = (images - self.mean) / self.std
 
@@ -188,9 +195,15 @@ class ImageFeaturizer(Featurizer):
         features = features.reshape(len(images), *self.feature_shape)
         return features
 
-    def map(self, *args, mask=False, image_index=0, **kwargs):
+    def map(  # type: ignore[override]
+        self,
+        *args: Any,
+        **kwargs: Any,
+    ) -> data.TensorDataset:
         """Override `Featurizer.map`, but change defaults for single image."""
-        return super().map(*args, mask=mask, image_index=image_index, **kwargs)
+        kwargs.setdefault('mask', False)
+        kwargs.setdefault('image_index', 0)
+        return super().map(*args, **kwargs)
 
     @staticmethod
     def configs() -> Mapping[str, ImageFeaturizerConfig]:
@@ -247,10 +260,14 @@ class MaskedPyramidFeaturizer(Featurizer, serialize.SerializableModule):
         self.register_buffer('mean', torch.tensor(mean).view(1, 3, 1, 1))
         self.register_buffer('std', torch.tensor(std).view(1, 3, 1, 1))
 
-    def forward(self, images, masks=None, normalize=True, **_: Any):
+    def forward(self,
+                images: torch.Tensor,
+                masks: Optional[torch.Tensor] = None,
+                normalize: bool = True,
+                **_: Any) -> torch.Tensor:
         """Construct masked features."""
         if masks is None:
-            masks = images.new_ones(len(images), 1, *images.shape[2:])
+            masks = images.new_ones((len(images), 1, *images.shape[2:]))
         if normalize:
             images = (images - self.mean) / self.std
 
@@ -322,7 +339,12 @@ class MaskedPyramidFeaturizer(Featurizer, serialize.SerializableModule):
 class MaskedImagePyramidFeaturizer(MaskedPyramidFeaturizer):
     """Same as MaskedPyramidFeaturizer, but images are masked, not features."""
 
-    def forward(self, images, masks=None, **kwargs):
+    def forward(self,
+                images: torch.Tensor,
+                masks: Optional[torch.Tensor] = None,
+                normalize: bool = True,
+                **kwargs: Any) -> torch.Tensor:
         """Mask the images and then compute pyramid features."""
         return super().forward(images * masks if masks is not None else images,
+                               normalize=normalize,
                                **kwargs)
