@@ -1,5 +1,5 @@
 """Utilities for serializing arbitrary objects."""
-from typing import Any, Mapping, Optional, Type, TypeVar
+from typing import Any, Mapping, Type, TypeVar
 
 from lv.utils.typing import PathLike
 
@@ -52,37 +52,24 @@ class Serializable:
         """Initialize the object (necessary for type checking)."""
         super().__init__()
 
-    def properties(self, **_: Any) -> Properties:
+    def properties(self) -> Properties:
         """Return all properties needed to reconstruct the object.
 
-        Properties are basically constructor (kw)args. Keyword arguments are
-        arbitrary options for configuring how object is serialized.
-
-        By default, returns dictionary of object fields. Subclasses should
-        override this method if different behavior is desired.
+        Properties are basically constructor (kw)args. By default, returns
+        dictionary of object fields. Subclasses should override this method
+        if different behavior is desired.
         """
         return vars(self)
 
-    def serializable(self, **_: Any) -> SerializableTypes:
+    def serializable(self) -> SerializableTypes:
         """Return unique keys for each recursively serializable property."""
         return {}
 
-    def serialize(
-        self,
-        properties_kwargs: Optional[Mapping[str, Any]] = None,
-        serializable_kwargs: Optional[Mapping[str, Any]] = None,
-        **kwargs: Any,
-    ) -> Serialized:
+    def serialize(self, **kwargs: Any) -> Serialized:
         """Return object serialized as a dictionary.
 
         Other keyword arguments are unused, but accepted for type-checking
         compatibility.
-
-        Args:
-            properties_kwargs (Optional[Mapping[str, Any]], optional): Kwargs
-                for call to `properties`. Defaults to None.
-            serializable_kwargs (Optional[Mapping[str, Any]], optional): Kwargs
-                for call to `serializable`. Defaults to None.
 
         Raises:
             ValueError: If `serializable` returns keys that refer to
@@ -92,12 +79,7 @@ class Serializable:
             Serialized: The serialized object.
 
         """
-        if properties_kwargs is None:
-            properties_kwargs = {}
-        if serializable_kwargs is None:
-            serializable_kwargs = {}
-
-        properties = dict(self.properties(**properties_kwargs))
+        properties = dict(self.properties())
 
         # Some object types require special serialization. We'll search for
         # those objects and do it live.
@@ -113,7 +95,7 @@ class Serializable:
                     current[key] = (config, payload)
 
         # Handle recursive serialization.
-        children = self.serializable(**serializable_kwargs)
+        children = self.serializable()
         for key, value in properties.items():
             if key in children:
                 if not isinstance(value, Serializable):
@@ -128,7 +110,6 @@ class Serializable:
         cls: Type[SerializableT],
         serialized: Mapping[str, Any],
         strict: bool = False,
-        resolve_kwargs: Optional[Mapping[str, Any]] = None,
         **kwargs: Any,
     ) -> SerializableT:
         """Deserialize the object from its properties.
@@ -139,8 +120,6 @@ class Serializable:
             serialized (Mapping[str, Any]): The serialized object.
             strict (bool, optional): If set, die when a recursive deserialize
                 is specified but not performed. Defaults to False.
-            resolve_kwargs (Optional[Mapping[str, Any]], optional): Kwargs for
-                call to `resolve`. Defaults to None.
 
         Raises:
             KeyError: If `resolve` returns properties not in the payload.
@@ -149,9 +128,6 @@ class Serializable:
             SerializableT: The deserialized object.
 
         """
-        if resolve_kwargs is None:
-            resolve_kwargs = {}
-
         properties = dict(serialized['properties'])
         children = dict(serialized['children'])
 
@@ -171,7 +147,7 @@ class Serializable:
                         current[key] = nlp
 
         # Then handle recursion, if requested and if possible.
-        resolved = cls.resolve(children, **resolve_kwargs)
+        resolved = cls.resolve(children)
         for key, SerializableType in resolved.items():
             if strict and key not in properties:
                 raise KeyError(f'cannot recurse on {key}; not in properties')
@@ -182,7 +158,7 @@ class Serializable:
         return deserialized
 
     @classmethod
-    def resolve(cls, children: SerializableTypes, **_: Any) -> ResolvedTypes:
+    def resolve(cls, children: SerializableTypes) -> ResolvedTypes:
         """Resolve Serializable types for all children."""
         return {}
 
@@ -204,20 +180,12 @@ class SerializableModule(Serializable, nn.Module):
         """Initialize the module."""
         super().__init__()
 
-    def serialize(self,
-                  properties_kwargs: Optional[Mapping[str, Any]] = None,
-                  serializable_kwargs: Optional[Mapping[str, Any]] = None,
-                  state_dict: bool = True,
-                  **kwargs: Any) -> Serialized:
+    def serialize(self, state_dict: bool = True, **kwargs: Any) -> Serialized:
         """Serialize the module, including its state dict.
 
         Keyword arguments are forwarded to `Serializable.serialize`.
 
         Args:
-            properties_kwargs (Optional[Mapping[str, Any]], optional): Kwargs
-                for call to `properties`. Defaults to None.
-            serializable_kwargs (Optional[Mapping[str, Any]], optional): Kwargs
-                for call to `serializable`. Defaults to None.
             state_dict (bool, optional): Include the module's parameters in
                 the payload. Defaults to True.
 
@@ -225,12 +193,7 @@ class SerializableModule(Serializable, nn.Module):
             Serialized: The serialized module.
 
         """
-        serialized = dict(super().serialize(
-            properties_kwargs=properties_kwargs,
-            serializable_kwargs=serializable_kwargs,
-            state_dict=False,
-            **kwargs,
-        ))
+        serialized = dict(super().serialize(state_dict=False, **kwargs))
         if state_dict:
             serialized['state_dict'] = self.state_dict()
         return serialized
@@ -254,7 +217,6 @@ class SerializableModule(Serializable, nn.Module):
     def deserialize(cls: Type[SerializableModuleT],
                     serialized: Mapping[str, Any],
                     strict: bool = False,
-                    resolve_kwargs: Optional[Mapping[str, Any]] = None,
                     load_state_dict: bool = True,
                     **kwargs: Any) -> SerializableModuleT:
         """Instantiate the module from its properties.
@@ -266,8 +228,6 @@ class SerializableModule(Serializable, nn.Module):
                 is in the properties, this method will call
                 `torch.nn.Module.load_state_dict` on it.
             strict (bool, optional): See `Serializable.deserialize`.
-            resolve_kwargs (Optional[Mapping[str, Any]], optional): Kwargs for
-                call to `resolve`. Defaults to None.
             load_state_dict (bool, optional): If set, load the serialized
                 module parameters. Defaults to True.
 
@@ -280,7 +240,6 @@ class SerializableModule(Serializable, nn.Module):
         module = super(SerializableModule,
                        cls).deserialize(serialized,
                                         strict=strict,
-                                        resolve_kwargs=resolve_kwargs,
                                         load_state_dict=False,
                                         **kwargs)
         if state_dict is not None and load_state_dict:
