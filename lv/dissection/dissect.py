@@ -163,7 +163,7 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
         numpy.savetxt(str(metadata_file), metadata, delimiter=',', fmt=fmt)
 
     # The lightbox lets us view all the masked images at once. Pretty handy!
-    lightbox_dir = pathlib.Path(__file__).parents[2] / 'third_party'
+    lightbox_dir = pathlib.Path(__file__).parents[1] / 'third_party'
     lightbox_file = lightbox_dir / 'lightbox.html'
     for unit in range(len(images)):
         unit_dir = results_dir / f'viz/unit_{unit}'
