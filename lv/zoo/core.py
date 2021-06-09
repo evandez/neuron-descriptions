@@ -160,7 +160,7 @@ class DatasetConfig:
     def load(self,
              path: Optional[PathLike] = None,
              factory: Optional[DatasetFactory] = None,
-             **kwargs) -> data.Dataset:
+             **kwargs: Any) -> data.Dataset:
         """Load the dataset from the given path.
 
         Args:

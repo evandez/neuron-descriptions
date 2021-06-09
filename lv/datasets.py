@@ -236,7 +236,7 @@ class AnnotatedTopImages(NamedTuple):
     masks: torch.Tensor
     annotations: Sequence[str]
 
-    def as_pil_image_grid(self, **kwargs) -> Image.Image:
+    def as_pil_image_grid(self, **kwargs: Any) -> Image.Image:
         """Show masked top images as a PIL image grid.
 
         Keyword arguments are forwarded to `TopImages.as_pil_image_grid`.

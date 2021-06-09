@@ -66,7 +66,7 @@ def resnet18_seq(**kwargs: Any) -> nn.Sequential:
         ]))
 
 
-def resnet152_seq(**kwargs: Any):
+def resnet152_seq(**kwargs: Any) -> nn.Sequential:
     """Return sequentialized ResNet-152 model from torchvision."""
     model = models.resnet152(**kwargs)
     return nn.Sequential(

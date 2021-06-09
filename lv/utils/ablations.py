@@ -58,7 +58,7 @@ def ablated(
     """
     # Dirty hack to get type checking to work.
     @contextlib.contextmanager
-    def wrapper():
+    def wrapper():  # type: ignore
         with nethook.InstrumentedModel(model) as instrumented:
             edits = collections.defaultdict(list)
             for la, un in units:

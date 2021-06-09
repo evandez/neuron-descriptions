@@ -9,7 +9,7 @@ import torch
 from torch import nn
 
 
-def __getattr__(name):
+def __getattr__(name: str) -> Any:
     """Forward to `pretorched.gans.biggan`."""
     return getattr(biggan, name)
 
