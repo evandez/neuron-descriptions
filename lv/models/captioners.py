@@ -3,7 +3,7 @@ from typing import (Any, Mapping, NamedTuple, Optional, Sequence, Sized, Tuple,
                     Type, TypeVar, Union, cast, overload)
 
 from lv.models import annotators, featurizers, lms, vectors
-from lv.utils import lang, serialize, training
+from lv.utils import lang, training
 from lv.utils.typing import Device, StrSequence
 
 import rouge
@@ -66,7 +66,7 @@ WORD2VEC_SPACY = 'spacy'
 WORD2VECS = (WORD2VEC_SPACY,)
 
 
-class WordFeaturizer(serialize.SerializableModule):
+class WordFeaturizer(nn.Module):
     """Wrap a WordAnnotator and pretrained word vectors."""
 
     def __init__(self,
@@ -143,7 +143,7 @@ class WordFeaturizer(serialize.SerializableModule):
         ...
 
     @overload
-    def forward(self, features_v: torch.Tensor,
+    def forward(self, images: torch.Tensor,
                 **kwargs: Any) -> Tuple[torch.Tensor, Sequence[StrSequence]]:
         """Predict words from (precomputed) visual features.
 
@@ -151,12 +151,15 @@ class WordFeaturizer(serialize.SerializableModule):
         """
         ...
 
-    def forward(self,
-                images,
-                masks=None,
-                threshold=None,
-                num_words=None,
-                captions=None):
+    def forward(
+        self,
+        images: torch.Tensor,
+        masks: Optional[torch.Tensor] = None,
+        threshold: Optional[float] = None,
+        num_words: Optional[int] = None,
+        captions: Optional[StrSequence] = None,
+        **_: Any,
+    ) -> Tuple[torch.Tensor, Sequence[StrSequence]]:
         """Implement both overloads."""
         if captions is not None and len(captions) != len(images):
             raise ValueError(f'expected {len(images)} ground truth '
@@ -167,6 +170,7 @@ class WordFeaturizer(serialize.SerializableModule):
         if num_words is None:
             num_words = self.num_words
 
+        idx: Sequence[Sequence[int]]
         if captions is None:
             annos: annotators.WordAnnotations
             with torch.no_grad():
@@ -185,37 +189,6 @@ class WordFeaturizer(serialize.SerializableModule):
             features_w = self.vectors(idx_t)
 
         return features_w, words
-
-    def properties(self, **kwargs):
-        """Override `SerializableModule.properties`."""
-        properties = super().properties(**kwargs)
-        properties.update({
-            'annotator': self.annotator,
-            'word2vec': self.word2vec,
-            'threshold': self.threshold,
-            'num_words': self.num_words,
-        })
-
-        state_dict = properties.get('state_dict', {})
-
-        # If the featurizer is serializable, remove its parameters from the
-        # state dict and serialize instead. We only have one Serializable
-        # featurizer type, so just check for that.
-        featurizer_v = self.annotator.featurizer
-        if isinstance(featurizer_v, featurizers.MaskedPyramidFeaturizer):
-            keys = [
-                key for key in state_dict
-                if key.startswith('annotator.featurizer.')
-            ]
-            for key in keys:
-                del state_dict[key]
-
-        return properties
-
-    @classmethod
-    def recurse(cls):
-        """Override `SerializableModule.recurse`."""
-        return {'annotator': annotators.WordAnnotator}
 
 
 class DecoderOutput(NamedTuple):
@@ -236,7 +209,7 @@ STRATEGY_SAMPLE = 'sample'
 STRATEGIES = (STRATEGY_GREEDY, STRATEGY_SAMPLE)
 
 
-class Decoder(serialize.SerializableModule):
+class Decoder(nn.Module):
     """Neuron caption decoder.
 
     Roughly mimics the architecture described in Show, Attend, and Tell
@@ -405,8 +378,7 @@ class Decoder(serialize.SerializableModule):
         ...
 
     @overload
-    def forward(self, features_v: torch.Tensor,
-                **kwargs: Any) -> DecoderOutput:
+    def forward(self, images: torch.Tensor, **kwargs: Any) -> DecoderOutput:
         """Decode captions for the given visual features.
 
         Same as the other overload, but inputs are visual features.
@@ -414,12 +386,12 @@ class Decoder(serialize.SerializableModule):
         ...
 
     def forward(self,
-                images,
-                masks=None,
-                length=15,
-                strategy=STRATEGY_GREEDY,
-                pmi=True,
-                **kwargs):
+                images: torch.Tensor,
+                masks: Optional[torch.Tensor] = None,
+                length: int = 15,
+                strategy: Strategy = STRATEGY_GREEDY,
+                pmi: bool = True,
+                **kwargs: Any) -> DecoderOutput:
         """Implement both overloads."""
         if isinstance(strategy, str) and strategy not in STRATEGIES:
             raise ValueError(f'unknown strategy: {strategy}')
@@ -804,9 +776,10 @@ class Decoder(serialize.SerializableModule):
         # iterate by annotation (for which there are ~3x per neuron).
         class WrapperDataset(data.Dataset):
 
-            def __init__(self, subset):
+            def __init__(self, subset: data.Subset):
                 self.samples = []
                 for index in subset.indices:
+                    assert features is not None
                     feature, = features[index]
 
                     annotations = dataset[index][annotation_index]
@@ -819,10 +792,10 @@ class Decoder(serialize.SerializableModule):
                         sample = (feature, annotation)
                         self.samples.append(sample)
 
-            def __getitem__(self, index):
+            def __getitem__(self, index: int) -> Tuple[torch.Tensor, str]:
                 return self.samples[index]
 
-            def __len__(self):
+            def __len__(self) -> int:
                 return len(self.samples)
 
         val_size = int(hold_out * len(features))
@@ -903,53 +876,6 @@ class Decoder(serialize.SerializableModule):
 
             if stopper(val_loss):
                 break
-
-    def properties(self, **kwargs):
-        """Override `SerializableModule.properties`."""
-        properties = super().properties(**kwargs)
-        properties.update({
-            'indexer': self.indexer,
-            'copy': self.copy,
-            'embedding_size': self.embedding_size,
-            'hidden_size': self.hidden_size,
-            'attention_hidden_size': self.attention_hidden_size,
-            'dropout': self.dropout,
-        })
-
-        state_dict = properties.get('state_dict', {})
-        delete = []
-
-        featurizer_v = self.featurizer_v
-        if featurizer_v is not None and isinstance(
-                featurizer_v, featurizers.MaskedPyramidFeaturizer):
-            delete += [
-                key for key in state_dict if key.startswith('featurizer_v.')
-            ]
-            properties['featurizer_v'] = featurizer_v
-
-        featurizer_w = self.featurizer_w
-        if featurizer_w is not None:
-            properties['featurizer_w'] = featurizer_w
-            if isinstance(featurizer_w.featurizer,
-                          featurizers.MaskedPyramidFeaturizer):
-                delete += [
-                    key for key in state_dict
-                    if key.startswith('featurizer_w.annotator.featurizer.')
-                ]
-
-        for key in delete:
-            del state_dict[key]
-
-        return properties
-
-    @classmethod
-    def recurse(cls):
-        """Override `SerializableModule.recurse`."""
-        return {
-            'featurizer_w': WordFeaturizer,
-            'featurizer_v': featurizers.MaskedPyramidFeaturizer,
-            'indexer': lang.Indexer,
-        }
 
 
 def decoder(dataset: data.Dataset,
