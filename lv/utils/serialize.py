@@ -10,8 +10,8 @@ from torch import nn
 # Useful type aliases to help with subclassing.
 Properties = Mapping[str, Any]
 Serialized = Mapping[str, Any]
-SerializableTypes = Mapping[str, Any]
-ResolvedTypes = Mapping[str, Type['Serializable']]
+Children = Mapping[str, Any]
+Resolved = Mapping[str, Type['Serializable']]
 
 SerializableT = TypeVar('SerializableT', bound='Serializable')
 
@@ -61,7 +61,7 @@ class Serializable:
         """
         return vars(self)
 
-    def serializable(self) -> SerializableTypes:
+    def serializable(self) -> Children:
         """Return unique keys for each recursively serializable property."""
         return {}
 
@@ -158,7 +158,7 @@ class Serializable:
         return deserialized
 
     @classmethod
-    def resolve(cls, children: SerializableTypes) -> ResolvedTypes:
+    def resolve(cls, children: Children) -> Resolved:
         """Resolve Serializable types for all children."""
         return {}
 

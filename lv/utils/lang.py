@@ -173,7 +173,7 @@ class Vocab(serialize.Serializable):
         """Return the set of unique tokens."""
         return frozenset(self.ids)
 
-    def properties(self, **_: Any) -> Mapping[str, Any]:
+    def properties(self) -> serialize.Properties:
         """Override `Serializable.properties`."""
         return {'tokens': self.tokens}
 
@@ -742,8 +742,7 @@ class Indexer(serialize.Serializable):
         }
 
     @classmethod
-    def resolve(cls, children: serialize.SerializableTypes,
-                **_: Any) -> serialize.ResolvedTypes:
+    def resolve(cls, children: serialize.Children) -> serialize.Resolved:
         """Override `Serializable.resolve`."""
         return {'vocab': Vocab, 'tokenize': Tokenizer}
 
