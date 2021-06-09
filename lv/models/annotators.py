@@ -4,7 +4,7 @@ from typing import (Any, Mapping, Optional, Sequence, Tuple, Type, TypeVar,
                     overload)
 
 from lv.models import featurizers
-from lv.utils import lang, serialize, training
+from lv.utils import lang, training
 from lv.utils.typing import Device, StrSequence
 
 import numpy
@@ -73,7 +73,7 @@ class WordAnnotations:
 WordAnnotatorT = TypeVar('WordAnnotatorT', bound='WordAnnotator')
 
 
-class WordAnnotator(serialize.SerializableModule):
+class WordAnnotator(nn.Module):
     """Predicts words that would appear in the caption of masked images."""
 
     def __init__(self,
@@ -115,7 +115,8 @@ class WordAnnotator(serialize.SerializableModule):
     def forward(self,
                 images: torch.Tensor,
                 masks: torch.Tensor,
-                threshold: float = ...) -> WordAnnotations:
+                threshold: float = ...,
+                **kwargs: Any) -> WordAnnotations:
         """Predict the words that describe the images and masks.
 
         Args:
@@ -133,16 +134,14 @@ class WordAnnotator(serialize.SerializableModule):
         ...
 
     @overload
-    def forward(self,
-                features: torch.Tensor,
-                threshold: float = ...) -> WordAnnotations:
+    def forward(self, images: torch.Tensor, **kwargs: Any) -> WordAnnotations:
         """Predict the words that describe the given image features.
 
+        Keyword arguments are the same as in other signature.
+
         Args:
-            features (torch.Tensor): Image features. Should have shape
+            images (torch.Tensor): Image features. Should have shape
                 (batch_size, *featurizer.feature_shape).
-            threshold (float, optional): Cutoff for whether or not a word
-                is predicted or not.
 
         Returns:
             WordAnnotations: Predicted annotations for features.
@@ -150,9 +149,13 @@ class WordAnnotator(serialize.SerializableModule):
         """
         ...
 
-    def forward(self, images, masks=None, threshold=.5):
-        """Implementat overloaded functions above."""
-        batch_size, *_ = images.shape
+    def forward(self,
+                images: torch.Tensor,
+                masks: Optional[torch.Tensor] = None,
+                threshold: float = .5,
+                **_: Any) -> WordAnnotations:
+        """Implement overloaded functions above."""
+        batch_size = images.shape[0]
         if masks is not None:
             images = images.view(-1, 3, *images.shape[-2:])
             masks = masks.view(-1, 1, *masks.shape[-2:])
@@ -301,37 +304,6 @@ class WordAnnotator(serialize.SerializableModule):
             indices.extend(prediction.indices)
 
         return WordAnnotations(probabilities, tuple(words), tuple(indices))
-
-    def properties(self, **kwargs):
-        """Override `Serializable.properties`."""
-        properties = super().properties(**kwargs)
-        properties['indexer'] = self.indexer
-
-        # If the featurizer is serializable, remove its parameters from the
-        # state dict and serialize instead. We only have one Serializable
-        # featurizer type, so just check for that.
-        featurizer = self.featurizer
-        if isinstance(featurizer, featurizers.MaskedPyramidFeaturizer):
-            state_dict = properties.get('state_dict', {})
-            keys = [key for key in state_dict if key.startswith('featurizer.')]
-            for key in keys:
-                del state_dict[key]
-            assert isinstance(featurizer, serialize.Serializable)
-            properties['featurizer'] = featurizer
-
-        return properties
-
-    @classmethod
-    def recurse(cls):
-        """Override `Serializable.recurse`."""
-        return {
-            'indexer': lang.Indexer,
-            # This class will only support deserializing
-            # MaskedPyramidFeaturizer. This is a limitation of our
-            # serialization method: each class can only be deserialized in
-            # one way.
-            'featurizer': featurizers.MaskedPyramidFeaturizer,
-        }
 
     @classmethod
     def fit(
