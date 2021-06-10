@@ -1,7 +1,7 @@
 """Generic RNN language models."""
 from typing import Any, Mapping, Optional, Sized, Type, cast
 
-from lv.utils import lang, training
+from lv.utils import lang, serialize, training
 from lv.utils.typing import Device, StrSequence
 
 import torch
@@ -10,7 +10,7 @@ from torch.utils import data
 from tqdm.auto import tqdm
 
 
-class LanguageModel(nn.Module):
+class LanguageModel(serialize.SerializableModule):
     """A simple LSTM language model."""
 
     def __init__(self,
@@ -246,6 +246,21 @@ class LanguageModel(nn.Module):
 
             if stopper(val_loss):
                 break
+
+    def properties(self) -> serialize.Properties:
+        """Override `Serializable.properties`."""
+        return {
+            'indexer': self.indexer,
+            'embedding_size': self.embedding_size,
+            'hidden_size': self.hidden_size,
+            'layers': self.layers,
+            'dropout': self.dropout,
+        }
+
+    @classmethod
+    def resolve(cls, children: serialize.Children) -> serialize.Resolved:
+        """Override `Serializable.resolve`."""
+        return {'indexer': lang.Indexer}
 
 
 def lm(dataset: data.Dataset,

@@ -4,7 +4,7 @@ from typing import (Any, Mapping, Optional, Sequence, Sized, Tuple, Type,
                     TypeVar, cast, overload)
 
 from lv.models import featurizers
-from lv.utils import lang, training
+from lv.utils import lang, serialize, training
 from lv.utils.typing import Device, StrSequence
 
 import numpy
@@ -15,7 +15,7 @@ from torch.utils import data
 from tqdm.auto import tqdm
 
 
-class WordClassifierHead(nn.Module):
+class WordClassifierHead(serialize.SerializableModule):
     """Classifier that predicts word distribution from visual features."""
 
     def __init__(self, feature_size: int, vocab_size: int):
@@ -49,6 +49,13 @@ class WordClassifierHead(nn.Module):
         predictions = torch.sigmoid(logits).mean(dim=1)
         return predictions
 
+    def properties(self) -> serialize.Properties:
+        """Override `Serializable.properties`."""
+        return {
+            'feature_size': self.feature_size,
+            'vocab_size': self.vocab_size,
+        }
+
 
 @dataclasses.dataclass(frozen=True)
 class WordAnnotations:
@@ -73,7 +80,7 @@ class WordAnnotations:
 WordAnnotatorT = TypeVar('WordAnnotatorT', bound='WordAnnotator')
 
 
-class WordAnnotator(nn.Module):
+class WordAnnotator(serialize.SerializableModule):
     """Predicts words that would appear in the caption of masked images."""
 
     def __init__(self,
@@ -426,6 +433,25 @@ class WordAnnotator(nn.Module):
 
             if stopper is not None and stopper(train_loss):
                 break
+
+    def properties(self) -> serialize.Properties:
+        """Override `Serializable.properties`."""
+        return {
+            'indexer': self.indexer,
+            'featurizer': self.featurizer,
+            'classifier': self.classifier,
+        }
+
+    def serializable(self) -> serialize.Children:
+        """Override `Serializable.serializable`."""
+        return {'featurizer': featurizers.key(self.featurizer)}
+
+    @classmethod
+    def resolve(cls, children: serialize.Children) -> serialize.Resolved:
+        """Override `Serializable.resolve`."""
+        key = children.get('featurizer')
+        assert key is not None
+        return {'featurizer': featurizers.parse(key)}
 
 
 def word_annotator(dataset: data.Dataset,

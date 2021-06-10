@@ -62,7 +62,15 @@ class Serializable:
         return vars(self)
 
     def serializable(self) -> Children:
-        """Return unique keys for each recursively serializable property."""
+        """Return type information for recursively serializable fields.
+
+        It is not strictly required for subclasses to override this method.
+        Its only use is when the recursively serialized field could be one of
+        several types. In that case, this function should return a dictionary
+        mapping the field name to some value (e.g a string) encoding the type
+        information. Otherwise, subclasses can just override `resolve` and
+        return the single type that field can take.
+        """
         return {}
 
     def serialize(self, **kwargs: Any) -> Serialized:
@@ -97,10 +105,10 @@ class Serializable:
         # Handle recursive serialization.
         children = self.serializable()
         for key, value in properties.items():
-            if key in children:
-                if not isinstance(value, Serializable):
-                    raise ValueError(f'child "{key}" is not serializable '
-                                     f'type: {type(value).__name__}')
+            if key in children and not isinstance(value, Serializable):
+                raise ValueError(f'child "{key}" is not serializable '
+                                 f'type: {type(value).__name__}')
+            if isinstance(value, Serializable):
                 properties[key] = value.serialize(**kwargs)
 
         return {'properties': properties, 'children': children}
@@ -109,7 +117,6 @@ class Serializable:
     def deserialize(
         cls: Type[SerializableT],
         serialized: Mapping[str, Any],
-        strict: bool = False,
         **kwargs: Any,
     ) -> SerializableT:
         """Deserialize the object from its properties.
@@ -118,11 +125,6 @@ class Serializable:
 
         Args:
             serialized (Mapping[str, Any]): The serialized object.
-            strict (bool, optional): If set, die when a recursive deserialize
-                is specified but not performed. Defaults to False.
-
-        Raises:
-            KeyError: If `resolve` returns properties not in the payload.
 
         Returns:
             SerializableT: The deserialized object.
@@ -149,10 +151,9 @@ class Serializable:
         # Then handle recursion, if requested and if possible.
         resolved = cls.resolve(children)
         for key, SerializableType in resolved.items():
-            if strict and key not in properties:
-                raise KeyError(f'cannot recurse on {key}; not in properties')
-            properties[key] = SerializableType.deserialize(
-                properties[key], **kwargs)
+            if key in properties and properties[key] is not None:
+                properties[key] = SerializableType.deserialize(
+                    properties[key], **kwargs)
 
         deserialized = cls(**properties)
         return deserialized
@@ -227,7 +228,8 @@ class SerializableModule(Serializable, nn.Module):
             serialized (Mapping[str, Any]): Module properties. If state_dict
                 is in the properties, this method will call
                 `torch.nn.Module.load_state_dict` on it.
-            strict (bool, optional): See `Serializable.deserialize`.
+            strict (bool, optional): Forwarded to
+                `torch.nn.Module.load_state_dict`.
             load_state_dict (bool, optional): If set, load the serialized
                 module parameters. Defaults to True.
 
@@ -239,7 +241,6 @@ class SerializableModule(Serializable, nn.Module):
         state_dict = serialized.pop('state_dict', None)
         module = super(SerializableModule,
                        cls).deserialize(serialized,
-                                        strict=strict,
                                         load_state_dict=False,
                                         **kwargs)
         if state_dict is not None and load_state_dict:

@@ -22,7 +22,7 @@ def test_featurizer_map(featurizer, top_images_dataset, device):
         assert features.eq(0).all()
 
 
-def test_pretrained_pyramid_featurizer_init_bad_config():
+def test_masked_pyramid_featurizer_init_bad_config():
     """Test MaskedPyramidFeaturizer.__init__ dies on bad config."""
     bad = 'bad-config'
     with pytest.raises(ValueError, match=f'.*{bad}.*'):
@@ -48,7 +48,7 @@ def masks():
 
 
 @pytest.mark.parametrize('config', ('resnet18', 'alexnet'))
-def test_pretrained_pyramid_featurizer_forward(config, images, masks):
+def test_masked_pyramid_featurizer_forward(config, images, masks):
     """Test MaskedPyramidFeaturizer.forward returns correct shape."""
     featurizer = featurizers.MaskedPyramidFeaturizer(config=config,
                                                      pretrained=False)
@@ -58,8 +58,7 @@ def test_pretrained_pyramid_featurizer_forward(config, images, masks):
 
 
 @pytest.mark.parametrize('config', ('resnet18', 'alexnet'))
-def test_pretrained_pyramid_featurizer_forward_invalid_mask(
-        config, images, masks):
+def test_masked_pyramid_featurizer_forward_invalid_mask(config, images, masks):
     """Test MaskedPyramidFeaturizer.forward handles some invalid masks."""
     featurizer = featurizers.MaskedPyramidFeaturizer(config=config,
                                                      pretrained=False)
@@ -72,7 +71,7 @@ def test_pretrained_pyramid_featurizer_forward_invalid_mask(
 
 
 @pytest.mark.parametrize('config', ('resnet18', 'alexnet'))
-def test_pretrained_pyramid_featurizer_forward_all_invalid_masks(
+def test_masked_pyramid_featurizer_forward_all_invalid_masks(
         config, images, masks):
     """Test MaskedPyramidFeaturizer.forward handles all invalid masks."""
     featurizer = featurizers.MaskedPyramidFeaturizer(config=config,

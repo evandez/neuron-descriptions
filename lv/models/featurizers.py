@@ -1,6 +1,6 @@
 """Models that map images and masks to features."""
-from typing import (Any, Callable, Mapping, Optional, Sequence, Tuple, Union,
-                    overload)
+from typing import (Any, Callable, Mapping, Optional, Sequence, Tuple, Type,
+                    Union, overload)
 
 from lv.ext.torchvision import models
 from lv.third_party.netdissect import nethook, renormalize
@@ -14,7 +14,7 @@ from torch.utils import data
 from tqdm.auto import tqdm
 
 
-class Featurizer(nn.Module):
+class Featurizer(serialize.SerializableModule):
     """An abstract module mapping images (and optionally masks) to features."""
 
     feature_shape: Tuple[int, ...]
@@ -46,6 +46,10 @@ class Featurizer(nn.Module):
                 masks: Optional[torch.Tensor] = None,
                 **kwargs: Any) -> torch.Tensor:
         """Abstract forward function corresponding to both overloads."""
+        raise NotImplementedError
+
+    def properties(self) -> serialize.Properties:
+        """Require subclasses to implement `Serializable.properties`."""
         raise NotImplementedError
 
     def map(self,
@@ -205,6 +209,10 @@ class ImageFeaturizer(Featurizer):
         kwargs.setdefault('image_index', 0)
         return super().map(*args, **kwargs)
 
+    def properties(self) -> serialize.Properties:
+        """Override `Serializable.properties`."""
+        return {'config': self.config, **self.kwargs}
+
     @staticmethod
     def configs() -> Mapping[str, ImageFeaturizerConfig]:
         """Return the support configs mapped to their names."""
@@ -296,28 +304,9 @@ class MaskedPyramidFeaturizer(Featurizer, serialize.SerializableModule):
 
         return torch.cat(masked, dim=-1)
 
-    def properties(self,
-                   state_dict: bool = False,
-                   **kwargs: Any) -> Mapping[str, Any]:
-        """Return serializable values for the module.
-
-        Usually, we do not need to save module parameters because the
-        featurizer is pretrained. Hence `state_dict` defaults to False.
-
-        Keyword arguments are forwarded to `torch.nn.Module.state_dict`.
-
-        Args:
-            state_dict (bool, optional): If set, include state_dict in
-                properties. Defaults to False.
-
-        Returns:
-            Mapping[str, Any]: Model properties.
-
-        """
-        assert 'state_dict' not in self.kwargs, 'state_dict parameter?'
-        properties = dict(super().properties(state_dict=state_dict, **kwargs))
-        properties.update({'config': self.config, **self.kwargs})
-        return properties
+    def properties(self) -> serialize.Properties:
+        """Override `Serializable.properties`."""
+        return {'config': self.config, **self.kwargs}
 
     @staticmethod
     def configs() -> Mapping[str, MaskedPyramidFeaturizerConfig]:
@@ -348,3 +337,17 @@ class MaskedImagePyramidFeaturizer(MaskedPyramidFeaturizer):
         return super().forward(images * masks if masks is not None else images,
                                normalize=normalize,
                                **kwargs)
+
+
+def parse(key: str) -> Type[Featurizer]:
+    """Parse the string key into a featurizer type."""
+    return {
+        Type.__name__: Type
+        for Type in (ImageFeaturizer, MaskedPyramidFeaturizer,
+                     MaskedImagePyramidFeaturizer)
+    }[key]
+
+
+def key(featurizer: Featurizer) -> str:
+    """Return the key for the given featurizer."""
+    return type(featurizer).__name__

@@ -3,7 +3,7 @@ from typing import (Any, Mapping, NamedTuple, Optional, Sequence, Sized, Tuple,
                     Type, TypeVar, Union, cast, overload)
 
 from lv.models import annotators, featurizers, lms, vectors
-from lv.utils import lang, training
+from lv.utils import lang, serialize, training
 from lv.utils.typing import Device, StrSequence
 
 import rouge
@@ -15,7 +15,7 @@ from torch.utils import data
 from tqdm.auto import tqdm
 
 
-class Attention(nn.Module):
+class Attention(serialize.SerializableModule):
     """Attention mechanism from Show, Attend, and Tell [Xu et al., 2015]."""
 
     def __init__(self,
@@ -61,12 +61,20 @@ class Attention(nn.Module):
         hidden = torch.tanh(q_hidden + k_hidden)
         return self.output(hidden).view(*keys.shape[:2])
 
+    def properties(self) -> serialize.Properties:
+        """Override `Serializable.properties`."""
+        return {
+            'query_size': self.query_size,
+            'key_size': self.key_size,
+            'hidden_size': self.hidden_size,
+        }
+
 
 WORD2VEC_SPACY = 'spacy'
 WORD2VECS = (WORD2VEC_SPACY,)
 
 
-class WordFeaturizer(nn.Module):
+class WordFeaturizer(serialize.SerializableModule):
     """Wrap a WordAnnotator and pretrained word vectors."""
 
     def __init__(self,
@@ -190,6 +198,20 @@ class WordFeaturizer(nn.Module):
 
         return features_w, words
 
+    def properties(self) -> serialize.Properties:
+        """Override `Serializable.properties`."""
+        return {
+            'annotator': self.annotator,
+            'word2vec': self.word2vec,
+            'threshold': self.threshold,
+            'num_words': self.num_words,
+        }
+
+    @classmethod
+    def resolve(cls, children: serialize.Children) -> serialize.Resolved:
+        """Override `Serializable.resolve`."""
+        return {'annotator': annotators.WordAnnotator}
+
 
 class DecoderOutput(NamedTuple):
     """Wraps output of the caption decoder."""
@@ -209,7 +231,7 @@ STRATEGY_SAMPLE = 'sample'
 STRATEGIES = (STRATEGY_GREEDY, STRATEGY_SAMPLE)
 
 
-class Decoder(nn.Module):
+class Decoder(serialize.SerializableModule):
     """Neuron caption decoder.
 
     Roughly mimics the architecture described in Show, Attend, and Tell
@@ -876,6 +898,42 @@ class Decoder(nn.Module):
 
             if stopper(val_loss):
                 break
+
+    def properties(self) -> serialize.Properties:
+        """Override `Serializable.properties`."""
+        return {
+            'indexer': self.indexer,
+            'featurizer_v': self.featurizer_v,
+            'featurizer_w': self.featurizer_w,
+            'lm': self.lm,
+            'copy': self.copy,
+            'embedding_size': self.embedding_size,
+            'hidden_size': self.hidden_size,
+            'attention_hidden_size': self.attention_hidden_size,
+            'dropout': self.dropout,
+        }
+
+    def serializable(self) -> serialize.Children:
+        """Override `Serializable.serializable`."""
+        serializable = {}
+        if self.featurizer_v is not None:
+            serializable['featurizer_v'] = featurizers.key(self.featurizer_v)
+        return serializable
+
+    @classmethod
+    def resolve(cls, children: serialize.Children) -> serialize.Resolved:
+        """Override `Serializable.resolve`."""
+        resolved = {
+            'indexer': lang.Indexer,
+            'featurizer_w': WordFeaturizer,
+            'lm': lms.LanguageModel,
+        }
+
+        featurizer_v_key = children.get('featurizer_v')
+        if featurizer_v_key is not None:
+            resolved['featurizer_v'] = featurizers.parse(featurizer_v_key)
+
+        return resolved
 
 
 def decoder(dataset: data.Dataset,
