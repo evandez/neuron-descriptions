@@ -1,6 +1,7 @@
 """Core tools for interacting with the zoo."""
 import dataclasses
 import pathlib
+import tempfile
 import zipfile
 from typing import (Any, Callable, Iterable, Mapping, Optional, OrderedDict,
                     Tuple)
@@ -189,10 +190,11 @@ class DatasetConfig:
         # Otherwise, handle URL if it is set and pass path as an arg.
         path = pathlib.Path(path)
         if not path.exists() and self.url is not None:
-            file = path.parent / self.url.split('/')[-1]
-            hub.download_url_to_file(self.url, file)
-            with zipfile.ZipFile(file, 'r') as handle:
-                handle.extractall(path)
+            with tempfile.TemporaryDirectory() as tempdir:
+                file = pathlib.Path(tempdir) / self.url.split('/')[-1]
+                hub.download_url_to_file(self.url, file)
+                with zipfile.ZipFile(file, 'r') as handle:
+                    handle.extractall(path)
 
         if not path.exists():
             raise FileNotFoundError(f'dataset path does not exist: {path}')
