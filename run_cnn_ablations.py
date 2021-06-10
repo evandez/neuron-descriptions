@@ -268,10 +268,8 @@ for dataset_name in args.datasets:
 
             annotator = None
             if args.captioner in (CAPTIONER_SAT_WF, CAPTIONER_SAT_MF_WF):
-                annotator = annotators.WordAnnotator.fit(train,
-                                                         featurizer=featurizer,
-                                                         features=features,
-                                                         device=device)
+                annotator = annotators.word_annotator(train, featurizer)
+                annotator.fit(train, features=features, device=device)
 
             if args.captioner in (CAPTIONER_SAT, CAPTIONER_SAT_MF):
                 captioner = captioners.decoder(train, featurizer=featurizer)

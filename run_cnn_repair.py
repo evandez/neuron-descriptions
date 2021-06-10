@@ -176,10 +176,8 @@ if args.captioner != CAPTIONER_SAT_WF:
 
 annotator = None
 if args.captioner in (CAPTIONER_SAT_WF, CAPTIONER_SAT_MF_WF):
-    annotator = annotators.WordAnnotator.fit(annotations,
-                                             featurizer=featurizer,
-                                             features=features,
-                                             device=device)
+    annotator = annotators.word_annotator(annotations, featurizer)
+    annotator.fit(annotations, features=features, device=device)
 
 if args.captioner in (CAPTIONER_SAT, CAPTIONER_SAT_MF):
     captioner = captioners.decoder(annotations, featurizer=featurizer)
