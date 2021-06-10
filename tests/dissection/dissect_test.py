@@ -80,8 +80,13 @@ def assert_results_dir_populated(results_dir, layer=None):
             unit_activation = float(unit_activation)
             assert not math.isnan(float(unit_activation))
 
-    # Check visualizations.
-    viz_dir = results_dir / 'viz'
+
+def assert_viz_dir_populated(viz_dir, layer=None):
+    """Assert viz_dir contains individual png images and lightbox."""
+    if layer is not None:
+        viz_dir = viz_dir / layer
+    assert viz_dir.is_dir()
+
     assert viz_dir.is_dir()
     units = tuple(f'unit_{unit}' for unit in range(conftest.N_UNITS_PER_LAYER))
     actual = tuple(path.name for path in viz_dir.iterdir())
@@ -104,6 +109,15 @@ def results_dir():
         results_dir = pathlib.Path(tempdir) / 'results'
         results_dir.mkdir(exist_ok=True, parents=True)
         yield results_dir
+
+
+@pytest.yield_fixture
+def viz_dir():
+    """Yield a fake viz directory for testing."""
+    with tempfile.TemporaryDirectory() as tempdir:
+        viz_dir = pathlib.Path(tempdir) / 'viz'
+        viz_dir.mkdir(exist_ok=True, parents=True)
+        yield viz_dir
 
 
 @pytest.fixture
@@ -141,13 +155,14 @@ def model():
     return nn.Sequential(collections.OrderedDict(layers))
 
 
-def test_discriminative(model, dataset, results_dir, tally_cache_file,
+def test_discriminative(model, dataset, results_dir, viz_dir, tally_cache_file,
                         masks_cache_file):
     """Test discriminative runs in normal case."""
     dissect.discriminative(model,
                            dataset,
                            device='cpu',
                            results_dir=results_dir,
+                           viz_dir=viz_dir,
                            display_progress=False,
                            num_workers=1,
                            k=conftest.N_TOP_IMAGES_PER_UNIT,
@@ -158,9 +173,10 @@ def test_discriminative(model, dataset, results_dir, tally_cache_file,
                            clear_cache_files=True,
                            clear_results_dir=True)
     assert_results_dir_populated(results_dir)
+    assert_viz_dir_populated(viz_dir)
 
 
-def test_sequential(model, dataset, results_dir, tally_cache_file,
+def test_sequential(model, dataset, results_dir, viz_dir, tally_cache_file,
                     masks_cache_file):
     """Test sequential runs in normal case."""
     dissect.sequential(model,
@@ -168,6 +184,7 @@ def test_sequential(model, dataset, results_dir, tally_cache_file,
                        layer='conv_2',
                        device='cpu',
                        results_dir=results_dir,
+                       viz_dir=viz_dir,
                        display_progress=False,
                        num_workers=1,
                        k=conftest.N_TOP_IMAGES_PER_UNIT,
@@ -178,6 +195,7 @@ def test_sequential(model, dataset, results_dir, tally_cache_file,
                        clear_cache_files=True,
                        clear_results_dir=True)
     assert_results_dir_populated(results_dir, layer='conv_2')
+    assert_viz_dir_populated(viz_dir, layer='conv_2')
 
 
 class FeaturesToImage(nn.Module):
@@ -190,7 +208,7 @@ class FeaturesToImage(nn.Module):
         return torch.sigmoid(features[:, :3])
 
 
-def test_generative(model, dataset, results_dir, tally_cache_file,
+def test_generative(model, dataset, results_dir, viz_dir, tally_cache_file,
                     masks_cache_file):
     """Test generative runs in normal case."""
     layers = list(model.named_children())
@@ -201,6 +219,7 @@ def test_generative(model, dataset, results_dir, tally_cache_file,
                        'conv_2',
                        device='cpu',
                        results_dir=results_dir,
+                       viz_dir=viz_dir,
                        display_progress=False,
                        num_workers=1,
                        k=conftest.N_TOP_IMAGES_PER_UNIT,
@@ -211,3 +230,4 @@ def test_generative(model, dataset, results_dir, tally_cache_file,
                        clear_cache_files=True,
                        clear_results_dir=True)
     assert_results_dir_populated(results_dir, layer='conv_2')
+    assert_viz_dir_populated(viz_dir, layer='conv_2')

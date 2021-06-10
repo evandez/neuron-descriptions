@@ -12,8 +12,12 @@ parser.add_argument('dataset', help='dataset model is trained on')
 parser.add_argument('--layers', nargs='+', help='layers to dissect')
 parser.add_argument('--results-dir',
                     type=pathlib.Path,
-                    default='.dissection',
+                    default='.dissection/results',
                     help='directory to write dissection results')
+parser.add_argument('--viz-dir',
+                    type=pathlib.Path,
+                    default='.dissection/viz',
+                    help='directory to write dissection visualizations')
 parser.add_argument('--model-file',
                     type=pathlib.Path,
                     help='path to model weights')
@@ -40,13 +44,15 @@ dataset = zoo.dataset(dataset, path=args.dataset_path)
 layers = args.layers or layers
 assert layers is not None, 'should always be >= 1 layer'
 
+results_dir = args.results_dir / args.model / args.dataset
+viz_dir = args.viz_dir / args.model / args.dataset
 for layer in layers:
-    results_dir = args.results_dir / args.model / args.dataset
     if generative:
         dissect.generative(model,
                            dataset,
                            layer=layer,
                            results_dir=results_dir,
+                           viz_dir=viz_dir,
                            device=device,
                            **config.dissection.kwargs)
     else:
@@ -54,5 +60,6 @@ for layer in layers:
                            dataset,
                            layer=layer,
                            results_dir=results_dir,
+                           viz_dir=viz_dir,
                            device=device,
                            **config.dissection.kwargs)

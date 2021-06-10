@@ -26,10 +26,12 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
         renormalizer: Optional[renormalize.Renormalizer] = None,
         num_workers: int = 30,
         results_dir: Optional[PathLike] = None,
+        viz_dir: Optional[PathLike] = None,
         tally_cache_file: Optional[PathLike] = None,
         masks_cache_file: Optional[PathLike] = None,
         clear_cache_files: bool = False,
         clear_results_dir: bool = False,
+        clear_viz_dir: bool = False,
         display_progress: bool = True) -> None:
     """Find and visualize the top-activating images for each unit.
 
@@ -68,6 +70,9 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
             use this many worker threads. Defaults to 30.
         results_dir (Optional[PathLike], optional): Directory to write
             results to. Defaults to 'dissection-results'.
+        viz_dir (Optional[PathLike], optional): Directory to write top image
+            visualizations to (e.g., individual png images, lightbox, etc.).
+            Defaults to f'{results_dir}/viz'.
         tally_cache_file (Optional[PathLike], optional): Write intermediate
             results for tally step to this file. Defaults to None.
         masks_cache_file (Optional[PathLike], optional): Write intermediate
@@ -78,6 +83,8 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
             function. Useful if you want to redo all computation.
             Defaults to False.
         clear_results_dir (bool, optional): If set, clear the results_dir if
+            it exists. Defaults to False.
+        clear_viz_dir (bool, optional): If set, clear the viz_dir if
             it exists. Defaults to False.
         display_progress (bool, optional): If True, display progress bar.
             Defaults to True.
@@ -94,10 +101,16 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
     if image_size is None and not hasattr(dataset, 'transform'):
         raise ValueError('dataset has no `transform` property so '
                          'image_size= must be set')
+
     if results_dir is None:
         results_dir = pathlib.Path(__file__).parents[2] / 'dissection-results'
     if not isinstance(results_dir, pathlib.Path):
         results_dir = pathlib.Path(results_dir)
+
+    if viz_dir is None:
+        viz_dir = results_dir / 'viz'
+    if not isinstance(viz_dir, pathlib.Path):
+        viz_dir = pathlib.Path(viz_dir)
 
     # Clear cache files if requested.
     if clear_cache_files:
@@ -108,10 +121,14 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
             if cache_file.exists():
                 cache_file.unlink()
 
-    # Clear results directory if requested.
-    if clear_results_dir and results_dir.exists():
-        shutil.rmtree(results_dir)
-    results_dir.mkdir(exist_ok=True, parents=True)
+    # Clear results and viz directories if requested.
+    for clear, directory in (
+        (clear_results_dir, results_dir),
+        (clear_viz_dir, viz_dir),
+    ):
+        if clear and directory.exists():
+            shutil.rmtree(directory)
+        directory.mkdir(exist_ok=True, parents=True)
 
     # Compute activation statistics across dataset.
     if display_progress:
@@ -150,7 +167,7 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
     numpy.save(f'{results_dir}/images.npy', images)
     numpy.save(f'{results_dir}/masks.npy', masks)
     imgsave.save_image_set(masked,
-                           f'{results_dir}/viz/unit_%d/image_%d.png',
+                           f'{viz_dir}/unit_%d/image_%d.png',
                            sourcefile=masks_cache_file)
 
     # Finally, save the IDs of all top images and the activation values
@@ -166,7 +183,7 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
     lightbox_dir = pathlib.Path(__file__).parents[1] / 'third_party'
     lightbox_file = lightbox_dir / 'lightbox.html'
     for unit in range(len(images)):
-        unit_dir = results_dir / f'viz/unit_{unit}'
+        unit_dir = viz_dir / f'unit_{unit}'
         unit_lightbox_file = unit_dir / '+lightbox.html'
         shutil.copy(lightbox_file, unit_lightbox_file)
 
@@ -233,6 +250,7 @@ def sequential(model: nn.Sequential,
                dataset: data.Dataset,
                layer: Optional[Layer] = None,
                results_dir: Optional[PathLike] = None,
+               viz_dir: Optional[PathLike] = None,
                **kwargs: Any) -> None:
     """Run dissection on a sequential discriminative model.
 
@@ -252,16 +270,28 @@ def sequential(model: nn.Sequential,
         results_dir (PathLike, optional): Directory to write results to.
             If set and layer is also set, layer name will be appended to path.
             Defaults to same as `run`.
+        viz_dir (Optional[PathLike], optional): Directory to write top image
+            visualizations to (e.g., individual png images, lightbox, etc.).
+            If set and layer is also set, layer name will be appended to path.
+            Defaults to same as `run`.
 
     """
-    if results_dir is not None:
-        results_dir = pathlib.Path(results_dir)
-        results_dir /= str(layer) if layer is not None else 'outputs'
     if layer is not None:
         model = nethook.subsequence(model,
                                     last_layer=str(layer),
                                     share_weights=True)
-    discriminative(model, dataset, results_dir=results_dir, **kwargs)
+
+    def resolve(directory: Optional[PathLike]) -> Optional[pathlib.Path]:
+        if directory is not None:
+            directory = pathlib.Path(directory)
+            directory /= str(layer) if layer is not None else 'outputs'
+        return directory
+
+    discriminative(model,
+                   dataset,
+                   results_dir=resolve(results_dir),
+                   viz_dir=resolve(viz_dir),
+                   **kwargs)
 
 
 def generative(
@@ -270,6 +300,7 @@ def generative(
         layer: Layer,
         device: Optional[Device] = None,
         results_dir: Optional[PathLike] = None,
+        viz_dir: Optional[PathLike] = None,
         transform_inputs: transforms.TransformToTuple = transforms.identities,
         transform_hiddens: transforms.TransformToTensor = transforms.identity,
         transform_outputs: transforms.TransformToTensor = transforms.identity,
@@ -295,6 +326,10 @@ def generative(
         results_dir (PathLike, optional): Directory to write results to.
             If set, layer name will be appended to path. Defaults to same
             as `run`.
+        viz_dir (Optional[PathLike], optional): Directory to write top image
+            visualizations to (e.g., individual png images, lightbox, etc.).
+            If set and layer is also set, layer name will be appended to path.
+            Defaults to same as `run`.
         transform_inputs (transforms.TransformToTuple, optional): Pass batch
             as *args to this function and use output as *args to model.
             Defaults to identity, i.e. entire batch is passed to model.
@@ -312,6 +347,8 @@ def generative(
     """
     if results_dir is not None:
         results_dir = pathlib.Path(results_dir) / str(layer)
+    if viz_dir is not None:
+        viz_dir = pathlib.Path(viz_dir) / str(layer)
 
     model.to(device)
     with nethook.InstrumentedModel(model) as instrumented:
@@ -339,4 +376,5 @@ def generative(
             compute_activations,
             dataset,
             results_dir=results_dir,
+            viz_dir=viz_dir,
             **kwargs)
