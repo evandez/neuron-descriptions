@@ -190,6 +190,7 @@ class DatasetConfig:
         # Otherwise, handle URL if it is set and pass path as an arg.
         path = pathlib.Path(path)
         if not path.exists() and self.url is not None:
+            path.mkdir(parents=True)
             with tempfile.TemporaryDirectory() as tempdir:
                 file = pathlib.Path(tempdir) / self.url.split('/')[-1]
                 hub.download_url_to_file(self.url, file)
