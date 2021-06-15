@@ -294,7 +294,7 @@ class WordAnnotator(serialize.SerializableModule):
         predictions = []
         for (inputs,) in loader:
             with torch.no_grad():
-                outputs = self(inputs, **kwargs)
+                outputs = self(inputs.to(device), **kwargs)
             predictions.append(outputs)
 
         probabilities = torch.cat([pred.probabilities for pred in predictions])
@@ -411,7 +411,7 @@ class WordAnnotator(serialize.SerializableModule):
             for (inputs,), (targets,) in zip(features_loader, targets_loader):
                 inputs = inputs.view(*inputs.shape[:2], -1)
                 targets = targets[:, None, :].expand(-1, inputs.shape[1], -1)
-                predictions = classifier(inputs)
+                predictions = classifier(inputs.to(device))
                 loss = criterion(predictions, targets)
                 loss.backward()
                 optimizer.step()

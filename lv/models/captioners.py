@@ -673,7 +673,7 @@ class Decoder(serialize.SerializableModule):
         outputs = []
         for (inputs,) in loader:
             with torch.no_grad():
-                output = self(inputs, **kwargs)
+                output = self(inputs.to(device), **kwargs)
             outputs.append(output)
 
         captions = []
@@ -814,7 +814,7 @@ class Decoder(serialize.SerializableModule):
                 _, length = targets.shape
 
                 outputs: DecoderOutput = self(
-                    features_v,
+                    features_v.to(device),
                     length=length,
                     strategy=targets,
                     captions=captions if use_ground_truth_words else None,
