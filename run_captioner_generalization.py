@@ -188,7 +188,7 @@ for model in args.models:
             if model not in (SAT, SAT_MF):
                 annotator = annotators.WordAnnotator.fit(
                     train, featurizer, features=train_features, device=device)
-                annotator_f1, _ = annotator.score(
+                annotator_f1 = annotator.f1(
                     test,
                     features=test_features,
                     device=device,

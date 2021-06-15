@@ -77,10 +77,10 @@ annotator = annotators.word_annotator(train,
                                       featurizer,
                                       indexer_kwargs={'ignore_rarer_than': 5})
 annotator.fit(train, features=train_features, device=device)
-annotator_f1, _ = annotator.f1(test,
-                               features=test_features,
-                               device=device,
-                               display_progress_as='test word annotator')
+annotator_f1 = annotator.f1(test,
+                            features=test_features,
+                            device=device,
+                            display_progress_as='test word annotator')
 run.summary['annotator-f1'] = annotator_f1  # type: ignore
 
 factories = {

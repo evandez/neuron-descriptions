@@ -116,10 +116,7 @@ def test_word_annotator_f1(word_annotator, dataset):
     actual = word_annotator.f1(dataset,
                                batch_size=BATCH_SIZE,
                                display_progress_as=None)
-    assert len(actual) == 2
-    f1, predictions = actual
-    assert f1 >= 0 and f1 <= 1
-    assert_word_annotations_valid(predictions, len(dataset))
+    assert actual >= 0 and actual <= 1
 
 
 def test_word_annotator_fit(word_annotator, dataset):

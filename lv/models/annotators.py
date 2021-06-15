@@ -178,7 +178,10 @@ class WordAnnotator(serialize.SerializableModule):
         # by their probability.
         words, indices = [], []
         for s_ps in probabilities:
-            s_indices = s_ps.gt(threshold).nonzero().squeeze().tolist()
+            s_indices = s_ps.gt(threshold)\
+                .nonzero(as_tuple=False)\
+                .squeeze()\
+                .tolist()
 
             # Sometimes this chain of calls returns a single element. Rewrap it
             # in a list for consistency.
@@ -197,30 +200,29 @@ class WordAnnotator(serialize.SerializableModule):
     def f1(self,
            dataset: data.Dataset,
            annotation_index: int = 4,
-           batch_size: int = 16,
            threshold: float = .5,
+           predictions: Optional[WordAnnotations] = None,
            **kwargs: Any) -> Tuple[float, WordAnnotations]:
         """Compute F1 score of this model on the given dataset.
+
+        Keyword arguments are forwarded to `forward`.
 
         Args:
             dataset (data.Dataset): Test dataset.
             annotation_index (int, optional): Index of annotations in dataset
                 samples. Defaults to 4 to be compatible with
                 AnnotatedTopImagesDataset.
-            batch_size (int, optional): Number of samples to process at once.
-                Defaults to 16.
             threshold (float, optional): Probability threshold for whether or
                 not the model predicts a word. Defaults to .5.
+            predictions (Optional[WordAnnotations], optional): Precomputed
+                word predictions. Defaults to None.
 
         Returns:
-            Tuple[float, WordAnnotations]: F1 score and predictions for every
-                sample.
+            float: F1 score.
 
         """
-        predictions = self.predict(dataset,
-                                   batch_size=batch_size,
-                                   threshold=threshold,
-                                   **kwargs)
+        if predictions is None:
+            predictions = self.predict(dataset, threshold=threshold, **kwargs)
         y_pred = predictions.probabilities.gt(threshold).int().cpu().numpy()
 
         annotations = []
@@ -238,7 +240,7 @@ class WordAnnotator(serialize.SerializableModule):
                               y_true=y_true,
                               average='weighted',
                               zero_division=0.)
-        return f1, predictions
+        return f1
 
     def predict(self,
                 dataset: data.Dataset,
