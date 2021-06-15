@@ -246,7 +246,6 @@ class Decoder(serialize.SerializableModule):
                  featurizer_v: Optional[featurizers.Featurizer] = None,
                  featurizer_w: Optional[WordFeaturizer] = None,
                  lm: Optional[lms.LanguageModel] = None,
-                 copy: bool = False,
                  embedding_size: int = 128,
                  hidden_size: int = 512,
                  attention_hidden_size: Optional[int] = None,
@@ -264,8 +263,6 @@ class Decoder(serialize.SerializableModule):
             lm (Optional[lms.LanguageModel], optional): Language model. Changes
                 decoding to use PMI [p(caption | image) / p(caption)] instead
                 of likelihood [p(caption | image)].
-            copy (bool, optional): Use a copy mechanism in the model.
-                Defaults to False.
             embedding_size (int, optional): Size of previous-word embeddings
                 that are input to the LSTM. Defaults to 128.
             hidden_size (int, optional): Size of LSTM hidden states.
@@ -296,21 +293,10 @@ class Decoder(serialize.SerializableModule):
                                  f'lm missing {cap_vocab - lm_vocab} and '
                                  f'cap missing {lm_vocab - cap_vocab}')
 
-        if copy:
-            if featurizer_w is None:
-                raise ValueError('must set featurizer_w if copy=True')
-            elif not featurizer_w.annotator.indexer.unique <= indexer.unique:
-                raise ValueError(
-                    'when using a copy mechanism, annotator vocab must be a '
-                    'subset of indexer vocab, but indexer is missing words: '
-                    f'{featurizer_w.annotator.indexer.unique - indexer.unique}'
-                )
-
         self.indexer = indexer
         self.featurizer_v = featurizer_v
         self.featurizer_w = featurizer_w
         self.lm = lm
-        self.copy = copy
         self.embedding_size = embedding_size
         self.hidden_size = hidden_size
         self.attention_hidden_size = attention_hidden_size
@@ -341,11 +327,6 @@ class Decoder(serialize.SerializableModule):
                                     nn.Tanh())
         self.init_c = nn.Sequential(nn.Linear(self.feature_size, hidden_size),
                                     nn.Tanh())
-
-        self.copy_gate = None
-        if copy:
-            self.copy_gate = nn.Sequential(nn.Linear(hidden_size, 1),
-                                           nn.Sigmoid())
 
         self.vocab_size = len(indexer)
         self.embedding = nn.Embedding(self.vocab_size, embedding_size)
@@ -521,24 +502,6 @@ class Decoder(serialize.SerializableModule):
                     _, (h_lm, c_lm) = self.lm.lstm(inputs_lm, (h_lm, c_lm))
                     log_p_w_lm = self.lm.output(h_lm[-1])
                 logprobs[:, time] = log_p_w - log_p_w_lm
-
-            # If copy mechanism is enabled, apply it.
-            if self.copy_gate is not None:
-                assert words is not None
-                assert attention_w is not None
-                word_idx = [self.indexer[w] for ws in words for w in ws]
-                batch_idx = [
-                    idx for idx, ws in enumerate(words) for _ in range(len(ws))
-                ]
-
-                p_copy = self.copy_gate(h)
-                p_copy_w = torch.zeros_like(log_p_w)
-                p_copy_w[batch_idx, word_idx] = torch.cat([
-                    attention_w[idx, :len(words)]
-                    for idx, words in enumerate(words)
-                ])
-                p_w = (1 - p_copy) * torch.exp(log_p_w) + p_copy * p_copy_w
-                logprobs[:, time] = log_p_w = torch.log(p_w)
 
             # Pick next token by applying the decoding strategy.
             if isinstance(strategy, torch.Tensor):
@@ -906,7 +869,6 @@ class Decoder(serialize.SerializableModule):
             'featurizer_v': self.featurizer_v,
             'featurizer_w': self.featurizer_w,
             'lm': self.lm,
-            'copy': self.copy,
             'embedding_size': self.embedding_size,
             'hidden_size': self.hidden_size,
             'attention_hidden_size': self.attention_hidden_size,
@@ -987,8 +949,7 @@ def decoder(dataset: data.Dataset,
 
     indexer_kwargs = dict(indexer_kwargs)
     if 'tokenize' not in indexer_kwargs:
-        copy = kwargs.get('copy', False)
-        indexer_kwargs['tokenize'] = lang.tokenizer(lemmatize=copy,
+        indexer_kwargs['tokenize'] = lang.tokenizer(lemmatize=False,
                                                     ignore_stop=False,
                                                     ignore_punct=False)
     for key in ('start', 'stop', 'pad', 'unk'):
