@@ -1,7 +1,6 @@
 """Models for annotating new, unseen neurons."""
-import dataclasses
-from typing import (Any, Mapping, Optional, Sequence, Sized, Tuple, Type,
-                    TypeVar, cast, overload)
+from typing import (Any, Mapping, NamedTuple, Optional, Sequence, Sized, Tuple,
+                    Type, TypeVar, cast, overload)
 
 from lv.models import featurizers
 from lv.utils import lang, serialize, training
@@ -57,8 +56,7 @@ class WordClassifierHead(serialize.SerializableModule):
         }
 
 
-@dataclasses.dataclass(frozen=True)
-class WordAnnotations:
+class WordAnnotations(NamedTuple):
     """Word annotations predicted by our model."""
 
     # Probabilities for *every word*, even those not predicted.
@@ -69,12 +67,6 @@ class WordAnnotations:
     # of batch_size. Length of internal lists could be anything.
     words: Sequence[StrSequence]
     indices: Sequence[Sequence[int]]
-
-    def __post_init__(self) -> None:
-        """Validate all the data has the right shape."""
-        lengths = {len(self.probabilities), len(self.words), len(self.indices)}
-        if len(lengths) != 1:
-            raise ValueError(f'found multiple batch sizes: {lengths}')
 
 
 WordAnnotatorT = TypeVar('WordAnnotatorT', bound='WordAnnotator')

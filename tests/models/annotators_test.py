@@ -35,14 +35,6 @@ def test_word_classifier_head_forward(word_classifier_head, features):
     assert actual.max() <= 1
 
 
-def test_word_annotations_post_init():
-    """Test WordAnnotations.__post_init__ validates batch sizes."""
-    with pytest.raises(ValueError, match=f'.*{BATCH_SIZE - 1}.*'):
-        annotators.WordAnnotations(torch.rand(BATCH_SIZE, VOCAB_SIZE),
-                                   [['foo']] * (BATCH_SIZE - 1),
-                                   [[0]] * (BATCH_SIZE - 1))
-
-
 @pytest.fixture(scope='module')
 def indexer():
     """Return a fake Indexer for testing."""
