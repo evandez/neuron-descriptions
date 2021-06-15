@@ -289,8 +289,7 @@ class WordAnnotator(serialize.SerializableModule):
                 mask_index=mask_index,
                 batch_size=batch_size,
                 device=device,
-                display_progress_as=display_progress_as and
-                'featurize dataset')
+                display_progress_as=display_progress_as is not None)
 
         loader = data.DataLoader(features,
                                  batch_size=batch_size,
@@ -374,8 +373,7 @@ class WordAnnotator(serialize.SerializableModule):
                 mask_index=mask_index,
                 batch_size=batch_size,
                 device=device,
-                display_progress_as=display_progress_as and
-                'featurize dataset')
+                display_progress_as=display_progress_as is not None)
 
         targets = torch.zeros(len(features),
                               len(self.indexer.vocab),

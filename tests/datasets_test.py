@@ -46,6 +46,7 @@ def test_top_images_dataset_init(top_images_root, device):
                                         display_progress=False,
                                         device=device)
     assert dataset.root == top_images_root
+    assert str(top_images_root).endswith(dataset.name)
     assert dataset.layers == tuple(
         f'layer-{i}' for i in range(conftest.N_LAYERS))
     assert dataset.device is device
@@ -216,6 +217,7 @@ def test_annotated_top_images_dataset_init_no_keep_unannotated_samples(
         annotation_column=conftest.ANNOTATION_COLUMN,
         keep_unannotated_samples=keep_unannotated_samples,
         display_progress=False)
+    assert str(top_images_root).endswith(annotated_top_images_dataset.name)
 
     # Yeah, yeah, yeah, this is bad practice, I know...
     if keep_unannotated_samples:

@@ -699,7 +699,7 @@ class Decoder(serialize.SerializableModule):
                 mask_index=mask_index,
                 batch_size=batch_size,
                 device=device,
-                display_progress=display_progress_as and 'featurize dataset')
+                display_progress_as=display_progress_as is not None)
 
         loader = data.DataLoader(features,
                                  batch_size=batch_size,
@@ -784,14 +784,14 @@ class Decoder(serialize.SerializableModule):
         if optimizer_kwargs is None:
             optimizer_kwargs = {}
         if features is None:
-            features = self.featurizer_v_.map(dataset,
-                                              mask=mask,
-                                              image_index=image_index,
-                                              mask_index=mask_index,
-                                              batch_size=batch_size,
-                                              device=device,
-                                              progress=display_progress_as and
-                                              'featurize dataset')
+            features = self.featurizer_v_.map(
+                dataset,
+                mask=mask,
+                image_index=image_index,
+                mask_index=mask_index,
+                batch_size=batch_size,
+                device=device,
+                display_progress_as=display_progress_as is not None)
 
         # Prepare dataset and data loader. Use an anonymous dataset class to
         # make this easier, since we want to split train/val by neuron, but

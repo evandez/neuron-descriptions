@@ -55,6 +55,7 @@ class TopImagesDataset(data.Dataset):
 
     def __init__(self,
                  root: PathLike,
+                 name: Optional[str] = None,
                  layers: Optional[Iterable[Layer]] = None,
                  device: Optional[Union[str, torch.device]] = None,
                  display_progress: bool = True):
@@ -63,6 +64,8 @@ class TopImagesDataset(data.Dataset):
         Args:
             root (PathLike): Root directory for the dataset. See
                 `dissection.dissect` function for expected format.
+            name (Optional[str], optional): Human-readable name for this
+                dataset. Defaults to last two components of root directory.
             layers (Optional[Iterable[Layer]], optional): The layers to load.
                 Layer data is assumed to be a subdirectory of the root.
                 By default, all subdirectories of root are treated as layers.
@@ -81,12 +84,17 @@ class TopImagesDataset(data.Dataset):
         root = pathlib.Path(root)
         if not root.is_dir():
             raise FileNotFoundError(f'root directory not found: {root}')
+
         if layers is None:
             layers = [f.name for f in root.iterdir() if f.is_dir()]
         if not layers:
             raise ValueError('no layers given and root has no subdirectories')
 
+        if name is None:
+            name = f'{root.parent.name}/{root.name}'
+
         self.root = root
+        self.name = name
         self.layers = layers = tuple(sorted(str(layer) for layer in layers))
         self.device = device
 
@@ -331,6 +339,8 @@ class AnnotatedTopImagesDataset(data.Dataset):
                 samples.append(annotated_top_images)
         self.samples = tuple(samples)
         self.samples_by_layer_unit = {(s.layer, s.unit): s for s in samples}
+
+        self.name = top_images_dataset.name
 
     def __getitem__(self, index: int) -> AnnotatedTopImages:
         """Return the annotated top images.

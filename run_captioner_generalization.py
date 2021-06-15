@@ -179,14 +179,10 @@ for model in args.models:
         for train, test, train_keys, test_keys in configs:
             train_features, test_features = None, None
             if featurizer is not None:
-                train_features = featurizer.map(
-                    cast(data.Dataset, train),
-                    display_progress_as='featurize train set',
-                    device=device)
-                test_features = featurizer.map(
-                    cast(data.Dataset, test),
-                    display_progress_as='featurize test set',
-                    device=device)
+                train_features = featurizer.map(cast(data.Dataset, train),
+                                                device=device)
+                test_features = featurizer.map(cast(data.Dataset, test),
+                                               device=device)
 
             annotator, annotator_f1 = None, None
             if model not in (SAT, SAT_MF):

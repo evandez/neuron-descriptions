@@ -2,6 +2,7 @@
 from typing import (Any, Callable, Mapping, Optional, Sequence, Tuple, Type,
                     Union, overload)
 
+from lv import datasets
 from lv.ext.torchvision import models
 from lv.third_party.netdissect import nethook, renormalize
 from lv.utils import serialize
@@ -60,7 +61,7 @@ class Featurizer(serialize.SerializableModule):
             batch_size: int = 128,
             num_workers: int = 0,
             device: Optional[Device] = None,
-            display_progress_as: Optional[str] = 'featurize dataset',
+            display_progress_as: Union[bool, str] = True,
             **kwargs: Any) -> data.TensorDataset:
         """Featurize an entire dataset.
 
@@ -84,8 +85,10 @@ class Featurizer(serialize.SerializableModule):
                 Defaults to 0.
             device (Optional[Device], optional): Run preprocessing on this
                 device. Defaults to None.
-            display_progress_as (Optional[str], optional): Show a progress bar
-                with this key. Defaults to 'featurize dataset'.
+            display_progress_as (Union[bool, str], optional): If a string, show
+                progress bar with this key. If True, show progress bar and
+                generate the key. If False, do not show progress bar. Defaults
+                to True.
 
         Raises:
             ValueError: If images or masks are not tensors.
@@ -102,8 +105,15 @@ class Featurizer(serialize.SerializableModule):
         loader = data.DataLoader(dataset,
                                  batch_size=batch_size,
                                  num_workers=num_workers)
-        if display_progress_as is not None:
+        if isinstance(display_progress_as, str) or display_progress_as:
+            if not isinstance(display_progress_as, str):
+                if isinstance(dataset, (datasets.TopImagesDataset,
+                                        datasets.AnnotatedTopImagesDataset)):
+                    display_progress_as = f'featurize {dataset.name}'
+                else:
+                    display_progress_as = 'featurize dataset'
             loader = tqdm(loader, desc=display_progress_as)
+
         for batch in loader:
             images = batch[image_index]
             if not isinstance(images, torch.Tensor):
