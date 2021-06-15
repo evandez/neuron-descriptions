@@ -299,7 +299,8 @@ class WordAnnotator(serialize.SerializableModule):
 
         predictions = []
         for (inputs,) in loader:
-            outputs = self(inputs, **kwargs)
+            with torch.no_grad():
+                outputs = self(inputs, **kwargs)
             predictions.append(outputs)
 
         probabilities = torch.cat([pred.probabilities for pred in predictions])
