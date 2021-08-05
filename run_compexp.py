@@ -115,14 +115,13 @@ for layer in layers:
             # If our model is generative: the images come from the model, not
             # from the data batch.
             if generative:
-                assert isinstance(config.dissection,
-                                  zoo.GenerativeModelDissectionConfig)
-                transform_inputs = (config.dissection.transform_inputs or
-                                    transforms.identities)
-                transform_hiddens = (config.dissection.transform_hiddens or
-                                     transforms.identity)
-                transform_outputs = (config.dissection.transform_outputs or
-                                     transforms.identity)
+                kwargs = config.dissection.kwargs
+                transform_inputs = kwargs.get('transform_inputs',
+                                              transforms.identities)
+                transform_hiddens = kwargs.get('transform_hiddens',
+                                               transforms.identity)
+                transform_outputs = kwargs.get('transform_outputs',
+                                               transforms.identity)
 
                 with torch.no_grad():
                     inputs = transform_inputs(inputs)
@@ -133,12 +132,11 @@ for layer in layers:
             # If our model is discriminative: the images come from the dataset,
             # and we just need to compute activations.
             else:
-                assert isinstance(config.dissection,
-                                  zoo.DiscriminativeModelDissectionConfig)
-                transform_inputs = (config.dissection.transform_inputs or
-                                    transforms.identity)
-                transform_outputs = (config.dissection.transform_outputs or
-                                     transforms.identity)
+                kwargs = config.dissection.kwargs
+                transform_inputs = kwargs.get('transform_inputs',
+                                              transforms.identities)
+                transform_outputs = kwargs.get('transform_outputs',
+                                               transforms.identity)
 
                 images, *_ = inputs  # Just assume images are first...
                 with torch.no_grad():
