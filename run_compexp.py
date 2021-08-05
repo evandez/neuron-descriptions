@@ -166,7 +166,7 @@ for layer in layers:
         masks = tally.tally_cat_dict(compute_segs_and_unit_masks,
                                      dataset,
                                      batch_size=args.batch_size,
-                                     cachefile=args.cache_file /
+                                     cachefile=args.cache_dir /
                                      f'{cache_key}_seg_unit_masks.npz')
 
     # Now...finally...we can do the CompExp labeling.
