@@ -56,7 +56,7 @@ if isinstance(config.dissection, zoo.GenerativeModelDissectionConfig):
     dataset = config.dissection.dataset
     generative = True
 
-dataset = zoo.dataset(dataset)
+dataset = zoo.dataset(dataset, path=args.dataset_path)
 
 # Load the segmentation model for later.
 segmodel_cache_dir = args.cache_dir / 'segmodel'
