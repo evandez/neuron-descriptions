@@ -1,18 +1,21 @@
 """Functions for dissecting convolutional units in vision models."""
 import pathlib
 import shutil
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Tuple
 
 from lv.dissection import transforms
 from lv.ext.netdissect import imgviz
 from lv.third_party.netdissect import (imgsave, nethook, pbar, renormalize,
-                                       tally)
+                                       runningstats, tally)
 from lv.utils.typing import Device, Layer, PathLike, TensorPair
 
 import numpy
 import torch
 from torch import nn
 from torch.utils import data
+
+DissectionResults = Tuple[runningstats.RunningTopK,
+                          runningstats.RunningQuantile]
 
 
 def run(compute_topk_and_quantile: Callable[..., TensorPair],
@@ -34,7 +37,7 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
         clear_cache_files: bool = False,
         clear_results_dir: bool = False,
         clear_viz_dir: bool = False,
-        display_progress: bool = True) -> None:
+        display_progress: bool = True) -> DissectionResults:
     """Find and visualize the top-activating images for each unit.
 
     Top-activating images are found with network dissection [Bau et al., 2017].
@@ -99,6 +102,9 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
     Raises:
         ValueError: If `k` or `quantile` are invalid.
 
+    Returns:
+        DissectionResults: The top-k and quantile statistics for every unit.
+
     """
     if k < 1:
         raise ValueError(f'must have k >= 1, got k={k}')
@@ -139,7 +145,7 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
             shutil.rmtree(results_dir)
         directory.mkdir(exist_ok=True, parents=True)
 
-    # Compute activation statistics across dataset.
+    # We always compute activation statistics across dataset.
     if display_progress:
         pbar.descnext('tally activations')
     topk, rq = tally.tally_topk_and_quantile(compute_topk_and_quantile,
@@ -150,26 +156,32 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
                                              pin_memory=True,
                                              cachefile=tally_cache_file)
 
-    # Now compute top images and masks for the highest-activating pixels.
-    if display_progress:
-        pbar.descnext('compute top images')
-    levels = rq.quantiles(quantile).reshape(-1)
-    viz = imgviz.ImageVisualizer(output_size,
-                                 image_size=image_size,
-                                 renormalizer=renormalizer,
-                                 source=dataset,
-                                 level=levels)
-    masked, images, masks = viz.individual_masked_images_for_topk(
-        compute_activations,
-        dataset,
-        topk,
-        k=k,
-        batch_size=batch_size,
-        num_workers=num_workers,
-        pin_memory=True,
-        cachefile=masks_cache_file)
+    # Now compute top images and masks for the highest-activating pixels if
+    # there is any reason to do so.
+    masked, images, masks = None, None, None
+    if save_results or save_viz or masks_cache_file is not None:
+        if display_progress:
+            pbar.descnext('compute top images')
+        levels = rq.quantiles(quantile).reshape(-1)
+        viz = imgviz.ImageVisualizer(output_size,
+                                     image_size=image_size,
+                                     renormalizer=renormalizer,
+                                     source=dataset,
+                                     level=levels)
+        masked, images, masks = viz.individual_masked_images_for_topk(
+            compute_activations,
+            dataset,
+            topk,
+            k=k,
+            batch_size=batch_size,
+            num_workers=num_workers,
+            pin_memory=True,
+            cachefile=masks_cache_file)
 
     if save_results:
+        assert images is not None
+        assert masks is not None
+
         # Save the top images and masks in easily accessible numpy files.
         if display_progress:
             pbar.descnext('saving top images')
@@ -186,6 +198,8 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
             numpy.savetxt(str(metadata_file), metadata, delimiter=',', fmt=fmt)
 
     if save_viz:
+        assert masked is not None
+
         # Now save the top images with the masks overlaid. We save each image
         # individually so they can be visualized and/or shown on MTurk.
         imgsave.save_image_set(masked,
@@ -195,10 +209,12 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
         # The lightbox lets us view all the masked images at once. Handy!
         lightbox_dir = pathlib.Path(__file__).parents[1] / 'third_party'
         lightbox_file = lightbox_dir / 'lightbox.html'
-        for unit in range(len(images)):
+        for unit in range(len(masked)):
             unit_dir = viz_dir / f'unit_{unit}'
             unit_lightbox_file = unit_dir / '+lightbox.html'
             shutil.copy(lightbox_file, unit_lightbox_file)
+
+    return topk, rq
 
 
 def discriminative(
@@ -208,7 +224,7 @@ def discriminative(
         results_dir: Optional[PathLike] = None,
         transform_inputs: transforms.TransformToTuple = transforms.first,
         transform_outputs: transforms.TransformToTensor = transforms.identity,
-        **kwargs: Any) -> None:
+        **kwargs: Any) -> DissectionResults:
     """Run dissection on a discriminative model.
 
     That is, a model for which image goes in, prediction comes out. Its outputs
@@ -232,6 +248,9 @@ def discriminative(
             result to netdissect. Defaults to identity function, i.e. the raw
             data will be tracked by netdissect.
 
+    Returns:
+        DissectionResults: The top-k and quantile statistics for every unit.
+
     """
     model.to(device)
 
@@ -252,11 +271,11 @@ def discriminative(
         outputs = transform_outputs(outputs)
         return outputs
 
-    run(compute_topk_and_quantile,
-        compute_activations,
-        dataset,
-        results_dir=results_dir,
-        **kwargs)
+    return run(compute_topk_and_quantile,
+               compute_activations,
+               dataset,
+               results_dir=results_dir,
+               **kwargs)
 
 
 def sequential(model: nn.Sequential,
@@ -264,7 +283,7 @@ def sequential(model: nn.Sequential,
                layer: Optional[Layer] = None,
                results_dir: Optional[PathLike] = None,
                viz_dir: Optional[PathLike] = None,
-               **kwargs: Any) -> None:
+               **kwargs: Any) -> DissectionResults:
     """Run dissection on a sequential discriminative model.
 
     That is, a model for which image goes in, prediction comes out.
@@ -288,6 +307,9 @@ def sequential(model: nn.Sequential,
             If set and layer is also set, layer name will be appended to path.
             Defaults to same as `run`.
 
+    Returns:
+        DissectionResults: The top-k and quantile statistics for every unit.
+
     """
     if layer is not None:
         model = nethook.subsequence(model,
@@ -300,11 +322,11 @@ def sequential(model: nn.Sequential,
             directory /= str(layer) if layer is not None else 'outputs'
         return directory
 
-    discriminative(model,
-                   dataset,
-                   results_dir=resolve(results_dir),
-                   viz_dir=resolve(viz_dir),
-                   **kwargs)
+    return discriminative(model,
+                          dataset,
+                          results_dir=resolve(results_dir),
+                          viz_dir=resolve(viz_dir),
+                          **kwargs)
 
 
 def generative(
@@ -317,7 +339,7 @@ def generative(
         transform_inputs: transforms.TransformToTuple = transforms.identities,
         transform_hiddens: transforms.TransformToTensor = transforms.identity,
         transform_outputs: transforms.TransformToTensor = transforms.identity,
-        **kwargs: Any) -> None:
+        **kwargs: Any) -> DissectionResults:
     """Run dissection on a generative model of images.
 
     That is, a model for which representation goes in, image comes out.
@@ -357,6 +379,9 @@ def generative(
             result to netdissect. Defaults to identity function, i.e. the raw
             data will be tracked by netdissect.
 
+    Returns:
+        DissectionResults: The top-k and quantile statistics for every unit.
+
     """
     if results_dir is not None:
         results_dir = pathlib.Path(results_dir) / str(layer)
@@ -385,9 +410,9 @@ def generative(
             images = transform_outputs(images)
             return hiddens, images
 
-        run(compute_topk_and_quantile,
-            compute_activations,
-            dataset,
-            results_dir=results_dir,
-            viz_dir=viz_dir,
-            **kwargs)
+        return run(compute_topk_and_quantile,
+                   compute_activations,
+                   dataset,
+                   results_dir=results_dir,
+                   viz_dir=viz_dir,
+                   **kwargs)
