@@ -155,8 +155,17 @@ def model():
     return nn.Sequential(collections.OrderedDict(layers))
 
 
+@pytest.mark.parametrize(
+    'save_results,save_viz',
+    (
+        (False, False),
+        (False, True),
+        (True, False),
+        (True, True),
+    ),
+)
 def test_discriminative(model, dataset, results_dir, viz_dir, tally_cache_file,
-                        masks_cache_file):
+                        masks_cache_file, save_results, save_viz):
     """Test discriminative runs in normal case."""
     dissect.discriminative(model,
                            dataset,
@@ -168,36 +177,29 @@ def test_discriminative(model, dataset, results_dir, viz_dir, tally_cache_file,
                            k=conftest.N_TOP_IMAGES_PER_UNIT,
                            image_size=conftest.IMAGE_SIZE,
                            output_size=conftest.IMAGE_SIZE,
+                           save_results=save_results,
+                           save_viz=save_viz,
                            tally_cache_file=tally_cache_file,
                            masks_cache_file=masks_cache_file,
                            clear_cache_files=True,
                            clear_results_dir=True)
-    assert_results_dir_populated(results_dir)
-    assert_viz_dir_populated(viz_dir)
+    if save_results:
+        assert_results_dir_populated(results_dir)
+    if save_viz:
+        assert_viz_dir_populated(viz_dir)
 
 
-def test_discriminative_no_viz(model, dataset, results_dir, tally_cache_file,
-                               masks_cache_file):
-    """Test discriminative runs when save_viz=False."""
-    dissect.discriminative(model,
-                           dataset,
-                           device='cpu',
-                           results_dir=results_dir,
-                           display_progress=False,
-                           num_workers=1,
-                           k=conftest.N_TOP_IMAGES_PER_UNIT,
-                           image_size=conftest.IMAGE_SIZE,
-                           output_size=conftest.IMAGE_SIZE,
-                           tally_cache_file=tally_cache_file,
-                           masks_cache_file=masks_cache_file,
-                           clear_cache_files=True,
-                           clear_results_dir=True,
-                           save_viz=False)
-    assert_results_dir_populated(results_dir)
-
-
+@pytest.mark.parametrize(
+    'save_results,save_viz',
+    (
+        (False, False),
+        (False, True),
+        (True, False),
+        (True, True),
+    ),
+)
 def test_sequential(model, dataset, results_dir, viz_dir, tally_cache_file,
-                    masks_cache_file):
+                    masks_cache_file, save_results, save_viz):
     """Test sequential runs in normal case."""
     dissect.sequential(model,
                        dataset,
@@ -210,12 +212,16 @@ def test_sequential(model, dataset, results_dir, viz_dir, tally_cache_file,
                        k=conftest.N_TOP_IMAGES_PER_UNIT,
                        image_size=conftest.IMAGE_SIZE,
                        output_size=conftest.IMAGE_SIZE,
+                       save_results=save_results,
+                       save_viz=save_viz,
                        tally_cache_file=tally_cache_file,
                        masks_cache_file=masks_cache_file,
                        clear_cache_files=True,
                        clear_results_dir=True)
-    assert_results_dir_populated(results_dir, layer='conv_2')
-    assert_viz_dir_populated(viz_dir, layer='conv_2')
+    if save_results:
+        assert_results_dir_populated(results_dir, layer='conv_2')
+    if save_viz:
+        assert_viz_dir_populated(viz_dir, layer='conv_2')
 
 
 class FeaturesToImage(nn.Module):
@@ -228,8 +234,17 @@ class FeaturesToImage(nn.Module):
         return torch.sigmoid(features[:, :3])
 
 
+@pytest.mark.parametrize(
+    'save_results,save_viz',
+    (
+        (False, False),
+        (False, True),
+        (True, False),
+        (True, True),
+    ),
+)
 def test_generative(model, dataset, results_dir, viz_dir, tally_cache_file,
-                    masks_cache_file):
+                    masks_cache_file, save_results, save_viz):
     """Test generative runs in normal case."""
     layers = list(model.named_children())
     layers.append(('output', FeaturesToImage()))
@@ -245,9 +260,13 @@ def test_generative(model, dataset, results_dir, viz_dir, tally_cache_file,
                        k=conftest.N_TOP_IMAGES_PER_UNIT,
                        image_size=conftest.IMAGE_SIZE,
                        output_size=conftest.IMAGE_SIZE,
+                       save_results=save_results,
+                       save_viz=save_viz,
                        tally_cache_file=tally_cache_file,
                        masks_cache_file=masks_cache_file,
                        clear_cache_files=True,
                        clear_results_dir=True)
-    assert_results_dir_populated(results_dir, layer='conv_2')
-    assert_viz_dir_populated(viz_dir, layer='conv_2')
+    if save_results:
+        assert_results_dir_populated(results_dir, layer='conv_2')
+    if save_viz:
+        assert_viz_dir_populated(viz_dir, layer='conv_2')

@@ -29,8 +29,8 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
         viz_dir: Optional[PathLike] = None,
         tally_cache_file: Optional[PathLike] = None,
         masks_cache_file: Optional[PathLike] = None,
+        save_results: bool = True,
         save_viz: bool = True,
-        save_metadata: bool = True,
         clear_cache_files: bool = False,
         clear_results_dir: bool = False,
         clear_viz_dir: bool = False,
@@ -80,10 +80,11 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
         masks_cache_file (Optional[PathLike], optional): Write intermediate
             results for determining top-k image masks to this file.
             Defaults to None.
+        save_results (bool, optional): If set, save dissection results and
+            metadata to results_dir. Otherwise, save nothing (viz may still
+            be saved, see `save_viz` arg). Defaults to True.
         save_viz (bool, optional): If set, save individual masked images to
             `viz_dir`. Otherwise, `viz_dir` will not be used. Defaults to True.
-        save_metadata (bool, optional): If set, save dissection metadata to CSV
-            files. Defaults to True.
         clear_cache_files (bool, optional): If set, clear existing cache files
             with the same name as any of the *_cache_file arguments to this
             function. Useful if you want to redo all computation.
@@ -113,14 +114,10 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
     if not isinstance(results_dir, pathlib.Path):
         results_dir = pathlib.Path(results_dir)
 
-    # Default the viz_dir if we want to save visualizations.
-    if save_viz:
-        if viz_dir is None:
-            viz_dir = results_dir / 'viz'
-        if not isinstance(viz_dir, pathlib.Path):
-            viz_dir = pathlib.Path(viz_dir)
-    else:
-        viz_dir = None  # Won't be used, so force it to None.
+    if viz_dir is None:
+        viz_dir = results_dir / 'viz'
+    if not isinstance(viz_dir, pathlib.Path):
+        viz_dir = pathlib.Path(viz_dir)
 
     # Clear cache files if requested.
     if clear_cache_files:
@@ -132,14 +129,15 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
                 cache_file.unlink()
 
     # Clear results and viz directories if requested.
-    if results_dir.exists() and clear_results_dir:
-        shutil.rmtree(results_dir)
-    results_dir.mkdir(exist_ok=True, parents=True)
-
-    if viz_dir is not None:
-        if viz_dir.exists() and clear_viz_dir:
-            shutil.rmtree(viz_dir)
-        viz_dir.mkdir(exist_ok=True, parents=True)
+    for save, clear, directory in (
+        (save_results, clear_results_dir, results_dir),
+        (save_viz, clear_viz_dir, viz_dir),
+    ):
+        if not save:
+            continue
+        if clear and directory.exists():
+            shutil.rmtree(results_dir)
+        directory.mkdir(exist_ok=True, parents=True)
 
     # Compute activation statistics across dataset.
     if display_progress:
@@ -171,16 +169,25 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
         pin_memory=True,
         cachefile=masks_cache_file)
 
-    # Save the top images and masks in easily accessible numpy files.
-    if display_progress:
-        pbar.descnext('saving top images')
-    numpy.save(f'{results_dir}/images.npy', images)
-    numpy.save(f'{results_dir}/masks.npy', masks)
+    if save_results:
+        # Save the top images and masks in easily accessible numpy files.
+        if display_progress:
+            pbar.descnext('saving top images')
+        numpy.save(f'{results_dir}/images.npy', images)
+        numpy.save(f'{results_dir}/masks.npy', masks)
 
-    # Now save the top images with the masks overlaid. We save each image
-    # individually so they can be visualized and/or shown on MTurk.
+        # Finally, save the IDs of all top images and the activation values
+        # associated with each unit and image.
+        activations, ids = topk.result()
+        for metadata, name, fmt in ((activations, 'activations', '%.5e'),
+                                    (ids, 'ids', '%i')):
+            metadata = metadata.view(len(images), k).cpu().numpy()
+            metadata_file = results_dir / f'{name}.csv'
+            numpy.savetxt(str(metadata_file), metadata, delimiter=',', fmt=fmt)
+
     if save_viz:
-        assert viz_dir is not None
+        # Now save the top images with the masks overlaid. We save each image
+        # individually so they can be visualized and/or shown on MTurk.
         imgsave.save_image_set(masked,
                                f'{viz_dir}/unit_%d/image_%d.png',
                                sourcefile=masks_cache_file)
@@ -192,16 +199,6 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
             unit_dir = viz_dir / f'unit_{unit}'
             unit_lightbox_file = unit_dir / '+lightbox.html'
             shutil.copy(lightbox_file, unit_lightbox_file)
-
-    # Finally, save the IDs of all top images and the activation values
-    # associated with each unit and image.
-    if save_metadata:
-        activations, ids = topk.result()
-        for metadata, name, fmt in ((activations, 'activations', '%.5e'),
-                                    (ids, 'ids', '%i')):
-            metadata = metadata.view(len(images), k).cpu().numpy()
-            metadata_file = results_dir / f'{name}.csv'
-            numpy.savetxt(str(metadata_file), metadata, delimiter=',', fmt=fmt)
 
 
 def discriminative(
