@@ -103,7 +103,8 @@ for layer in layers:
     # image in the dataset.
     pbar.descnext('compute seg/unit masks')
     with nethook.InstrumentedModel(model) as instr:
-        instr.retain_layer(layer, detach=False)
+        if generative:
+            instr.retain_layer(layer, detach=False)
 
         upsampler = None
 
@@ -134,15 +135,15 @@ for layer in layers:
             else:
                 kwargs = config.dissection.kwargs
                 transform_inputs = kwargs.get('transform_inputs',
-                                              transforms.identities)
+                                              transforms.first)
                 transform_outputs = kwargs.get('transform_outputs',
                                                transforms.identity)
 
                 images, *_ = inputs  # Just assume images are first...
                 with torch.no_grad():
                     inputs = transform_inputs(*inputs)
-                    instr(*inputs)
-                    acts = transform_outputs(instr.retained_layer(layer))
+                    acts = instr(*inputs, layer=layer)
+                    acts = transform_outputs(acts)
 
             with torch.no_grad():
                 segs = segmodel.segment_batch(segrenorm(images), downsample=4)
