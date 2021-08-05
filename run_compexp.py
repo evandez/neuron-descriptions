@@ -124,7 +124,7 @@ for layer in layers:
                                                transforms.identity)
 
                 with torch.no_grad():
-                    inputs = transform_inputs(inputs)
+                    inputs = transform_inputs(*inputs)
                     outputs = model(*inputs)
                     images = transform_outputs(outputs)
                     acts = transform_hiddens(instr.retained_layer(layer))
@@ -140,7 +140,7 @@ for layer in layers:
 
                 images, *_ = inputs  # Just assume images are first...
                 with torch.no_grad():
-                    inputs = transform_inputs(inputs)
+                    inputs = transform_inputs(*inputs)
                     model(*inputs)
                     acts = transform_outputs(instr.retained_layer(layer))
 
