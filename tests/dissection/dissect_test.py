@@ -176,6 +176,26 @@ def test_discriminative(model, dataset, results_dir, viz_dir, tally_cache_file,
     assert_viz_dir_populated(viz_dir)
 
 
+def test_discriminative_no_viz(model, dataset, results_dir, tally_cache_file,
+                               masks_cache_file):
+    """Test discriminative runs when save_viz=False."""
+    dissect.discriminative(model,
+                           dataset,
+                           device='cpu',
+                           results_dir=results_dir,
+                           display_progress=False,
+                           num_workers=1,
+                           k=conftest.N_TOP_IMAGES_PER_UNIT,
+                           image_size=conftest.IMAGE_SIZE,
+                           output_size=conftest.IMAGE_SIZE,
+                           tally_cache_file=tally_cache_file,
+                           masks_cache_file=masks_cache_file,
+                           clear_cache_files=True,
+                           clear_results_dir=True,
+                           save_viz=False)
+    assert_results_dir_populated(results_dir)
+
+
 def test_sequential(model, dataset, results_dir, viz_dir, tally_cache_file,
                     masks_cache_file):
     """Test sequential runs in normal case."""
