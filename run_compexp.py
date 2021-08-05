@@ -97,7 +97,7 @@ for layer in layers:
                                    save_viz=False,
                                    tally_cache_file=tally_cache_file,
                                    **config.dissection.kwargs)
-    levels = rq.quantiles(args.quantile).reshape(-1).to(device)
+    levels = rq.quantiles(args.quantile).reshape(1, -1, 1, 1).to(device)
 
     # Compute unit masks and "ground truth" segmentation masks for every
     # image in the dataset.
