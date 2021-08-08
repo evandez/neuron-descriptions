@@ -216,6 +216,7 @@ for model in args.models:
                                             device=device)
             bleu = captioner.bleu(test, predictions=predictions)
             rouge = captioner.rouge(test, predictions=predictions)
+            bert_score = captioner.bert_score(test, predictions=predictions)
 
             # Log ALL the things!
             log = {
@@ -232,6 +233,8 @@ for model in args.models:
             for kind, scores in rouge.items():
                 for key, score in scores.items():
                     log[f'{kind}-{key}'] = score
+            for kind, score in bert_score.items():
+                log[f'bert_score-{kind}'] = score
             log['samples'] = [
                 wandb.Image(
                     test[index].as_pil_image_grid(),

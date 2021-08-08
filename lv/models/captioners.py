@@ -6,6 +6,7 @@ from lv.models import annotators, featurizers, lms, vectors
 from lv.utils import lang, serialize, training
 from lv.utils.typing import Device, StrSequence
 
+import bert_score
 import rouge
 import sacrebleu
 import torch
@@ -611,6 +612,51 @@ class Decoder(serialize.SerializableModule):
                                  references,
                                  avg=True,
                                  ignore_empty=True)
+
+    def bert_score(self,
+                   dataset: data.Dataset,
+                   annotation_index: int = 4,
+                   predictions: Optional[StrSequence] = None,
+                   device: Optional[Device] = None,
+                   **kwargs: Any) -> Mapping[str, float]:
+        """Return average BERTScore P/R/F.
+
+        Args:
+            dataset (data.Dataset): The test dataset.
+            annotation_index (int, optional): Index of language annotations in
+                dataset samples. Defaults to 4 to be compatible with
+                AnnotatedTopImagesDataset.
+            predictions (Optional[StrSequence], optional): Precomputed
+                predicted captions for all images in the dataset.
+                By default, computed from the dataset using `Decoder.predict`.
+            device (Optional[Device], optional): Run BERT on this device.
+                Defaults to torch default.
+
+        Returns:
+            Mapping[str, float]: Average BERTScore precision/recall/F1.
+
+        """
+        if predictions is None:
+            predictions = self.predict(dataset, **kwargs)
+        predictions = [pred.lower().strip('. ') for pred in predictions]
+
+        references = []
+        for index in range(len(predictions)):
+            annotations = dataset[index][annotation_index]
+            if isinstance(annotations, str):
+                annotations = [annotations]
+            # Preprocess target annotations in the same way as the predictions.
+            annotations = [anno.lower().strip('. ') for anno in annotations]
+            references.append(annotations)
+
+        prf = bert_score.score(predictions,
+                               references,
+                               lang='en',
+                               device=device)
+        return {
+            key: scores.mean().item()
+            for key, scores in zip(('p', 'r', 'f'), prf)
+        }
 
     def predict(self,
                 dataset: data.Dataset,
