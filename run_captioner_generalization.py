@@ -6,6 +6,7 @@ from typing import Mapping, Optional, Sequence, Sized, Tuple, cast
 from lv import zoo
 from lv.models import annotators, captioners, featurizers
 
+import bert_score
 import wandb
 from torch.utils import data
 
@@ -112,6 +113,12 @@ assert run is not None, 'failed to initialize wandb?'
 
 device = 'cuda' if args.cuda else 'cpu'
 
+# Load BERTScorer once up front.
+bert_scorer = bert_score.BERTScorer(lang='en',
+                                    idf=True,
+                                    rescale_with_baseline=True,
+                                    device=device)
+
 # Load all featurizers in advance to avoid issues with reading model files
 # after Kerberos tickets expire.
 masked_image_featurizer = featurizers.MaskedImagePyramidFeaturizer().to(device)
@@ -217,7 +224,9 @@ for model in args.models:
                                             device=device)
             bleu = captioner.bleu(test, predictions=predictions)
             rouge = captioner.rouge(test, predictions=predictions)
-            bert_score = captioner.bert_score(test, predictions=predictions)
+            bert_score = captioner.bert_score(test,
+                                              predictions=predictions,
+                                              scorer=bert_scorer)
 
             # Log ALL the things!
             log = {
