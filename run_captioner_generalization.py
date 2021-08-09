@@ -67,7 +67,8 @@ SAT_WF = 'sat+wf'
 SAT_MF_WF = 'sat+mf+wf'
 MODELS = (SAT, SAT_MF, SAT_WF, SAT_MF_WF)
 
-parser = argparse.ArgumentParser(description='run captioner abalations')
+parser = argparse.ArgumentParser(
+    description='run captioner generalization experiments')
 parser.add_argument('--experiments',
                     nargs='+',
                     help='experiments to run (default: all experiments)')
