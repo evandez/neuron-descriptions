@@ -115,7 +115,6 @@ device = 'cuda' if args.cuda else 'cpu'
 
 # Load BERTScorer once up front.
 bert_scorer = bert_score.BERTScorer(lang='en',
-                                    idf=True,
                                     rescale_with_baseline=True,
                                     device=device)
 
