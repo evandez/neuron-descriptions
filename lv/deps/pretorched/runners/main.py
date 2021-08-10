@@ -14,8 +14,8 @@ import torch.multiprocessing as mp
 import torch.utils.data
 import torch.utils.data.distributed
 
-from third_party.pretorched import loggers
-from third_party.pretorched.metrics import accuracy
+from lv.deps.pretorched import loggers
+from lv.deps.pretorched.metrics import accuracy
 
 from . import core
 from . import config as cfg

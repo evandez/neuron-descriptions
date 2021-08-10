@@ -18,7 +18,7 @@ import torch.utils.data.distributed
 import torchvision.transforms as transforms
 import torchvision.models as models
 
-from lv.third_party.pretorched.runners import core, config as cfg
+from lv.deps.pretorched.runners import core, config as cfg
 
 model_names = sorted(name for name in models.__dict__
                      if name.islower() and not name.startswith("__")

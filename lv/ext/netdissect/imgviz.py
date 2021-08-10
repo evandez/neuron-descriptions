@@ -1,7 +1,7 @@
 """Extensions to the imgviz module."""
 from typing import Any, Callable, Iterator, Sequence, Tuple, Union
 
-from lv.third_party.netdissect import imgviz, runningstats, tally
+from lv.deps.netdissect import imgviz, runningstats, tally
 from lv.utils.typing import TensorPair, TensorTriplet
 
 import torch
@@ -10,7 +10,7 @@ from torch.utils import data
 
 
 def __getattr__(name: str) -> Any:
-    """Forward to `third_party.netdissect.imgviz`."""
+    """Forward to `deps.netdissect.imgviz`."""
     return getattr(imgviz, name)
 
 

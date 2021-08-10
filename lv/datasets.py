@@ -4,7 +4,7 @@ import csv
 import pathlib
 from typing import Any, Iterable, NamedTuple, Optional, Sequence, Union
 
-from lv.third_party.netdissect import renormalize
+from lv.deps.netdissect import renormalize
 from lv.utils.typing import Layer, PathLike, Unit
 
 import numpy

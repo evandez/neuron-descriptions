@@ -9,8 +9,8 @@ from torch.nn import init
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 
-from third_party.pretorched import data, models, optim, utils
-from third_party.pretorched.data import samplers, transforms
+from lv.deps.pretorched import data, models, optim, utils
+from lv.deps.pretorched.data import samplers, transforms
 
 from . import config as cfg
 

@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from torch.nn.modules.utils import _triple
 
-from lv.third_party.pretorched.models import resnet3D
+from lv.deps.pretorched.models import resnet3D
 
 __all__ = [
     'R2Plus1D', 'r2plus1d10', 'r2plus1d18', 'r2plus1d34', 'r2plus1d50', 'r2plus1d101',

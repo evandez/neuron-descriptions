@@ -2,15 +2,15 @@
 import collections
 from typing import Any, List, NamedTuple, Sequence, Tuple
 
-from lv.third_party.pretorched import layers
-from lv.third_party.pretorched.gans import biggan
+from lv.deps.pretorched import layers
+from lv.deps.pretorched.gans import biggan
 
 import torch
 from torch import nn
 
 
 def __getattr__(name: str) -> Any:
-    """Forward to `pretorched.gans.biggan`."""
+    """Forward to `lv.deps.pretorched.gans.biggan`."""
     return getattr(biggan, name)
 
 

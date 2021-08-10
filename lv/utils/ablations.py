@@ -3,7 +3,7 @@ import collections
 import contextlib
 from typing import Callable, ContextManager, Sequence
 
-from lv.third_party.netdissect import nethook
+from lv.deps.netdissect import nethook
 from lv.utils.typing import Unit
 
 import torch

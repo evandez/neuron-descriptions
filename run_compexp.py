@@ -9,9 +9,9 @@ import argparse
 import pathlib
 from typing import Any, Mapping
 
+from lv.deps.netdissect import (nethook, pbar, renormalize, segmenter, tally,
+                                upsample)
 from lv.dissection import dissect, transforms, zoo
-from lv.third_party.netdissect import (nethook, pbar, renormalize, segmenter,
-                                       tally, upsample)
 
 import torch
 

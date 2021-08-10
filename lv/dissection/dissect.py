@@ -3,10 +3,10 @@ import pathlib
 import shutil
 from typing import Any, Callable, Optional, Tuple
 
+from lv.deps.netdissect import (imgsave, nethook, pbar, renormalize,
+                                runningstats, tally)
 from lv.dissection import transforms
 from lv.ext.netdissect import imgviz
-from lv.third_party.netdissect import (imgsave, nethook, pbar, renormalize,
-                                       runningstats, tally)
 from lv.utils.typing import Device, Layer, PathLike, TensorPair
 
 import numpy
@@ -207,7 +207,7 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
                                sourcefile=masks_cache_file)
 
         # The lightbox lets us view all the masked images at once. Handy!
-        lightbox_dir = pathlib.Path(__file__).parents[1] / 'third_party'
+        lightbox_dir = pathlib.Path(__file__).parents[1] / 'deps'
         lightbox_file = lightbox_dir / 'lightbox.html'
         for unit in range(len(masked)):
             unit_dir = viz_dir / f'unit_{unit}'

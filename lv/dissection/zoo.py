@@ -3,12 +3,12 @@ import dataclasses
 from typing import Any, Iterable, Mapping, Optional, Tuple
 
 from lv import zoo
+from lv.deps import alexnet, resnet152
+from lv.deps.netdissect import renormalize
 from lv.dissection import datasets as lv_datasets
 from lv.dissection import transforms as lv_transforms
 from lv.ext.pretorched.gans import biggan
 from lv.ext.torchvision import models
-from lv.third_party import alexnet, resnet152
-from lv.third_party.netdissect import renormalize
 from lv.utils.typing import Layer
 from lv.zoo import (KEY_ALEXNET, KEY_BIGGAN, KEY_IMAGENET, KEY_PLACES365,
                     KEY_RESNET152)

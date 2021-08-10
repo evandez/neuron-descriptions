@@ -8,7 +8,7 @@ import torch
 from pkg_resources import parse_version
 from torch.utils.tensorboard import SummaryWriter
 
-from lv.third_party.pretorched.utils import cache
+from lv.deps.pretorched.utils import cache
 from .base import LoggerBase, rank_zero_only, History
 
 

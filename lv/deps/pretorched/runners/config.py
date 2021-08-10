@@ -2,7 +2,7 @@ import argparse
 import os
 from collections import defaultdict
 
-import third_party.pretorched.models as models
+import lv.deps.pretorched.models as models
 
 model_names = sorted(name for name in models.__dict__
                      if name.islower() and not name.startswith("__")

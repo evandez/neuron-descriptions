@@ -6,9 +6,9 @@ import random
 
 import lv.zoo
 from lv import datasets
+from lv.deps.netdissect import renormalize
 from lv.dissection import dissect, zoo
 from lv.models import annotators, captioners, classifiers, featurizers
-from lv.third_party.netdissect import renormalize
 from lv.utils import logging, training
 
 import numpy

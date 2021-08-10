@@ -3,8 +3,8 @@ from typing import (Any, Callable, Mapping, Optional, Sequence, Tuple, Type,
                     Union, overload)
 
 from lv import datasets
+from lv.deps.netdissect import nethook, renormalize
 from lv.ext.torchvision import models
-from lv.third_party.netdissect import nethook, renormalize
 from lv.utils import serialize
 from lv.utils.typing import Device
 

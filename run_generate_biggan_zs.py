@@ -2,7 +2,7 @@
 import argparse
 import pathlib
 
-from lv.third_party.pretorched.gans import biggan, utils
+from lv.deps.pretorched.gans import biggan, utils
 
 import torch
 
