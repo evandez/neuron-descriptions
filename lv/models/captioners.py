@@ -1,4 +1,5 @@
 """Models for captioning neurons."""
+import warnings
 from typing import (Any, Mapping, NamedTuple, Optional, Sequence, Sized, Tuple,
                     Type, TypeVar, Union, cast, overload)
 
@@ -619,7 +620,7 @@ class Decoder(serialize.SerializableModule):
                    batch_size: int = 32,
                    predictions: Optional[StrSequence] = None,
                    device: Optional[Device] = None,
-                   scorer: Optional[bert_score.BERTScorer] = None,
+                   bert_scorer: Optional[bert_score.BERTScorer] = None,
                    **kwargs: Any) -> Mapping[str, float]:
         """Return average BERTScore P/R/F.
 
@@ -633,7 +634,7 @@ class Decoder(serialize.SerializableModule):
             predictions (Optional[StrSequence], optional): Precomputed
                 predicted captions for all images in the dataset.
                 By default, computed from the dataset using `Decoder.predict`.
-            scorer (Optional[bert_score.BERTScorer], optional): Pre-
+            bert_scorer (Optional[bert_score.BERTScorer], optional): Pre-
                 instantiated BERTScorer object. Defaults to none.
             device (Optional[Device], optional): Run BERT on this device.
                 Defaults to torch default.
@@ -642,11 +643,11 @@ class Decoder(serialize.SerializableModule):
             Mapping[str, float]: Average BERTScore precision/recall/F1.
 
         """
-        if scorer is None:
-            scorer = bert_score.BERTScorer(idf=True,
-                                           lang='en',
-                                           rescale_with_baseline=True,
-                                           device=device)
+        if bert_scorer is None:
+            bert_scorer = bert_score.BERTScorer(idf=True,
+                                                lang='en',
+                                                rescale_with_baseline=True,
+                                                device=device)
         if predictions is None:
             predictions = self.predict(dataset, **kwargs)
         predictions = [pred.lower().strip('. ') for pred in predictions]
@@ -660,7 +661,12 @@ class Decoder(serialize.SerializableModule):
             annotations = [anno.lower().strip('. ') for anno in annotations]
             references.append(annotations)
 
-        prf = scorer.score(predictions, references, batch_size=batch_size)
+        if bert_scorer.idf:
+            with warnings.catch_warnings():
+                warnings.filterwarnings('ignore', message=r'.*Overwriting.*')
+                bert_scorer.compute_idf([r for rs in references for r in rs])
+
+        prf = bert_scorer.score(predictions, references, batch_size=batch_size)
         return {
             key: scores.mean().item()
             for key, scores in zip(('p', 'r', 'f'), prf)
