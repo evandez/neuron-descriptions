@@ -262,7 +262,7 @@ class AnnotatedTopImagesDataset(data.Dataset):
                  layer_column: str = DEFAULT_LAYER_COLUMN,
                  unit_column: str = DEFAULT_UNIT_COLUMN,
                  annotation_column: str = DEFAULT_ANNOTATION_COLUMN,
-                 keep_unannotated_samples: bool = False,
+                 annotation_count: int = None,
                  **kwargs: Any):
         """Initialize the dataset.
 
@@ -278,9 +278,11 @@ class AnnotatedTopImagesDataset(data.Dataset):
                 Defaults to `DEFAULT_UNIT_COLUMN`.
             annotation_column (str, optional): CSV column containing
                 annotation. Defaults to `DEFAULT_ANNOTATION_COLUMN`.
-            keep_unannotated_samples (bool, optional): Keep top images for
-                units with no annotations. Otherwise, do not include them
-                in the dataset. Defaults to False.
+            annotation_count: (Optional[int], optional): Exact number of
+                annotations to keep for each sample. If a sample has fewer than
+                this many annotations, it will be excluded. If it has more,
+                throw out the extras. If this value is None, no samples will
+                be excluded. Defaults to None.
 
         Raises:
             FileNotFoundError: If annotations CSV file is not found.
@@ -307,17 +309,17 @@ class AnnotatedTopImagesDataset(data.Dataset):
             if column not in fields:
                 raise KeyError(f'annotations csv missing column: {column}')
 
-        annotations = collections.defaultdict(list)
+        annotations_by_layer_unit = collections.defaultdict(list)
         for row in rows:
             layer_str = row[layer_column]
             layer: Layer = int(layer_str) if layer_str.isdigit() else layer_str
             unit = int(row[unit_column])
             annotation = row[annotation_column]
-            annotations[layer, unit].append(annotation)
+            annotations_by_layer_unit[layer, unit].append(annotation)
 
         samples = []
         top_images_dataset = TopImagesDataset(root, *args, **kwargs)
-        if keep_unannotated_samples:
+        if annotation_count is None:
             for top_images in top_images_dataset.samples:
                 layer, unit = top_images.layer, top_images.unit
                 annotated_top_images = AnnotatedTopImages(
@@ -325,17 +327,21 @@ class AnnotatedTopImagesDataset(data.Dataset):
                     unit=top_images.unit,
                     images=top_images.images,
                     masks=top_images.masks,
-                    annotations=tuple(annotations[layer, unit]))
+                    annotations=tuple(annotations_by_layer_unit[layer, unit]))
                 samples.append(annotated_top_images)
         else:
-            for layer, unit in annotations.keys():
-                top_images = top_images_dataset.lookup(layer, unit)
+            for key, annotations in annotations_by_layer_unit.items():
+                if len(annotations) < annotation_count:
+                    continue
+                elif len(annotations) > annotation_count:
+                    annotations = annotations[:annotation_count]
+                top_images = top_images_dataset.lookup(*key)
                 annotated_top_images = AnnotatedTopImages(
                     layer=top_images.layer,
                     unit=top_images.unit,
                     images=top_images.images,
                     masks=top_images.masks,
-                    annotations=tuple(annotations[layer, unit]))
+                    annotations=tuple(annotations))
                 samples.append(annotated_top_images)
         self.samples = tuple(samples)
         self.samples_by_layer_unit = {(s.layer, s.unit): s for s in samples}

@@ -197,14 +197,21 @@ def test_annotated_top_images_as_pil_image_grid(annotated_top_images, opacity):
     assert isinstance(actual, Image.Image)
 
 
-@pytest.mark.parametrize('keep_unannotated_samples', (False, True))
-def test_annotated_top_images_dataset_init_no_keep_unannotated_samples(
+@pytest.mark.parametrize('annotation_count', (None, 1))
+def test_annotated_top_images_dataset_init_annotation_count(
         top_images_root, top_images_annotations_csv_file,
-        top_image_annotations, keep_unannotated_samples):
-    """Test AnnotatedTopImagesDataset.__init__, not keeping unannotated."""
+        top_image_annotations, annotation_count):
+    """Test AnnotatedTopImagesDataset.__init__, setting annotation_count."""
+    # Remove all L0 annotations.
     banned = conftest.layer(0)
     rows = [conftest.HEADER]
     rows += [anno for anno in top_image_annotations if anno[0] != banned]
+
+    # Add an extra one for L1.
+    expanded = conftest.layer(1)
+    rows += [anno for anno in top_image_annotations if anno[0] == expanded]
+
+    # Overwrite annotations file with our janky modifications.
     with top_images_annotations_csv_file.open('w') as handle:
         writer = csv.writer(handle)
         writer.writerows(rows)
@@ -215,12 +222,12 @@ def test_annotated_top_images_dataset_init_no_keep_unannotated_samples(
         layer_column=conftest.LAYER_COLUMN,
         unit_column=conftest.UNIT_COLUMN,
         annotation_column=conftest.ANNOTATION_COLUMN,
-        keep_unannotated_samples=keep_unannotated_samples,
+        annotation_count=annotation_count,
         display_progress=False)
     assert str(top_images_root).endswith(annotated_top_images_dataset.name)
 
     # Yeah, yeah, yeah, this is bad practice, I know...
-    if keep_unannotated_samples:
+    if annotation_count is None:
         assert len(annotated_top_images_dataset.samples) == conftest.N_SAMPLES
 
         actuals = [
@@ -230,6 +237,14 @@ def test_annotated_top_images_dataset_init_no_keep_unannotated_samples(
         assert len(actuals) == conftest.N_UNITS_PER_LAYER
         for actual in actuals:
             assert actual.annotations == ()
+
+        actuals = [
+            sample for sample in annotated_top_images_dataset.samples
+            if sample.layer == expanded
+        ]
+        assert len(actuals) == conftest.N_UNITS_PER_LAYER
+        for actual in actuals:
+            assert len(actual.annotations) == 2
     else:
         actual = len(annotated_top_images_dataset.samples)
         expected = (conftest.N_LAYERS - 1) * conftest.N_UNITS_PER_LAYER
@@ -239,6 +254,13 @@ def test_annotated_top_images_dataset_init_no_keep_unannotated_samples(
             sample.layer for sample in annotated_top_images_dataset.samples
         }
         assert banned not in layers
+        assert expanded in layers
+
+        lengths = {
+            len(sample.annotations)
+            for sample in annotated_top_images_dataset.samples
+        }
+        assert lengths == {annotation_count}
 
 
 def test_annotated_top_images_dataset_getitem(annotated_top_images_dataset,
