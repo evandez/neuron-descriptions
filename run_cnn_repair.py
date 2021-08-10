@@ -8,7 +8,7 @@ import lv.zoo
 from lv import datasets
 from lv.deps.netdissect import renormalize
 from lv.dissection import dissect, zoo
-from lv.models import annotators, captioners, classifiers, featurizers
+from lv.models import classifiers, decoders, encoders
 from lv.utils import logging, training
 
 import numpy
@@ -42,13 +42,6 @@ ANNOTATIONS = (
     lv.zoo.KEY_BIGGAN_PLACES365,
 )
 
-CAPTIONER_SAT = 'sat'
-CAPTIONER_SAT_MF = 'sat+mf'
-CAPTIONER_SAT_WF = 'sat+wf'
-CAPTIONER_SAT_MF_WF = 'sat+mf+wf'
-CAPTIONERS = (CAPTIONER_SAT, CAPTIONER_SAT_MF, CAPTIONER_SAT_WF,
-              CAPTIONER_SAT_MF_WF)
-
 parser = argparse.ArgumentParser(description='train a cnn on spurious data')
 parser.add_argument('--experiments',
                     choices=EXPERIMENTS,
@@ -65,10 +58,6 @@ parser.add_argument('--conditions',
                     default=CONDITIONS,
                     nargs='+',
                     help='condition(s) to test under (default: all)')
-parser.add_argument('--captioner',
-                    choices=CAPTIONERS,
-                    default=CAPTIONER_SAT_MF,
-                    help='captioning model to use (default: sat+mf)')
 parser.add_argument('--cnn',
                     choices=(lv.zoo.KEY_ALEXNET, zoo.KEY_RESNET18),
                     default=zoo.KEY_RESNET18,
@@ -164,33 +153,11 @@ args.out_root.mkdir(exist_ok=True, parents=True)
 # Before diving into experiments, train a captioner on all the data.
 # TODO(evandez): Use a pretrained captioner.
 annotations = lv.zoo.datasets(*args.annotations, path=args.datasets_root)
-
-if args.captioner != CAPTIONER_SAT:
-    featurizer = featurizers.MaskedPyramidFeaturizer().to(device)
-else:
-    featurizer = featurizers.MaskedImagePyramidFeaturizer().to(device)
-
-features = None
-if args.captioner != CAPTIONER_SAT_WF:
-    features = featurizer.map(annotations, device=device)
-
-annotator = None
-if args.captioner in (CAPTIONER_SAT_WF, CAPTIONER_SAT_MF_WF):
-    annotator = annotators.word_annotator(annotations, featurizer)
-    annotator.fit(annotations, features=features, device=device)
-
-if args.captioner in (CAPTIONER_SAT, CAPTIONER_SAT_MF):
-    captioner = captioners.decoder(annotations, featurizer=featurizer)
-else:
-    captioner = captioners.decoder(
-        annotations,
-        annotator=annotator,
-        featurizer=None if args.captioner == CAPTIONER_SAT_WF else featurizer)
-
-captioner.fit(annotations,
-              features=features,
-              display_progress_as=f'train {args.captioner}',
-              device=device)
+encoder = encoders.PyramidConvEncoder().to(device)
+decoder = decoders.decoder(annotations, encoder).to(device)
+decoder.fit(annotations,
+            display_progress_as=f'train {args.captioner}',
+            device=device)
 
 # Now that we have the captioner, we can start the experiments.
 for experiment in args.experiments:
@@ -239,7 +206,7 @@ for experiment in args.experiments:
                                                       target='byte'),
             )
         dissected = datasets.TopImagesDataset(dissection_root)
-        captions = captioner.predict(dissected, device=device)
+        captions = decoder.predict(dissected, device=device)
         texts = [
             index for index, caption in enumerate(captions)
             if 'text' in caption

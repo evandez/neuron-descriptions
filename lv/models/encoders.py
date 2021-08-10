@@ -4,7 +4,6 @@ from typing import (Any, Callable, Mapping, Optional, Sequence, Tuple, Type,
 
 from lv import datasets
 from lv.deps.netdissect import nethook, renormalize
-from lv.ext.torchvision import models
 from lv.utils import serialize
 from lv.utils.typing import Device
 
@@ -12,10 +11,11 @@ import torch
 from torch import nn
 from torch.nn import functional
 from torch.utils import data
+from torchvision import models
 from tqdm.auto import tqdm
 
 
-class Featurizer(serialize.SerializableModule):
+class Encoder(serialize.SerializableModule):
     """An abstract module mapping images (and optionally masks) to features."""
 
     feature_shape: Tuple[int, ...]
@@ -27,7 +27,7 @@ class Featurizer(serialize.SerializableModule):
         Equivalent to featurizing the images where the masks are all 1s.
 
         Args:
-            images (torch.Tensor): The images to featurizer. Should have
+            images (torch.Tensor): The images to encoder. Should have
                 shape (batch_size, 3, height, width).
 
         Returns:
@@ -71,7 +71,7 @@ class Featurizer(serialize.SerializableModule):
             dataset (data.Dataset): The dataset to featurize. Should return
                 a sequence or mapping of values.
             mask (bool, optional): Try to read masks from batch and pass them
-                to the featurizer. Setting this to False is equivalent to
+                to the encoder. Setting this to False is equivalent to
                 setting masks to be all 1s. Defaults to True.
             image_index (int, optional): Index of image in each dataset
                 sample. Defaults to -3 to be compatible with
@@ -147,30 +147,30 @@ ClassifierFactory = Callable[..., nn.Sequential]
 ClassifierLayers = Sequence[str]
 ClassifierNumFeatures = int
 ClassifierFeatureSize = int
-ImageFeaturizerConfig = Tuple[ClassifierFactory, ClassifierLayers,
-                              ClassifierNumFeatures, ClassifierFeatureSize]
+SpatialConvEncoderConfig = Tuple[ClassifierFactory, ClassifierLayers,
+                                 ClassifierNumFeatures, ClassifierFeatureSize]
 
 
-class ImageFeaturizer(Featurizer):
-    """Featurizes images using convolutional features from a pretrained CNN."""
+class SpatialConvEncoder(Encoder):
+    """Encodes images spatially using conv features from a pretrained CNN."""
 
     def __init__(self, config: str = 'resnet18', **kwargs: Any):
-        """Initialize the featurizer.
+        """Initialize the encoder.
 
         Keyword arguments are forwarded to the constructor of the underlying
         classifier model.
 
         Args:
-            config (str, optional): The featurizer config to use.
-                See `ImageFeaturizer.configs` for options.
+            config (str, optional): The encoder config to use.
+                See `SpatialConvEncoder.configs` for options.
                 Defaults to 'resnet18'.
 
         """
         super().__init__()
 
-        configs = ImageFeaturizer.configs()
+        configs = SpatialConvEncoder.configs()
         if config not in configs:
-            raise ValueError(f'featurizer not supported: {config}')
+            raise ValueError(f'encoder not supported: {config}')
 
         self.config = config
         self.kwargs = kwargs
@@ -180,9 +180,9 @@ class ImageFeaturizer(Featurizer):
         assert len(layers) == 1, 'multiple layers?'
         layer, = layers
 
-        self.featurizer = nethook.InstrumentedModel(factory(**self.kwargs))
-        self.featurizer.retain_layer(layer)
-        self.featurizer.eval()
+        self.encoder = nethook.InstrumentedModel(factory(**self.kwargs))
+        self.encoder.retain_layer(layer)
+        self.encoder.eval()
 
         self.layer = layer
         self.feature_shape = (n_features, feature_size)
@@ -197,14 +197,14 @@ class ImageFeaturizer(Featurizer):
                 masks: Optional[torch.Tensor] = None,
                 normalize: bool = True,
                 **_: Any) -> torch.Tensor:
-        """Featurize the images."""
+        """Encode the images."""
         if masks is None:
             masks = images.new_ones((len(images), 1, *images.shape[2:]))
         if normalize:
             images = (images - self.mean) / self.std
 
-        self.featurizer(images)
-        features = self.featurizer.retained_layer(self.layer)
+        self.encoder(images * masks)
+        features = self.encoder.retained_layer(self.layer)
         features = features.permute(0, 2, 3, 1)
         features = features.reshape(len(images), *self.feature_shape)
         return features
@@ -214,7 +214,7 @@ class ImageFeaturizer(Featurizer):
         *args: Any,
         **kwargs: Any,
     ) -> data.TensorDataset:
-        """Override `Featurizer.map`, but change defaults for single image."""
+        """Override `Encoder.map`, but change defaults for single image."""
         kwargs.setdefault('mask', False)
         kwargs.setdefault('image_index', 0)
         return super().map(*args, **kwargs)
@@ -224,19 +224,19 @@ class ImageFeaturizer(Featurizer):
         return {'config': self.config, **self.kwargs}
 
     @staticmethod
-    def configs() -> Mapping[str, ImageFeaturizerConfig]:
+    def configs() -> Mapping[str, SpatialConvEncoderConfig]:
         """Return the support configs mapped to their names."""
         return {
-            'resnet18': (models.resnet18_seq, ('layer4',), 49, 512),
+            'resnet18': (models.resnet18, ('layer4',), 49, 512),
         }
 
 
-MaskedPyramidFeaturizerConfig = Tuple[ClassifierFactory, ClassifierLayers,
-                                      ClassifierFeatureSize]
+PyramidConvEncoderConfig = Tuple[ClassifierFactory, ClassifierLayers,
+                                 ClassifierFeatureSize]
 
 
-class MaskedPyramidFeaturizer(Featurizer, serialize.SerializableModule):
-    """Map images and masks to a pyramid of masked convolutional features.
+class PyramidConvEncoder(Encoder, serialize.SerializableModule):
+    """Encode images at multiple resolutions into a single vector.
 
     Images are fed to a pretrained image classifier trained on ImageNet.
     The convolutional features from each layer are then masked using the
@@ -244,31 +244,31 @@ class MaskedPyramidFeaturizer(Featurizer, serialize.SerializableModule):
     """
 
     def __init__(self, config: str = 'resnet18', **kwargs: Any):
-        """Initialize the featurizer.
+        """Initialize the encoder.
 
         Keyword arguments are forwarded to the constructor of the underlying
         classifier model.
 
         Args:
-            config (str, optional): The featurizer config to use.
-                See `MaskedPyramidFeaturizer.configs` for options.
+            config (str, optional): The encoder config to use.
+                See `PyramidConvEncoder.configs` for options.
                 Defaults to 'resnet18'.
 
         """
         super().__init__()
 
-        configs = MaskedPyramidFeaturizer.configs()
+        configs = PyramidConvEncoder.configs()
         if config not in configs:
-            raise ValueError(f'featurizer not supported: {config}')
+            raise ValueError(f'encoder not supported: {config}')
 
         self.config = config
         self.kwargs = kwargs
         self.kwargs.setdefault('pretrained', True)
 
         factory, layers, feature_size = configs[config]
-        self.featurizer = nethook.InstrumentedModel(factory(**self.kwargs))
-        self.featurizer.retain_layers(layers)
-        self.featurizer.eval()
+        self.encoder = nethook.InstrumentedModel(factory(**self.kwargs))
+        self.encoder.retain_layers(layers)
+        self.encoder.eval()
 
         self.layers = layers
         self.feature_shape = (feature_size,)
@@ -283,15 +283,15 @@ class MaskedPyramidFeaturizer(Featurizer, serialize.SerializableModule):
                 masks: Optional[torch.Tensor] = None,
                 normalize: bool = True,
                 **_: Any) -> torch.Tensor:
-        """Construct masked features."""
+        """Construct pyramid features."""
         if masks is None:
             masks = images.new_ones((len(images), 1, *images.shape[2:]))
         if normalize:
             images = (images - self.mean) / self.std
 
-        # Feed images to featurizer, letting nethook record layer activations.
-        self.featurizer(images)
-        features = self.featurizer.retained_features(clear=True).values()
+        # Feed images to encoder, letting nethook record layer activations.
+        self.encoder(images)
+        features = self.encoder.retained_features(clear=True).values()
 
         # Mask the features at each level of the pyramid.
         masked = []
@@ -319,45 +319,31 @@ class MaskedPyramidFeaturizer(Featurizer, serialize.SerializableModule):
         return {'config': self.config, **self.kwargs}
 
     @staticmethod
-    def configs() -> Mapping[str, MaskedPyramidFeaturizerConfig]:
+    def configs() -> Mapping[str, PyramidConvEncoderConfig]:
         """Return the support configs mapped to their names."""
         return {
             'alexnet': (
-                models.alexnet_seq,
-                ('conv1', 'conv2', 'conv3', 'conv4', 'conv5'),
+                models.alexnet,
+                ('features.0', 'features.3', 'features.6', 'features.8',
+                 'features.10'),
                 1152,
             ),
             'resnet18': (
-                models.resnet18_seq,
+                models.resnet18,
                 ('conv1', 'layer1', 'layer2', 'layer3', 'layer4'),
                 1024,
             ),
         }
 
 
-class MaskedImagePyramidFeaturizer(MaskedPyramidFeaturizer):
-    """Same as MaskedPyramidFeaturizer, but images are masked, not features."""
-
-    def forward(self,
-                images: torch.Tensor,
-                masks: Optional[torch.Tensor] = None,
-                normalize: bool = True,
-                **kwargs: Any) -> torch.Tensor:
-        """Mask the images and then compute pyramid features."""
-        return super().forward(images * masks if masks is not None else images,
-                               normalize=normalize,
-                               **kwargs)
-
-
-def parse(key: str) -> Type[Featurizer]:
-    """Parse the string key into a featurizer type."""
+def parse(key: str) -> Type[Encoder]:
+    """Parse the string key into an encoder type."""
     return {
         Type.__name__: Type
-        for Type in (ImageFeaturizer, MaskedPyramidFeaturizer,
-                     MaskedImagePyramidFeaturizer)
+        for Type in (SpatialConvEncoder, PyramidConvEncoder)
     }[key]
 
 
-def key(featurizer: Featurizer) -> str:
-    """Return the key for the given featurizer."""
-    return type(featurizer).__name__
+def key(encoder: Encoder) -> str:
+    """Return the key for the given encoder."""
+    return type(encoder).__name__

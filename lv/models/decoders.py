@@ -1,13 +1,11 @@
-"""Models for captioning neurons."""
-import warnings
-from typing import (Any, Mapping, NamedTuple, Optional, Sequence, Sized, Tuple,
-                    Type, TypeVar, Union, cast, overload)
+"""Models for decoding neuron captions."""
+from typing import (Any, Dict, Mapping, NamedTuple, Optional, Sized, Tuple,
+                    Type, Union, cast, overload)
 
-from lv.models import annotators, featurizers, lms, vectors
+from lv.models import encoders, lms
 from lv.utils import lang, serialize, training
 from lv.utils.typing import Device, StrSequence
 
-import bert_score
 import rouge
 import sacrebleu
 import torch
@@ -72,160 +70,27 @@ class Attention(serialize.SerializableModule):
         }
 
 
-WORD2VEC_SPACY = 'spacy'
-WORD2VECS = (WORD2VEC_SPACY,)
-
-
-class WordFeaturizer(serialize.SerializableModule):
-    """Wrap a WordAnnotator and pretrained word vectors."""
-
-    def __init__(self,
-                 annotator: annotators.WordAnnotator,
-                 word2vec: str = WORD2VEC_SPACY,
-                 threshold: float = .5,
-                 num_words: int = 10):
-        """Initialize the word featurizer.
-
-        Args:
-            annotator (annotators.WordAnnotator): Word annotation model that
-                predicts words given visual features.
-            word2vec (str, optional): Pretrained word vectors to use.
-                Defaults to WORD2VEC_SPACY.
-            threshold (float, optional): Default threshold to use when
-                predicting applicable words. Defaults to .5.
-            num_words (int, optional): Exact number of words to take from
-                the predictor. If ground truth captions are provided and
-                contain fewer than this many words, the difference will be
-                filled with padding tokens. Defaults to 10.
-
-        Raises:
-            ValueError: If unknown word vectors model are specified.
-
-        """
-        super().__init__()
-        self.annotator = annotator
-        self.word2vec = word2vec
-        self.threshold = threshold
-        self.num_words = num_words
-
-        if word2vec == WORD2VEC_SPACY:
-            self.vectors = vectors.spacy(annotator.indexer)
-        else:
-            raise ValueError(f'unknown word2vec type: {word2vec}')
-
-    @property
-    def feature_size(self) -> int:
-        """Return the size of the word vectors."""
-        return self.vectors.embedding_dim
-
-    @overload
-    def forward(
-        self,
-        images: torch.Tensor,
-        masks: torch.Tensor,
-        threshold: Optional[float] = ...,
-        num_words: Optional[int] = ...,
-        captions: Optional[StrSequence] = ...,
-    ) -> Tuple[torch.Tensor, Sequence[StrSequence]]:
-        """Predict words from visual features and return their word vectors.
-
-        Args:
-            images (torch.Tensor): Top images. Should have shape
-                (batch_size, k, 3, height, width).
-            masks (torch.Tensor): Top image masks. Should have shape
-                (batch_size, k, 1, height, width).
-            threshold (Optional[float], optional): Only look at words predicted
-                with this probability or higher. Defaults to `self.threshold`.
-            num_words (Optional[int], optional): Maximum number of words to
-                return. Defaults to `self.num_words`.
-            captions (Optional[StrSequence], optional): Take words from these
-                captions instead of the word predictor. Must have length same
-                as batch_size. Defaults to None.
-
-        Raises:
-            ValueError: If captions is set and has bad length.
-
-        Returns:
-            Tuple[torch.Tensor, Sequence[StrSequence]]: Word vectors with
-                shape (batch_size, num_words, vector_size).
-
-        """
-        ...
-
-    @overload
-    def forward(self, images: torch.Tensor,
-                **kwargs: Any) -> Tuple[torch.Tensor, Sequence[StrSequence]]:
-        """Predict words from (precomputed) visual features.
-
-        Same as other overload, but assumes features already are computed.
-        """
-        ...
-
-    def forward(
-        self,
-        images: torch.Tensor,
-        masks: Optional[torch.Tensor] = None,
-        threshold: Optional[float] = None,
-        num_words: Optional[int] = None,
-        captions: Optional[StrSequence] = None,
-        **_: Any,
-    ) -> Tuple[torch.Tensor, Sequence[StrSequence]]:
-        """Implement both overloads."""
-        if captions is not None and len(captions) != len(images):
-            raise ValueError(f'expected {len(images)} ground truth '
-                             f'captions, got {len(captions)}')
-
-        if threshold is None:
-            threshold = self.threshold
-        if num_words is None:
-            num_words = self.num_words
-
-        idx: Sequence[Sequence[int]]
-        if captions is None:
-            annos: annotators.WordAnnotations
-            with torch.no_grad():
-                annos = self.annotator(images, masks, threshold=threshold)
-            idx = annos.probabilities.topk(k=self.num_words).indices.tolist()
-            words = self.annotator.indexer.unindex(idx, specials=False)
-        else:
-            idx = self.annotator.indexer(captions,
-                                         pad=True,
-                                         unk=False,
-                                         length=self.num_words)
-            words = self.annotator.indexer.unindex(idx, specials=False)
-
-        idx_t = torch.tensor(idx, dtype=torch.long, device=images.device)
-        with torch.no_grad():
-            features_w = self.vectors(idx_t)
-
-        return features_w, words
-
-    def properties(self) -> serialize.Properties:
-        """Override `Serializable.properties`."""
-        return {
-            'annotator': self.annotator,
-            'word2vec': self.word2vec,
-            'threshold': self.threshold,
-            'num_words': self.num_words,
-        }
-
-    @classmethod
-    def resolve(cls, children: serialize.Children) -> serialize.Resolved:
-        """Override `Serializable.resolve`."""
-        return {'annotator': annotators.WordAnnotator}
-
-
 class DecoderOutput(NamedTuple):
-    """Wraps output of the caption decoder."""
+    """Wraps output of the caption decoder.
+
+    Fields:
+        captions (StrSequence): Fully decoded captions for each sample.
+        scores (torch.Tensor): Shape (batch_size, length, vocab_size) tensor
+            containing log probabilities (if using likelihood decoding) or
+            mutual info (if using MI decoding) for each word.
+        tokens (torch.Tensor): Shape (batch_size, length) integer tensor
+            containing IDs of decoded tokens.
+        attentions (torch.Tensor): Shape (batch_size, length, n_features)
+            containing attention weights for each time step.
+
+    """
 
     captions: StrSequence
-    logprobs: torch.Tensor
+    scores: torch.Tensor
     tokens: torch.Tensor
-    attention_vs: Optional[torch.Tensor]
-    attention_ws: Optional[torch.Tensor]
+    attentions: torch.Tensor
 
 
-DecoderT = TypeVar('DecoderT', bound='Decoder')
 Strategy = Union[torch.Tensor, str]
 
 STRATEGY_GREEDY = 'greedy'
@@ -245,8 +110,7 @@ class Decoder(serialize.SerializableModule):
 
     def __init__(self,
                  indexer: lang.Indexer,
-                 featurizer_v: Optional[featurizers.Featurizer] = None,
-                 featurizer_w: Optional[WordFeaturizer] = None,
+                 encoder: encoders.Encoder,
                  lm: Optional[lms.LanguageModel] = None,
                  embedding_size: int = 128,
                  hidden_size: int = 512,
@@ -255,16 +119,12 @@ class Decoder(serialize.SerializableModule):
         """Initialize the decoder.
 
         Args:
-            indexer (lang.Indexer): Indexer for captions. The vocab used by
-                this indexer must be a superset of the `WordAnnotator` vocab.
-            featurizer_v (Optional[featurizers.Featurizer], optional): Visual
-                featurizer. If this is not set, `featurizer_w` must be.
-            featurizer_w (Optional[WordFeaturizer], optional): Word featurizer.
-                If this is not set, `featurizer_v` must be. By default, only
-                visual features are used.
+            indexer (lang.Indexer): Indexer for captions.
+            encoder (encoders.Encoder], optional): Visual encoder.
             lm (Optional[lms.LanguageModel], optional): Language model. Changes
-                decoding to use PMI [p(caption | image) / p(caption)] instead
-                of likelihood [p(caption | image)].
+                decoding to use mutual info [p(caption | image) / p(caption)]
+                instead of likelihood [p(caption | image)]. Defaults to None,
+                meaning decoding will always use likelihood.
             embedding_size (int, optional): Size of previous-word embeddings
                 that are input to the LSTM. Defaults to 128.
             hidden_size (int, optional): Size of LSTM hidden states.
@@ -283,74 +143,52 @@ class Decoder(serialize.SerializableModule):
         """
         super().__init__()
 
-        if featurizer_v is None and featurizer_w is None:
-            raise ValueError('must set at least one of '
-                             'featurizer_v and featurizer_w')
-
         if lm is not None:
-            cap_vocab = indexer.vocab.unique
+            my_vocab = indexer.vocab.unique
             lm_vocab = lm.indexer.vocab.unique
-            if lm_vocab != cap_vocab:
-                raise ValueError('lm and captioner have different vocabs;'
-                                 f'lm missing {cap_vocab - lm_vocab} and '
-                                 f'cap missing {lm_vocab - cap_vocab}')
+            if my_vocab != lm_vocab:
+                raise ValueError('lm and decoder have different vocabs;'
+                                 f'lm missing {my_vocab - lm_vocab} and '
+                                 f'decoder missing {lm_vocab - my_vocab}')
 
         self.indexer = indexer
-        self.featurizer_v = featurizer_v
-        self.featurizer_w = featurizer_w
+        self.encoder = encoder
         self.lm = lm
         self.embedding_size = embedding_size
         self.hidden_size = hidden_size
         self.attention_hidden_size = attention_hidden_size
         self.dropout = dropout
 
-        self.feature_v_size, self.attend_v = None, None
-        if featurizer_v is not None:
-            self.feature_v_size = featurizer_v.feature_shape[-1]
-            self.attend_v = Attention(hidden_size,
-                                      self.feature_v_size,
-                                      hidden_size=attention_hidden_size)
+        self.init_h = nn.Sequential(nn.Linear(self.feature_size, hidden_size),
+                                    nn.Tanh())
+        self.init_c = nn.Sequential(nn.Linear(self.feature_size, hidden_size),
+                                    nn.Tanh())
+        self.embedding = nn.Embedding(self.vocab_size, embedding_size)
 
-        self.feature_w_size, self.attend_w = None, None
-        if featurizer_w is not None:
-            self.feature_w_size = featurizer_w.vectors.embedding_dim
-            self.attend_w = Attention(hidden_size,
-                                      self.feature_w_size,
-                                      hidden_size=attention_hidden_size)
-
-        self.feature_size = self.feature_v_size or 0
-        self.feature_size += self.feature_w_size or 0
+        self.attend = Attention(hidden_size,
+                                self.feature_size,
+                                hidden_size=attention_hidden_size)
         self.feature_gate = nn.Sequential(
             nn.Linear(hidden_size, self.feature_size),
             nn.Sigmoid(),
         )
 
-        self.init_h = nn.Sequential(nn.Linear(self.feature_size, hidden_size),
-                                    nn.Tanh())
-        self.init_c = nn.Sequential(nn.Linear(self.feature_size, hidden_size),
-                                    nn.Tanh())
-
-        self.vocab_size = len(indexer)
-        self.embedding = nn.Embedding(self.vocab_size, embedding_size)
         self.lstm = nn.LSTMCell(embedding_size + self.feature_size,
                                 hidden_size)
+
         self.output = nn.Sequential(nn.Dropout(p=dropout),
                                     nn.Linear(hidden_size, self.vocab_size),
                                     nn.LogSoftmax(dim=-1))
 
     @property
-    def featurizer_v_(self) -> featurizers.Featurizer:
-        """Return the visual featurizer used in this model.
+    def feature_size(self) -> int:
+        """Return the visual feature size."""
+        return self.encoder.feature_shape[-1]
 
-        This function ends with _ because it descends into the word annotator,
-        if necessary, to find its visual featurizer, which is guaranteed to
-        be there.
-        """
-        featurizer_v = self.featurizer_v
-        if featurizer_v is None:
-            assert self.featurizer_w is not None
-            featurizer_v = self.featurizer_w.annotator.featurizer
-        return featurizer_v
+    @property
+    def vocab_size(self) -> int:
+        """Return the vocab size."""
+        return len(self.indexer)
 
     @overload
     def forward(self,
@@ -358,7 +196,7 @@ class Decoder(serialize.SerializableModule):
                 masks: torch.Tensor,
                 length: int = ...,
                 strategy: Strategy = ...,
-                pmi: bool = ...,
+                mi: bool = ...,
                 **kwargs: Any) -> DecoderOutput:
         """Decode captions for the given top images and masks.
 
@@ -374,7 +212,7 @@ class Decoder(serialize.SerializableModule):
                 values will be used as inputs at each time step, so it should
                 have shape (batch_size, length). Other options include 'greedy'
                 and 'sample'. Defaults to 'greedy'.
-            pmi (bool, optional): Use PMI decoding. Defaults to True.
+            mi (bool, optional): Use MI decoding. Defaults to True.
 
         Returns:
             DecoderOutput: Decoder outputs.
@@ -395,99 +233,53 @@ class Decoder(serialize.SerializableModule):
                 masks: Optional[torch.Tensor] = None,
                 length: int = 15,
                 strategy: Strategy = STRATEGY_GREEDY,
-                pmi: bool = True,
-                **kwargs: Any) -> DecoderOutput:
+                mi: bool = True,
+                **_: Any) -> DecoderOutput:
         """Implement both overloads."""
+        if mi and self.training:
+            raise ValueError('cannot use MI decoding in train mode')
         if isinstance(strategy, str) and strategy not in STRATEGIES:
             raise ValueError(f'unknown strategy: {strategy}')
+        if isinstance(strategy, torch.Tensor):
+            if strategy.dim() != 2:
+                raise ValueError(f'strategy must be 2D, got {strategy.dim()}')
+            if strategy.shape[-1] != length:
+                raise ValueError(f'strategy must have length {length}, '
+                                 f'got {strategy.shape[-1]}')
 
         batch_size = len(images)
 
         # If necessary, obtain visual features.
-        features_v = None
-        if self.featurizer_v is not None:
-            if masks is not None:
-                images = images.view(-1, 3, *images.shape[-2:])
-                masks = masks.view(-1, 1, *masks.shape[-2:])
-                with torch.no_grad():
-                    features_v = self.featurizer_v(images, masks)
-            else:
-                features_v = images
-            features_v = features_v.view(batch_size, -1, self.feature_v_size)
-
-        # Obtain word features from word annotator or ground truth captions.
-        features_w = None
-        words = None
-        if self.featurizer_w is not None:
-            if features_v is not None:
-                features_w, words = self.featurizer_w(features_v, **kwargs)
-            else:
-                features_w, words = self.featurizer_w(images, masks, **kwargs)
+        if masks is not None:
+            images = images.view(-1, 3, *images.shape[-2:])
+            masks = masks.view(-1, 1, *masks.shape[-2:])
+            with torch.no_grad():
+                features = self.encoder(images, masks)
+        else:
+            features = images.view(batch_size, -1, self.feature_size)
 
         # Prepare outputs.
         tokens = images.new_zeros(batch_size, length, dtype=torch.long)
-        logprobs = images.new_zeros(batch_size, length, self.vocab_size)
-
-        attention_vs = None
-        if self.featurizer_v is not None:
-            assert features_v is not None
-            attention_vs = images.new_zeros(batch_size, length,
-                                            features_v.shape[1])
-
-        attention_ws = None
-        if self.featurizer_w is not None:
-            assert features_w is not None
-            attention_ws = images.new_zeros(batch_size, length,
-                                            features_w.shape[1])
+        scores = images.new_zeros(batch_size, length, self.vocab_size)
+        attentions = images.new_zeros(batch_size, length, features.shape[1])
 
         # Compute initial hidden state and cell value.
-        pooled = torch.cat(
-            [
-                fs.mean(dim=1)
-                for fs in (features_v, features_w)
-                if fs is not None
-            ],
-            dim=-1,
-        )
+        pooled = features.mean(dim=1)
         h, c = self.init_h(pooled), self.init_c(pooled)
 
         # If necessary, compute LM initial hidden state and cell value.
         h_lm, c_lm = None, None
-        if self.lm is not None and pmi:
+        if self.lm is not None and mi:
             h_lm = h.new_zeros(self.lm.layers, batch_size, self.lm.hidden_size)
             c_lm = c.new_zeros(self.lm.layers, batch_size, self.lm.hidden_size)
 
         # Begin decoding.
         currents = tokens.new_empty(batch_size).fill_(self.indexer.start_index)
         for time in range(length):
-            # Attend over visual features.
-            attention_v, attenuated_v = None, None
-            if self.featurizer_v is not None:
-                assert features_v is not None
-                assert attention_vs is not None
-                assert self.attend_v is not None
-                attention_v = self.attend_v(h, features_v)
-                attention_vs[:, time] = attention_v
-                attenuated_v = attention_v.unsqueeze(-1).mul(features_v).sum(1)
-
-            # Attend over word featuers.
-            attention_w, attenuated_w = None, None
-            if self.featurizer_w is not None:
-                assert features_w is not None
-                assert attention_ws is not None
-                assert self.attend_w is not None
-                attention_w = self.attend_w(h, features_w)
-                attention_ws[:, time] = attention_w
-                attenuated_w = attention_w.unsqueeze(-1).mul(features_w).sum(1)
-
-            # Concatenate and gate attenuated features.
-            attenuated = torch.cat(
-                [
-                    attenuated for attenuated in (attenuated_v, attenuated_w)
-                    if attenuated is not None
-                ],
-                dim=-1,
-            )
+            # Attend over visual features and gate them.
+            attention = self.attend(h, features)
+            attentions[:, time] = attention
+            attenuated = attention.unsqueeze(-1).mul(features).sum(dim=1)
             gate = self.feature_gate(h)
             gated = attenuated * gate
 
@@ -495,34 +287,34 @@ class Decoder(serialize.SerializableModule):
             embeddings = self.embedding(currents)
             inputs = torch.cat((embeddings, gated), dim=-1)
             h, c = self.lstm(inputs, (h, c))
-            logprobs[:, time] = log_p_w = self.output(h)
+            scores[:, time] = log_p_w = self.output(h)
 
-            if self.lm is not None and pmi:
+            # If MI decoding, convert likelihood into mutual information.
+            if self.lm is not None and mi:
                 assert h_lm is not None and c_lm is not None
                 with torch.no_grad():
                     inputs_lm = self.lm.embedding(currents)[:, None]
                     _, (h_lm, c_lm) = self.lm.lstm(inputs_lm, (h_lm, c_lm))
                     log_p_w_lm = self.lm.output(h_lm[-1])
-                logprobs[:, time] = log_p_w - log_p_w_lm
+                scores[:, time] = log_p_w - log_p_w_lm
 
             # Pick next token by applying the decoding strategy.
             if isinstance(strategy, torch.Tensor):
                 currents = strategy[:, time]
             elif strategy == STRATEGY_GREEDY:
-                currents = logprobs[:, time].argmax(dim=1)
+                currents = scores[:, time].argmax(dim=1)
             else:
                 assert strategy == STRATEGY_SAMPLE
-                for index, lp in enumerate(logprobs[:, time]):
+                for index, lp in enumerate(scores[:, time]):
                     distribution = categorical.Categorical(probs=torch.exp(lp))
                     currents[index] = distribution.sample()
             tokens[:, time] = currents
 
         return DecoderOutput(
             captions=self.indexer.reconstruct(tokens.tolist()),
-            logprobs=logprobs,
+            scores=scores,
             tokens=tokens,
-            attention_vs=attention_vs,
-            attention_ws=attention_ws,
+            attentions=attentions,
         )
 
     def bleu(self,
@@ -614,64 +406,6 @@ class Decoder(serialize.SerializableModule):
                                  avg=True,
                                  ignore_empty=True)
 
-    def bert_score(self,
-                   dataset: data.Dataset,
-                   annotation_index: int = 4,
-                   batch_size: int = 32,
-                   predictions: Optional[StrSequence] = None,
-                   device: Optional[Device] = None,
-                   bert_scorer: Optional[bert_score.BERTScorer] = None,
-                   **kwargs: Any) -> Mapping[str, float]:
-        """Return average BERTScore P/R/F.
-
-        Args:
-            dataset (data.Dataset): The test dataset.
-            annotation_index (int, optional): Index of language annotations in
-                dataset samples. Defaults to 4 to be compatible with
-                AnnotatedTopImagesDataset.
-            batch_size (int, optional): Batch size to use when computing
-                BERTScore. Defaults to 32.
-            predictions (Optional[StrSequence], optional): Precomputed
-                predicted captions for all images in the dataset.
-                By default, computed from the dataset using `Decoder.predict`.
-            bert_scorer (Optional[bert_score.BERTScorer], optional): Pre-
-                instantiated BERTScorer object. Defaults to none.
-            device (Optional[Device], optional): Run BERT on this device.
-                Defaults to torch default.
-
-        Returns:
-            Mapping[str, float]: Average BERTScore precision/recall/F1.
-
-        """
-        if bert_scorer is None:
-            bert_scorer = bert_score.BERTScorer(idf=True,
-                                                lang='en',
-                                                rescale_with_baseline=True,
-                                                device=device)
-        if predictions is None:
-            predictions = self.predict(dataset, **kwargs)
-        predictions = [pred.lower().strip('. ') for pred in predictions]
-
-        references = []
-        for index in range(len(predictions)):
-            annotations = dataset[index][annotation_index]
-            if isinstance(annotations, str):
-                annotations = [annotations]
-            # Preprocess target annotations in the same way as the predictions.
-            annotations = [anno.lower().strip('. ') for anno in annotations]
-            references.append(annotations)
-
-        if bert_scorer.idf:
-            with warnings.catch_warnings():
-                warnings.filterwarnings('ignore', message=r'.*Overwriting.*')
-                bert_scorer.compute_idf([r for rs in references for r in rs])
-
-        prf = bert_scorer.score(predictions, references, batch_size=batch_size)
-        return {
-            key: scores.mean().item()
-            for key, scores in zip(('p', 'r', 'f'), prf)
-        }
-
     def predict(self,
                 dataset: data.Dataset,
                 mask: bool = True,
@@ -715,14 +449,14 @@ class Decoder(serialize.SerializableModule):
         if device is not None:
             self.to(device)
         if features is None:
-            features = self.featurizer_v_.map(
-                dataset,
-                mask=mask,
-                image_index=image_index,
-                mask_index=mask_index,
-                batch_size=batch_size,
-                device=device,
-                display_progress_as=display_progress_as is not None)
+            features = self.encoder.map(dataset,
+                                        mask=mask,
+                                        image_index=image_index,
+                                        mask_index=mask_index,
+                                        batch_size=batch_size,
+                                        device=device,
+                                        display_progress_as=display_progress_as
+                                        is not None)
 
         loader = data.DataLoader(features,
                                  batch_size=batch_size,
@@ -807,14 +541,14 @@ class Decoder(serialize.SerializableModule):
         if optimizer_kwargs is None:
             optimizer_kwargs = {}
         if features is None:
-            features = self.featurizer_v_.map(
-                dataset,
-                mask=mask,
-                image_index=image_index,
-                mask_index=mask_index,
-                batch_size=batch_size,
-                device=device,
-                display_progress_as=display_progress_as is not None)
+            features = self.encoder.map(dataset,
+                                        mask=mask,
+                                        image_index=image_index,
+                                        mask_index=mask_index,
+                                        batch_size=batch_size,
+                                        device=device,
+                                        display_progress_as=display_progress_as
+                                        is not None)
 
         # Prepare dataset and data loader. Use an anonymous dataset class to
         # make this easier, since we want to split train/val by neuron, but
@@ -866,7 +600,7 @@ class Decoder(serialize.SerializableModule):
         # Begin training!
         for _ in progress:
             self.train()
-            self.featurizer_v_.eval()
+            self.encoder.eval()
             train_loss = 0.
             for features_v, captions in train_loader:
                 targets = torch.tensor(self.indexer(captions),
@@ -878,14 +612,13 @@ class Decoder(serialize.SerializableModule):
                     length=length,
                     strategy=targets,
                     captions=captions if use_ground_truth_words else None,
-                    pmi=False)
+                    mi=False)
 
-                loss = criterion(outputs.logprobs.permute(0, 2, 1), targets)
+                loss = criterion(outputs.scores.permute(0, 2, 1), targets)
 
-                attention_vs = outputs.attention_vs
-                if attention_vs is not None:
-                    regularizer = ((1 - attention_vs.sum(dim=1))**2).mean()
-                    loss += regularization_weight * regularizer
+                attentions = outputs.attentions
+                regularizer = ((1 - attentions.sum(dim=1))**2).mean()
+                loss += regularization_weight * regularizer
 
                 loss.backward()
                 optimizer.step()
@@ -907,9 +640,8 @@ class Decoder(serialize.SerializableModule):
                         length=length,
                         strategy=targets,
                         captions=captions if use_ground_truth_words else None,
-                        pmi=False)
-                    loss = criterion(outputs.logprobs.permute(0, 2, 1),
-                                     targets)
+                        mi=False)
+                    loss = criterion(outputs.scores.permute(0, 2, 1), targets)
                 val_loss += loss.item()
             val_loss /= len(val_loader)
 
@@ -926,9 +658,7 @@ class Decoder(serialize.SerializableModule):
         """Override `Serializable.properties`."""
         return {
             'indexer': self.indexer,
-            'featurizer_v': self.featurizer_v,
-            'featurizer_w': self.featurizer_w,
-            'lm': self.lm,
+            'encoder': self.encoder,
             'embedding_size': self.embedding_size,
             'hidden_size': self.hidden_size,
             'attention_hidden_size': self.attention_hidden_size,
@@ -938,68 +668,46 @@ class Decoder(serialize.SerializableModule):
     def serializable(self) -> serialize.Children:
         """Override `Serializable.serializable`."""
         serializable = {}
-        if self.featurizer_v is not None:
-            serializable['featurizer_v'] = featurizers.key(self.featurizer_v)
+        if self.encoder is not None:
+            serializable['encoder'] = encoders.key(self.encoder)
         return serializable
 
     @classmethod
     def resolve(cls, children: serialize.Children) -> serialize.Resolved:
         """Override `Serializable.resolve`."""
-        resolved = {
-            'indexer': lang.Indexer,
-            'featurizer_w': WordFeaturizer,
-            'lm': lms.LanguageModel,
-        }
+        resolved: Dict[str, Type[serialize.Serializable]]
+        resolved = {'indexer': lang.Indexer}
 
-        featurizer_v_key = children.get('featurizer_v')
-        if featurizer_v_key is not None:
-            resolved['featurizer_v'] = featurizers.parse(featurizer_v_key)
+        encoder_key = children.get('encoder')
+        if encoder_key is not None:
+            resolved['encoder'] = encoders.parse(encoder_key)
 
         return resolved
 
 
 def decoder(dataset: data.Dataset,
-            featurizer: Optional[featurizers.Featurizer] = None,
-            annotator: Optional[annotators.WordAnnotator] = None,
-            lm: Optional[lms.LanguageModel] = None,
+            encoder: encoders.Encoder,
             annotation_index: int = 4,
             indexer_kwargs: Optional[Mapping[str, Any]] = None,
-            word_featurizer_kwargs: Optional[Mapping[str, Any]] = None,
             **kwargs: Any) -> Decoder:
     """Instantiate a new decoder.
 
     Args:
         dataset (data.Dataset): Dataset to draw vocabulary from.
-        featurizer (Optional[featurizers.Featurer], optional): Visual
-            featurizer. Must set this or `annotator`, or both.
-            Defaults to None.
-        annotator (Optional[annotators.WordAnnotator], optional): Word
-            annotation model. Must set this or `featurizer`, or both.
-            Defaults to None.
-        lm (Optional[lms.LanguageModel], optional): Language model.
-            Defaults to None.
+        encoder (encoders.Encoder): Visual encoder.
         annotation_index (int, optional): Index of language annotations in
             dataset samples. Defaults to 4 to be compatible with
             AnnotatedTopImagesDataset.
         indexer_kwargs (Optional[Mapping[str, Any]], optional): Indexer
             options. By default, indexer is configured to not ignore stop
             words and punctuation.
-        word_featurizer_kwargs (Optional[Mapping[str, Any]], optional): Word
-            featurizer options. Defaults to None.
-
-    Raises:
-        ValueError: If both `featurizer` and `annotator` are set.
 
     Returns:
         Decoder: The instantiated decoder.
 
     """
-    if featurizer is None and annotator is None:
-        raise ValueError('must set exactly one of featurizer and annotator')
     if indexer_kwargs is None:
         indexer_kwargs = {}
-    if word_featurizer_kwargs is None:
-        word_featurizer_kwargs = {}
 
     annotations = []
     for index in range(len(cast(Sized, dataset))):
@@ -1016,12 +724,4 @@ def decoder(dataset: data.Dataset,
         indexer_kwargs.setdefault(key, True)
     indexer = lang.indexer(annotations, **indexer_kwargs)
 
-    featurizer_v, featurizer_w = featurizer, None
-    if annotator is not None:
-        featurizer_w = WordFeaturizer(annotator, **word_featurizer_kwargs)
-
-    return Decoder(indexer,
-                   featurizer_v=featurizer_v,
-                   featurizer_w=featurizer_w,
-                   lm=lm,
-                   **kwargs)
+    return Decoder(indexer, encoder, **kwargs)

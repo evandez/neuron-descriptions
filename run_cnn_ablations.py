@@ -6,7 +6,7 @@ import random
 import lv.dissection.zoo
 import lv.zoo
 from lv import datasets
-from lv.models import annotators, captioners, classifiers, featurizers
+from lv.models import classifiers, decoders, encoders
 from lv.utils import logging, training
 from lv.utils.typing import StrSequence
 
@@ -113,13 +113,9 @@ TRAIN = {
     ),
 }
 
-CAPTIONER_GT = 'gt'
-CAPTIONER_SAT = 'sat'
-CAPTIONER_SAT_MF = 'sat+mf'
-CAPTIONER_SAT_WF = 'sat+wf'
-CAPTIONER_SAT_MF_WF = 'sat+mf+wf'
-CAPTIONERS = (CAPTIONER_GT, CAPTIONER_SAT, CAPTIONER_SAT_MF, CAPTIONER_SAT_WF,
-              CAPTIONER_SAT_MF_WF)
+CAPTIONS_GT = 'gt'
+CAPTIONS_LEARNED = 'learned'
+CAPTION_SOURCES = (CAPTIONS_GT, CAPTIONS_LEARNED)
 
 parser = argparse.ArgumentParser(description='run cnn ablation experiments')
 parser.add_argument('--cnns',
@@ -127,10 +123,10 @@ parser.add_argument('--cnns',
                     choices=CNNS,
                     default=CNNS,
                     help='cnns to ablate (default: alexnet, resnet152)')
-parser.add_argument('--captioner',
-                    choices=CAPTIONERS,
-                    default=CAPTIONER_SAT_MF,
-                    help='captioning model to use (default: sat+mf)')
+parser.add_argument('--captions',
+                    choices=CAPTION_SOURCES,
+                    default=CAPTIONS_LEARNED,
+                    help='caption source to use (default: learned)')
 parser.add_argument(
     '--datasets',
     choices=DATASETS,
@@ -197,7 +193,7 @@ wandb.init(project=args.wandb_project,
            entity=args.wandb_entity,
            group=args.wandb_group,
            config={
-               'captioner': args.captioner,
+               'captions': args.captions,
                'ablation_step_size': args.ablation_step_size,
                'n_random_trials': args.n_random_trials,
            },
@@ -247,41 +243,20 @@ for dataset_name in args.datasets:
         assert isinstance(annotations, datasets.AnnotatedTopImagesDataset)
 
         # Obtain captions for every neuron in the CNN.
-        if args.captioner == CAPTIONER_GT:
+        if args.captions == CAPTIONS_GT:
             captions: StrSequence = []
             for index in range(len(annotations)):
                 caption = random.choice(annotations[index].annotations)
                 assert isinstance(captions, list)
                 captions.append(caption)
         else:
+            assert args.captions == CAPTIONS_LEARNED
             train = lv.zoo.datasets(*TRAIN[cnn_name], path=args.datasets_root)
-
-            if args.captioner != CAPTIONER_SAT:
-                featurizer = featurizers.MaskedPyramidFeaturizer()
-            else:
-                featurizer = featurizers.MaskedImagePyramidFeaturizer()
-            featurizer.to(device)
-
-            features = None
-            if args.captioner != CAPTIONER_SAT_WF:
-                features = featurizer.map(train, device=device)
-
-            annotator = None
-            if args.captioner in (CAPTIONER_SAT_WF, CAPTIONER_SAT_MF_WF):
-                annotator = annotators.word_annotator(train, featurizer)
-                annotator.fit(train, features=features, device=device)
-
-            if args.captioner in (CAPTIONER_SAT, CAPTIONER_SAT_MF):
-                captioner = captioners.decoder(train, featurizer=featurizer)
-            else:
-                captioner = captioners.decoder(
-                    train,
-                    annotator=annotator,
-                    featurizer=None
-                    if args.captioner == CAPTIONER_SAT_WF else featurizer)
-            captioner.fit(train, device=device)
-            captioner.eval()
-            captions = captioner.predict(annotations, device=device)
+            encoder = encoders.PyramidConvEncoder().to(device)
+            decoder = decoders.decoder(train, encoder).to(device)
+            decoder.fit(train, device=device)
+            decoder.eval()
+            captions = decoder.predict(annotations, device=device)
 
         # Pretokenize the captions for efficiency.
         tokenized = tuple(nlp.pipe(captions))

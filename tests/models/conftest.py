@@ -1,16 +1,16 @@
 """Test configuration shared by all lv/models tests."""
-from lv.models import featurizers
+from lv.models import encoders
 
 import numpy
 import pytest
 import torch
 
 
-class FakeFeaturizer(featurizers.Featurizer):
-    """A fake Featurizer that always returns zeros."""
+class FakeEncoder(encoders.Encoder):
+    """A fake Encoder that always returns zeros."""
 
     def __init__(self, feature_shape):
-        """Initialize the featurizer."""
+        """Initialize the encoder."""
         super().__init__()
         self.feature_shape = feature_shape
 
@@ -29,6 +29,6 @@ FEATURE_SIZE = numpy.prod(FEATURE_SHAPE)
 
 
 @pytest.fixture
-def featurizer():
-    """Return a FakeFeaturizer for testing."""
-    return FakeFeaturizer(FEATURE_SHAPE)
+def encoder():
+    """Return a FakeEncoder for testing."""
+    return FakeEncoder(FEATURE_SHAPE)
