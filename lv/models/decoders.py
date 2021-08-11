@@ -659,6 +659,7 @@ class Decoder(serialize.SerializableModule):
         return {
             'indexer': self.indexer,
             'encoder': self.encoder,
+            'lm': self.lm,
             'embedding_size': self.embedding_size,
             'hidden_size': self.hidden_size,
             'attention_hidden_size': self.attention_hidden_size,
@@ -676,11 +677,15 @@ class Decoder(serialize.SerializableModule):
     def resolve(cls, children: serialize.Children) -> serialize.Resolved:
         """Override `Serializable.resolve`."""
         resolved: Dict[str, Type[serialize.Serializable]]
-        resolved = {'indexer': lang.Indexer}
+        resolved = {
+            'indexer': lang.Indexer,
+            'lm': lms.LanguageModel,
+        }
 
         encoder_key = children.get('encoder')
-        if encoder_key is not None:
-            resolved['encoder'] = encoders.parse(encoder_key)
+        if encoder_key is None:
+            raise ValueError('serialized decoder missing encoder')
+        resolved['encoder'] = encoders.parse(encoder_key)
 
         return resolved
 
