@@ -1,4 +1,5 @@
 """Models for decoding neuron captions."""
+import warnings
 from typing import (Any, Dict, Mapping, NamedTuple, Optional, Sized, Tuple,
                     Type, Union, cast, overload)
 
@@ -6,6 +7,7 @@ from lv.models import encoders, lms
 from lv.utils import lang, serialize, training
 from lv.utils.typing import Device, StrSequence
 
+import bert_score
 import rouge
 import sacrebleu
 import torch
@@ -405,6 +407,64 @@ class Decoder(serialize.SerializableModule):
                                  references,
                                  avg=True,
                                  ignore_empty=True)
+
+    def bert_score(self,
+                   dataset: data.Dataset,
+                   annotation_index: int = 4,
+                   batch_size: int = 32,
+                   predictions: Optional[StrSequence] = None,
+                   device: Optional[Device] = None,
+                   bert_scorer: Optional[bert_score.BERTScorer] = None,
+                   **kwargs: Any) -> Mapping[str, float]:
+        """Return average BERTScore P/R/F.
+
+        Args:
+            dataset (data.Dataset): The test dataset.
+            annotation_index (int, optional): Index of language annotations in
+                dataset samples. Defaults to 4 to be compatible with
+                AnnotatedTopImagesDataset.
+            batch_size (int, optional): Batch size to use when computing
+                BERTScore. Defaults to 32.
+            predictions (Optional[StrSequence], optional): Precomputed
+                predicted captions for all images in the dataset.
+                By default, computed from the dataset using `Decoder.predict`.
+            bert_scorer (Optional[bert_score.BERTScorer], optional): Pre-
+                instantiated BERTScorer object. Defaults to none.
+            device (Optional[Device], optional): Run BERT on this device.
+                Defaults to torch default.
+
+        Returns:
+            Mapping[str, float]: Average BERTScore precision/recall/F1.
+
+        """
+        if bert_scorer is None:
+            bert_scorer = bert_score.BERTScorer(idf=True,
+                                                lang='en',
+                                                rescale_with_baseline=True,
+                                                device=device)
+        if predictions is None:
+            predictions = self.predict(dataset, **kwargs)
+        predictions = [pred.lower().strip('. ') for pred in predictions]
+
+        references = []
+        for index in range(len(predictions)):
+            annotations = dataset[index][annotation_index]
+            if isinstance(annotations, str):
+                annotations = [annotations]
+            # Preprocess target annotations in the same way as the predictions.
+            annotations = [anno.lower().strip('. ') for anno in annotations]
+            references.append(annotations)
+
+        if bert_scorer.idf:
+            with warnings.catch_warnings():
+                warnings.filterwarnings('ignore', message=r'.*Overwriting.*')
+                bert_scorer.compute_idf([r for rs in references for r in rs])
+
+        prf = bert_scorer.score(predictions, references, batch_size=batch_size)
+        return {
+            key: scores.mean().item()
+            for key, scores in zip(('p', 'r', 'f'), prf)
+        }
 
     def predict(self,
                 dataset: data.Dataset,
