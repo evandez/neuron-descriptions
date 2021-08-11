@@ -115,10 +115,11 @@ def test_generate_hits_csv_too_many_urls(top_images_dataset, csv_file):
 
 
 RESULTS_CSV = f'''\
-Input.layer,ignore1,Input.unit,ignore2,Answer.summary,ignore3
-"{conftest.layer(0)}",foo,0,bar,"{conftest.annotation(0, 0)}",baz
-"{conftest.layer(1)}",foo,1,bar,"{conftest.annotation(1, 1)}",baz
-"{conftest.layer(2)}",foo,2,bar,"{conftest.annotation(2, 2)}",baz
+Input.layer,ignore1,Input.unit,ignore2,Answer.summary,ignore3,RejectionTime
+"{conftest.layer(0)}",foo,0,bar,"{conftest.annotation(0, 0)}",baz,
+"{conftest.layer(1)}",foo,1,bar,"{conftest.annotation(1, 1)}",baz,
+"{conftest.layer(2)}",foo,2,bar,"{conftest.annotation(2, 2)}",baz,
+rejected,foo,0,bar,"a rejected annotation",baz,123
 '''
 
 
@@ -155,6 +156,17 @@ def test_strip_results_csv(results_csv_file, out_csv_file):
         [conftest.layer(2), '2',
          conftest.annotation(2, 2)],
     ]
+
+
+def test_strip_results_csv_keep_rejected(results_csv_file):
+    """Test strip_results_csv keeps rejected HITs when told to do so."""
+    out_csv_file = results_csv_file.parent / 'out.csv'
+    hits.strip_results_csv(results_csv_file,
+                           out_csv_file=out_csv_file,
+                           keep_rejected=True)
+    with out_csv_file.open('r') as handle:
+        rows = list(csv.reader(handle))
+    assert len(rows) == 5
 
 
 def test_strip_results_csv_no_results_csv(results_csv_file):

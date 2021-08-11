@@ -100,9 +100,11 @@ def strip_results_csv(results_csv_file: PathLike,
                       in_layer_column: str = 'Input.layer',
                       in_unit_column: str = 'Input.unit',
                       in_annotation_column: str = 'Answer.summary',
+                      in_rejection_column: str = 'RejectionTime',
                       out_layer_column: str = 'layer',
                       out_unit_column: str = 'unit',
-                      out_annotation_column: str = 'summary') -> None:
+                      out_annotation_column: str = 'summary',
+                      keep_rejected: bool = False) -> None:
     """Strip the results CSV of everything but layer, unit, and annotation.
 
     Args:
@@ -115,12 +117,16 @@ def strip_results_csv(results_csv_file: PathLike,
             Defaults to 'Input.unit'.
         in_annotation_column (str, optional): Annotation column in input CSV.
             Defaults to 'Answer.summary'.
+        in_rejection_column (str, optional): Column in input CSV that indicates
+            whether HIT was rejected or not. Defaults to 'RejectionTime'.
         out_layer_column (str, optional): Layer column in output CSV.
             Defaults to 'layer'.
         out_unit_column (str, optional): Unit column in output CSV.
             Defaults to 'unit'.
         out_annotation_column (str, optional): Annotation column in output CSV.
             Defaults to 'summary'.
+        keep_rejected (bool, optional): If set, keep rejected HITs. Otherwise
+            they will be removed. Defaults to False.
 
     """
     results_csv_file = pathlib.Path(results_csv_file)
@@ -138,13 +144,16 @@ def strip_results_csv(results_csv_file: PathLike,
         fields = set(reader.fieldnames)
         inputs = tuple(reader)
 
-    for column in (in_layer_column, in_unit_column, in_annotation_column):
+    for column in (in_layer_column, in_unit_column, in_annotation_column,
+                   in_rejection_column):
         if column not in fields:
             raise KeyError(f'mturk results csv missing column: {column}')
 
     header = (out_layer_column, out_unit_column, out_annotation_column)
     outputs = [header]
     for input in inputs:
+        if not keep_rejected and input[in_rejection_column].strip():
+            continue
         output = (input[in_layer_column], input[in_unit_column],
                   input[in_annotation_column])
         outputs.append(output)
