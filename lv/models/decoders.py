@@ -72,6 +72,31 @@ class Attention(serialize.SerializableModule):
         }
 
 
+class DecoderStep(NamedTuple):
+    """Wraps the outputs of one decoding step.
+
+    Fields:
+        scores (torch.Tensor): Shape (batch_size, vocab_size) tensor containing
+            log probabilities (if using likelihood decoding) or mutual info (if
+            using MI decoding) for each word.
+        attentions (torch.Tensor): Shape (batch_size, n_features) tensor
+            containing attention weights for each visual feature.
+        h (torch.Tensor): The decoder LSTM's hidden state after stepping.
+        c (torch.Tensor): The decoder LSTM's cell state after stepping.
+        h_lm (Optional[torch.Tensor]): The LM LSTM's hidden state after
+            stepping.
+        c_lm (Optional[torch.Tensor]): The LM LSTM's cell state after stepping.
+
+    """
+
+    scores: torch.Tensor
+    attentions: torch.Tensor
+    h: torch.Tensor
+    c: torch.Tensor
+    h_lm: Optional[torch.Tensor]
+    c_lm: Optional[torch.Tensor]
+
+
 class DecoderOutput(NamedTuple):
     """Wraps output of the caption decoder.
 
@@ -276,41 +301,31 @@ class Decoder(serialize.SerializableModule):
             c_lm = c.new_zeros(self.lm.layers, batch_size, self.lm.hidden_size)
 
         # Begin decoding.
-        currents = tokens.new_empty(batch_size).fill_(self.indexer.start_index)
+        inputs = tokens.new_empty(batch_size).fill_(self.indexer.start_index)
         for time in range(length):
-            # Attend over visual features and gate them.
-            attention = self.attend(h, features)
-            attentions[:, time] = attention
-            attenuated = attention.unsqueeze(-1).mul(features).sum(dim=1)
-            gate = self.feature_gate(h)
-            gated = attenuated * gate
-
-            # Prepare LSTM inputs and take a step.
-            embeddings = self.embedding(currents)
-            inputs = torch.cat((embeddings, gated), dim=-1)
-            h, c = self.lstm(inputs, (h, c))
-            scores[:, time] = log_p_w = self.output(h)
-
-            # If MI decoding, convert likelihood into mutual information.
-            if self.lm is not None and mi:
-                assert h_lm is not None and c_lm is not None
-                with torch.no_grad():
-                    inputs_lm = self.lm.embedding(currents)[:, None]
-                    _, (h_lm, c_lm) = self.lm.lstm(inputs_lm, (h_lm, c_lm))
-                    log_p_w_lm = self.lm.output(h_lm[-1])
-                scores[:, time] = log_p_w - log_p_w_lm
+            step = self.step(features, inputs, h, c, h_lm=h_lm, c_lm=c_lm)
 
             # Pick next token by applying the decoding strategy.
             if isinstance(strategy, torch.Tensor):
-                currents = strategy[:, time]
+                inputs = strategy[:, time]
             elif strategy == STRATEGY_GREEDY:
-                currents = scores[:, time].argmax(dim=1)
+                inputs = step.scores.argmax(dim=1)
             else:
                 assert strategy == STRATEGY_SAMPLE
-                for index, lp in enumerate(scores[:, time]):
+                for index, lp in enumerate(step.scores):
                     distribution = categorical.Categorical(probs=torch.exp(lp))
-                    currents[index] = distribution.sample()
-            tokens[:, time] = currents
+                    inputs[index] = distribution.sample()
+
+            # Record step results.
+            scores[:, time] = step.scores
+            attentions[:, time] = step.attentions
+            tokens[:, time] = inputs
+
+            # Prepare for the next one.
+            h = step.h
+            c = step.c
+            h_lm = step.h_lm
+            c_lm = step.c_lm
 
         return DecoderOutput(
             captions=self.indexer.reconstruct(tokens.tolist()),
@@ -318,6 +333,77 @@ class Decoder(serialize.SerializableModule):
             tokens=tokens,
             attentions=attentions,
         )
+
+    def step(self,
+             features: torch.Tensor,
+             inputs: torch.Tensor,
+             h: torch.Tensor,
+             c: torch.Tensor,
+             h_lm: Optional[torch.Tensor] = None,
+             c_lm: Optional[torch.Tensor] = None) -> DecoderStep:
+        """Take one decoding step.
+
+        This does everything *except* choose the next token, which depends
+        on the decoding strategy being used.
+
+        Args:
+            features (torch.Tensor): The visual features. Should have shape
+                (batch_size, n_features, feature_size).
+            inputs (torch.Tensor): The current token inputs for the LSTM.
+                Should be an integer tensor of shape (batch_size,).
+            h (torch.Tensor): Current decoder LSTM hidden state. Should have
+                shape (batch_size, hidden_size).
+            c (torch.Tensor): Current decoder LSTM cell state. Should have
+                shape (batch_size, hidden_size).
+            h_lm (Optional[torch.Tensor], optional): Current LM hidden state.
+                If set, lm field must be set and you must also provide c_lm.
+                Should have shape (num_layers, batch_size, lm.hidden_size).
+                Defaults to None.
+            c_lm (Optional[torch.Tensor], optional): Current LM cell state.
+                If set, lm field must be set and you must also provide h_lm.
+                Should have shape (num_layers, batch_size, lm.hidden_size).
+                Defaults to None.
+
+        Raises:
+            ValueError: If one of {h_lm, c_lm} is set but not the other, or
+                if either is set but decoder has no lm.
+
+        Returns:
+            DecoderStep: Result of taking the step.
+
+        """
+        if (h_lm is None) != (c_lm is None):
+            raise ValueError('must set both h_lm and c_lm or neither')
+        if h_lm is not None and self.lm is None:
+            raise ValueError('cannot set h_lm or c_lm: decoder has no lm')
+
+        # Attend over visual features and gate them.
+        attentions = self.attend(h, features)
+        attenuated = attentions.unsqueeze(-1).mul(features).sum(dim=1)
+        gate = self.feature_gate(h)
+        gated = attenuated * gate
+
+        # Prepare LSTM inputs and take a step.
+        embeddings = self.embedding(inputs)
+        inputs = torch.cat((embeddings, gated), dim=-1)
+        h, c = self.lstm(inputs, (h, c))
+        scores = log_p_w = self.output(h)
+
+        # If MI decoding, convert likelihood into mutual information.
+        if self.lm is not None and h_lm is not None and c_lm is not None:
+            with torch.no_grad():
+                inputs_lm = self.lm.embedding(inputs)[:, None]
+                _, (h_lm, c_lm) = self.lm.lstm(inputs_lm, (h_lm, c_lm))
+                assert h_lm is not None and c_lm is not None
+                log_p_w_lm = self.lm.output(h_lm[-1])
+            scores = log_p_w - log_p_w_lm
+
+        return DecoderStep(scores=scores,
+                           attentions=attentions,
+                           h=h,
+                           c=c,
+                           h_lm=h_lm,
+                           c_lm=c_lm)
 
     def bleu(self,
              dataset: data.Dataset,
