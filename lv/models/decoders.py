@@ -141,7 +141,8 @@ class Decoder(serialize.SerializableModule):
                  embedding_size: int = 128,
                  hidden_size: int = 512,
                  attention_hidden_size: Optional[int] = None,
-                 dropout: float = .5):
+                 dropout: float = .5,
+                 temperature: float = .3):
         """Initialize the decoder.
 
         Args:
@@ -160,6 +161,9 @@ class Decoder(serialize.SerializableModule):
                 size and `hidden_size`.
             dropout (float, optional): Dropout probability, applied before
                 output layer of LSTM. Defaults to .5.
+            temperature (float, optional): Default temperature parameter to use
+                when MI decoding. When not MI decoding, this parameter does
+                nothing. Defaults to .3.
 
         Raises:
             ValueError: If LM is set but has a different vocabulary than the
@@ -183,6 +187,7 @@ class Decoder(serialize.SerializableModule):
         self.hidden_size = hidden_size
         self.attention_hidden_size = attention_hidden_size
         self.dropout = dropout
+        self.temperature = temperature
 
         self.init_h = nn.Sequential(nn.Linear(self.feature_size, hidden_size),
                                     nn.Tanh())
@@ -221,7 +226,8 @@ class Decoder(serialize.SerializableModule):
                 masks: torch.Tensor,
                 length: int = ...,
                 strategy: Strategy = ...,
-                mi: bool = ...,
+                mi: Optional[bool] = ...,
+                temperature: Optional[float] = ...,
                 **kwargs: Any) -> DecoderOutput:
         """Decode captions for the given top images and masks.
 
@@ -235,7 +241,12 @@ class Decoder(serialize.SerializableModule):
                 values will be used as inputs at each time step, so it should
                 have shape (batch_size, length). Other options include 'greedy'
                 and 'sample'. Defaults to 'greedy'.
-            mi (bool, optional): Use MI decoding. Defaults to True.
+            mi (bool, optional): If True, use MI decoding. If False, use
+                likelihood decoding. By default, MI decoding is used if the
+                decoder has an LM and is itself not in training mode.
+            temperature (Optional[float], optional): Temperature parameter for
+                MI decoding. Does nothing if not MI decoding.
+                Defaults to `self.temperature`.
 
         Returns:
             DecoderOutput: Decoder outputs.
@@ -256,11 +267,17 @@ class Decoder(serialize.SerializableModule):
                 masks: Optional[torch.Tensor] = None,
                 length: int = 15,
                 strategy: Strategy = STRATEGY_GREEDY,
-                mi: bool = True,
+                mi: Optional[bool] = None,
+                temperature: Optional[float] = None,
                 **_: Any) -> DecoderOutput:
         """Implement both overloads."""
+        if mi is None:
+            mi = self.lm is not None and not self.training
+        if mi and self.lm is None:
+            raise ValueError('cannot use MI decoding without an LM')
         if mi and self.training:
-            raise ValueError('cannot use MI decoding in train mode')
+            raise ValueError('cannot use MI decoding while training')
+
         if isinstance(strategy, str) and strategy not in STRATEGIES:
             raise ValueError(f'unknown strategy: {strategy}')
         if isinstance(strategy, torch.Tensor):
@@ -292,14 +309,21 @@ class Decoder(serialize.SerializableModule):
 
         # If necessary, compute LM initial hidden state and cell value.
         h_lm, c_lm = None, None
-        if self.lm is not None and mi:
+        if mi:
+            assert self.lm is not None
             h_lm = h.new_zeros(self.lm.layers, batch_size, self.lm.hidden_size)
             c_lm = c.new_zeros(self.lm.layers, batch_size, self.lm.hidden_size)
 
         # Begin decoding.
         inputs = tokens.new_empty(batch_size).fill_(self.indexer.start_index)
         for time in range(length):
-            step = self.step(features, inputs, h, c, h_lm=h_lm, c_lm=c_lm)
+            step = self.step(features,
+                             inputs,
+                             h,
+                             c,
+                             h_lm=h_lm,
+                             c_lm=c_lm,
+                             temperature=temperature)
 
             # Pick next token by applying the decoding strategy.
             if isinstance(strategy, torch.Tensor):
@@ -336,7 +360,8 @@ class Decoder(serialize.SerializableModule):
              h: torch.Tensor,
              c: torch.Tensor,
              h_lm: Optional[torch.Tensor] = None,
-             c_lm: Optional[torch.Tensor] = None) -> DecoderStep:
+             c_lm: Optional[torch.Tensor] = None,
+             temperature: Optional[float] = None) -> DecoderStep:
         """Take one decoding step.
 
         This does everything *except* choose the next token, which depends
@@ -359,6 +384,9 @@ class Decoder(serialize.SerializableModule):
                 If set, lm field must be set and you must also provide h_lm.
                 Should have shape (num_layers, batch_size, lm.hidden_size).
                 Defaults to None.
+            temperature (Optional[float], optional): Temperature to use when MI
+                decoding. If not MI decoding, does nothing. Defaults to
+                `self.temperature`.
 
         Raises:
             ValueError: If one of {h_lm, c_lm} is set but not the other, or
@@ -372,6 +400,7 @@ class Decoder(serialize.SerializableModule):
             raise ValueError('must set both h_lm and c_lm or neither')
         if h_lm is not None and self.lm is None:
             raise ValueError('cannot set h_lm or c_lm: decoder has no lm')
+        temperature = self.temperature if temperature is None else temperature
 
         # Attend over visual features and gate them.
         attentions = self.attend(h, features)
@@ -392,7 +421,7 @@ class Decoder(serialize.SerializableModule):
                 _, (h_lm, c_lm) = self.lm.lstm(inputs_lm, (h_lm, c_lm))
                 assert h_lm is not None and c_lm is not None
                 log_p_w_lm = self.lm.output(h_lm[-1])
-            scores = log_p_w - log_p_w_lm
+            scores = log_p_w - temperature * log_p_w_lm
 
         return DecoderStep(scores=scores,
                            attentions=attentions,
