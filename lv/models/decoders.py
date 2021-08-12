@@ -129,10 +129,9 @@ class Decoder(serialize.SerializableModule):
     """Neuron caption decoder.
 
     Roughly mimics the architecture described in Show, Attend, and Tell
-    [Xu et al., 2015]. The main difference is that the decoder attends over
-    two sets of features independently during each step: visual features
-    and word features. Word features can be extracted from ground truth
-    captions or predicted from the `WordAnnotator` model.
+    [Xu et al., 2015]. The main difference is in how the features are encoded
+    and that the decoder can also decode using mutual information instead of
+    likelihood.
     """
 
     def __init__(self,
@@ -158,14 +157,13 @@ class Decoder(serialize.SerializableModule):
                 Defaults to 512.
             attention_hidden_size (Optional[int], optional): Size of attention
                 mechanism hidden layer. Defaults to minimum of visual feature
-                size plus word feature size and `hidden_size`.
+                size and `hidden_size`.
             dropout (float, optional): Dropout probability, applied before
                 output layer of LSTM. Defaults to .5.
 
         Raises:
-            ValueError: If annotator vocabulary is not a subset of captioner
-                vocabulary, or if `featurizer_w` does not have correct number
-                of vectors.
+            ValueError: If LM is set but has a different vocabulary than the
+                given indexer.
 
         """
         super().__init__()
@@ -226,8 +224,6 @@ class Decoder(serialize.SerializableModule):
                 mi: bool = ...,
                 **kwargs: Any) -> DecoderOutput:
         """Decode captions for the given top images and masks.
-
-        Keyword arguments are forwarded to WordFeaturizer, if decoder has one.
 
         Args:
             images (torch.Tensor): Top-k images for a neuron.
@@ -633,7 +629,6 @@ class Decoder(serialize.SerializableModule):
             patience: int = 4,
             hold_out: float = .1,
             regularization_weight: float = 1.,
-            use_ground_truth_words: bool = True,
             optimizer_t: Type[optim.Optimizer] = optim.Adam,
             optimizer_kwargs: Optional[Mapping[str, Any]] = None,
             features: Optional[data.TensorDataset] = None,
@@ -664,9 +659,6 @@ class Decoder(serialize.SerializableModule):
             regularization_weight (float, optional): Weight for double
                 stochasticity regularization. See [Xu et al., 2015] for
                 details. Defaults to 1..
-            use_ground_truth_words (bool, optional): Instead of conditioning
-                on words predicted by the word annotator, condition on words
-                from the ground truth captions instead. Defaults to True.
             optimizer_t (Type[optim.Optimizer], optional): Optimizer type.
                 Defaults to optim.Adam.
             optimizer_kwargs (Optional[Mapping[str, Any]], optional): Optimizer
@@ -753,12 +745,10 @@ class Decoder(serialize.SerializableModule):
                                        device=device)[:, 1:]
                 _, length = targets.shape
 
-                outputs: DecoderOutput = self(
-                    features_v.to(device),
-                    length=length,
-                    strategy=targets,
-                    captions=captions if use_ground_truth_words else None,
-                    mi=False)
+                outputs: DecoderOutput = self(features_v.to(device),
+                                              length=length,
+                                              strategy=targets,
+                                              mi=False)
 
                 loss = criterion(outputs.scores.permute(0, 2, 1), targets)
 
@@ -781,12 +771,10 @@ class Decoder(serialize.SerializableModule):
                 _, length = targets.shape
 
                 with torch.no_grad():
-                    outputs = self(
-                        features_v,
-                        length=length,
-                        strategy=targets,
-                        captions=captions if use_ground_truth_words else None,
-                        mi=False)
+                    outputs = self(features_v,
+                                   length=length,
+                                   strategy=targets,
+                                   mi=False)
                     loss = criterion(outputs.scores.permute(0, 2, 1), targets)
                 val_loss += loss.item()
             val_loss /= len(val_loader)
