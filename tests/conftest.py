@@ -85,10 +85,25 @@ def top_images_root(top_image_tensors, top_image_masks):
         yield root
 
 
+def transform_images(images):
+    """Transform images dumbly to make sure transforms work."""
+    assert images.shape == (N_TOP_IMAGES_PER_UNIT, *IMAGE_SHAPE)
+    return images
+
+
+def transform_masks(masks):
+    """Transform masks dumbly to make sure transforms work."""
+    assert masks.shape == (N_TOP_IMAGES_PER_UNIT, *MASK_SHAPE)
+    return masks
+
+
 @pytest.fixture
 def top_images_dataset(top_images_root):
     """Return a TopImagesDataset for testing."""
-    return datasets.TopImagesDataset(top_images_root, display_progress=False)
+    return datasets.TopImagesDataset(top_images_root,
+                                     transform_images=transform_images,
+                                     transform_masks=transform_masks,
+                                     display_progress=False)
 
 
 def annotation(layer_index, unit_index):
@@ -127,6 +142,20 @@ def top_images_annotations_csv_file(top_images_root, top_image_annotations):
     return annotations_csv_file
 
 
+def transform_annotation(annotation):
+    """Transform annotation dumbly, asserting it is a string."""
+    assert isinstance(annotation, str)
+    return annotation
+
+
+def transform_annotations(annotations):
+    """Transform annotations dumbly, asserting it is a sequence of strs."""
+    assert isinstance(annotations, (list, tuple))
+    for annotation in annotations:
+        assert isinstance(annotation, str)
+    return annotations
+
+
 @pytest.fixture
 def annotated_top_images_dataset(top_images_root,
                                  top_images_annotations_csv_file):
@@ -137,4 +166,8 @@ def annotated_top_images_dataset(top_images_root,
         layer_column=LAYER_COLUMN,
         unit_column=UNIT_COLUMN,
         annotation_column=ANNOTATION_COLUMN,
+        transform_images=transform_images,
+        transform_masks=transform_masks,
+        transform_annotation=transform_annotation,
+        transform_annotations=transform_annotations,
         display_progress=False)

@@ -5,7 +5,8 @@ import pathlib
 from typing import Any, Iterable, NamedTuple, Optional, Sequence, Union
 
 from lv.deps.netdissect import renormalize
-from lv.utils.typing import Layer, PathLike, Unit
+from lv.utils.typing import (Layer, PathLike, StrSequence, TransformStr,
+                             TransformStrSeq, TransformTensor, Unit)
 
 import numpy
 import torch
@@ -58,6 +59,8 @@ class TopImagesDataset(data.Dataset):
                  name: Optional[str] = None,
                  layers: Optional[Iterable[Layer]] = None,
                  device: Optional[Union[str, torch.device]] = None,
+                 transform_images: Optional[TransformTensor] = None,
+                 transform_masks: Optional[TransformTensor] = None,
                  display_progress: bool = True):
         """Initialize the dataset.
 
@@ -71,6 +74,10 @@ class TopImagesDataset(data.Dataset):
                 By default, all subdirectories of root are treated as layers.
             device (Optional[Union[str, torch.device]], optional): Send all
                 tensors to this device.
+            transform_images (Optional[TransformTensor], optional): Transform
+                all dataset images with this function. Defaults to None.
+            transform_masks (Optional[TransformTensor], optional): Transform
+                all dataset masks with this function. Defaults to None.
             display_progress (bool, optional): Show a progress
                 bar when reading images into menu. Defaults to True.
 
@@ -97,6 +104,8 @@ class TopImagesDataset(data.Dataset):
         self.name = name
         self.layers = layers = tuple(sorted(str(layer) for layer in layers))
         self.device = device
+        self.transform_images = transform_images
+        self.transform_masks = transform_masks
 
         progress = layers
         if display_progress is not None:
@@ -150,6 +159,10 @@ class TopImagesDataset(data.Dataset):
             units = zip(self.images_by_layer[layer],
                         self.masks_by_layer[layer])
             for unit, (images, masks) in enumerate(units):
+                if transform_images is not None:
+                    images = transform_images(images)
+                if transform_masks is not None:
+                    masks = transform_masks(masks)
                 sample = TopImages(layer=str(layer),
                                    unit=unit,
                                    images=images,
@@ -242,7 +255,7 @@ class AnnotatedTopImages(NamedTuple):
     unit: int
     images: torch.Tensor
     masks: torch.Tensor
-    annotations: Sequence[str]
+    annotations: StrSequence
 
     def as_pil_image_grid(self, **kwargs: Any) -> Image.Image:
         """Show masked top images as a PIL image grid.
@@ -263,6 +276,8 @@ class AnnotatedTopImagesDataset(data.Dataset):
                  unit_column: str = DEFAULT_UNIT_COLUMN,
                  annotation_column: str = DEFAULT_ANNOTATION_COLUMN,
                  annotation_count: int = None,
+                 transform_annotation: Optional[TransformStr] = None,
+                 transform_annotations: Optional[TransformStrSeq] = None,
                  **kwargs: Any):
         """Initialize the dataset.
 
@@ -278,11 +293,17 @@ class AnnotatedTopImagesDataset(data.Dataset):
                 Defaults to `DEFAULT_UNIT_COLUMN`.
             annotation_column (str, optional): CSV column containing
                 annotation. Defaults to `DEFAULT_ANNOTATION_COLUMN`.
-            annotation_count: (Optional[int], optional): Exact number of
+            annotation_count (Optional[int], optional): Exact number of
                 annotations to keep for each sample. If a sample has fewer than
                 this many annotations, it will be excluded. If it has more,
                 throw out the extras. If this value is None, no samples will
                 be excluded. Defaults to None.
+            transform_annotation (Optional[TransformStr], optional): Call
+                this transform each annotation in isolation. Applied before
+                `transform_annotations`. Defaults to None.
+            transform_annotations (Optional[TransformStrSeq], optional): Call
+                this transform on each sample's annotations. Applied after
+                `transform_annotation`, if that argument is set too.
 
         Raises:
             FileNotFoundError: If annotations CSV file is not found.
@@ -315,19 +336,24 @@ class AnnotatedTopImagesDataset(data.Dataset):
             layer: Layer = int(layer_str) if layer_str.isdigit() else layer_str
             unit = int(row[unit_column])
             annotation = row[annotation_column]
+            if transform_annotation is not None:
+                annotation = transform_annotation(annotation)
             annotations_by_layer_unit[layer, unit].append(annotation)
 
         samples = []
         top_images_dataset = TopImagesDataset(root, *args, **kwargs)
         if annotation_count is None:
             for top_images in top_images_dataset.samples:
-                layer, unit = top_images.layer, top_images.unit
+                la, un = top_images.layer, top_images.unit
+                annotations: StrSequence = annotations_by_layer_unit[la, un]
+                if transform_annotations is not None:
+                    annotations = transform_annotations(annotations)
                 annotated_top_images = AnnotatedTopImages(
-                    layer=top_images.layer,
-                    unit=top_images.unit,
+                    layer=la,
+                    unit=un,
                     images=top_images.images,
                     masks=top_images.masks,
-                    annotations=tuple(annotations_by_layer_unit[layer, unit]))
+                    annotations=tuple(annotations))
                 samples.append(annotated_top_images)
         else:
             for key, annotations in annotations_by_layer_unit.items():
@@ -335,6 +361,8 @@ class AnnotatedTopImagesDataset(data.Dataset):
                     continue
                 elif len(annotations) > annotation_count:
                     annotations = annotations[:annotation_count]
+                if transform_annotations is not None:
+                    annotations = transform_annotations(annotations)
                 top_images = top_images_dataset.lookup(*key)
                 annotated_top_images = AnnotatedTopImages(
                     layer=top_images.layer,
