@@ -35,20 +35,26 @@ def datasets() -> core.DatasetConfigs:
     return {
         KEY_ALEXNET_IMAGENET:
             core.DatasetConfig(lv.datasets.AnnotatedTopImagesDataset,
-                               url=f'{HOST}/data/alexnet-imagenet.zip'),
+                               url=f'{HOST}/data/alexnet-imagenet.zip',
+                               annotation_count=3),
         KEY_ALEXNET_PLACES365:
             core.DatasetConfig(lv.datasets.AnnotatedTopImagesDataset,
-                               url=f'{HOST}/data/alexnet-places365.zip'),
+                               url=f'{HOST}/data/alexnet-places365.zip',
+                               annotation_count=3),
         KEY_RESNET152_IMAGENET:
             core.DatasetConfig(lv.datasets.AnnotatedTopImagesDataset,
-                               url=f'{HOST}/data/resnet152-imagenet.zip'),
+                               url=f'{HOST}/data/resnet152-imagenet.zip',
+                               annotation_count=3),
         KEY_RESNET152_PLACES365:
             core.DatasetConfig(lv.datasets.AnnotatedTopImagesDataset,
-                               url=f'{HOST}/data/resnet152-places365.zip'),
+                               url=f'{HOST}/data/resnet152-places365.zip',
+                               annotation_count=3),
         KEY_BIGGAN_IMAGENET:
             core.DatasetConfig(lv.datasets.AnnotatedTopImagesDataset,
-                               url=f'{HOST}/data/biggan-imagenet.zip'),
+                               url=f'{HOST}/data/biggan-imagenet.zip',
+                               annotation_count=3),
         KEY_BIGGAN_PLACES365:
             core.DatasetConfig(lv.datasets.AnnotatedTopImagesDataset,
-                               url=f'{HOST}/data/biggan-places365.zip'),
+                               url=f'{HOST}/data/biggan-places365.zip',
+                               annotation_count=3),
     }
