@@ -72,6 +72,24 @@ class Attention(serialize.SerializableModule):
         }
 
 
+class DecoderState(NamedTuple):
+    """Wrapper for all decoder state.
+
+    Fields:
+        h (torch.Tensor): The decoder LSTM's hidden state after stepping.
+        c (torch.Tensor): The decoder LSTM's cell state after stepping.
+        h_lm (Optional[torch.Tensor]): The LM LSTM's hidden state after
+            stepping.
+        c_lm (Optional[torch.Tensor]): The LM LSTM's cell state after stepping.
+
+    """
+
+    h: torch.Tensor
+    c: torch.Tensor
+    h_lm: Optional[torch.Tensor]
+    c_lm: Optional[torch.Tensor]
+
+
 class DecoderStep(NamedTuple):
     """Wraps the outputs of one decoding step.
 
@@ -81,20 +99,13 @@ class DecoderStep(NamedTuple):
             using MI decoding) for each word.
         attentions (torch.Tensor): Shape (batch_size, n_features) tensor
             containing attention weights for each visual feature.
-        h (torch.Tensor): The decoder LSTM's hidden state after stepping.
-        c (torch.Tensor): The decoder LSTM's cell state after stepping.
-        h_lm (Optional[torch.Tensor]): The LM LSTM's hidden state after
-            stepping.
-        c_lm (Optional[torch.Tensor]): The LM LSTM's cell state after stepping.
+        state (DecoderState): Hidden states used by the decoder.
 
     """
 
     scores: torch.Tensor
     attentions: torch.Tensor
-    h: torch.Tensor
-    c: torch.Tensor
-    h_lm: Optional[torch.Tensor]
-    c_lm: Optional[torch.Tensor]
+    state: DecoderState
 
 
 class DecoderOutput(NamedTuple):
@@ -122,7 +133,8 @@ Strategy = Union[torch.Tensor, str]
 
 STRATEGY_GREEDY = 'greedy'
 STRATEGY_SAMPLE = 'sample'
-STRATEGIES = (STRATEGY_GREEDY, STRATEGY_SAMPLE)
+STRATEGY_BEAM = 'beam'
+STRATEGIES = (STRATEGY_GREEDY, STRATEGY_SAMPLE, STRATEGY_BEAM)
 
 
 class Decoder(serialize.SerializableModule):
@@ -303,27 +315,13 @@ class Decoder(serialize.SerializableModule):
         scores = images.new_zeros(batch_size, length, self.vocab_size)
         attentions = images.new_zeros(batch_size, length, features.shape[1])
 
-        # Compute initial hidden state and cell value.
-        pooled = features.mean(dim=1)
-        h, c = self.init_h(pooled), self.init_c(pooled)
-
-        # If necessary, compute LM initial hidden state and cell value.
-        h_lm, c_lm = None, None
-        if mi:
-            assert self.lm is not None
-            h_lm = h.new_zeros(self.lm.layers, batch_size, self.lm.hidden_size)
-            c_lm = c.new_zeros(self.lm.layers, batch_size, self.lm.hidden_size)
+        # Compute initial decoder state.
+        state = self.init_state(features, lm=mi)
 
         # Begin decoding.
         inputs = tokens.new_empty(batch_size).fill_(self.indexer.start_index)
         for time in range(length):
-            step = self.step(features,
-                             inputs,
-                             h,
-                             c,
-                             h_lm=h_lm,
-                             c_lm=c_lm,
-                             temperature=temperature)
+            step = self.step(features, inputs, state, temperature=temperature)
 
             # Pick next token by applying the decoding strategy.
             if isinstance(strategy, torch.Tensor):
@@ -340,12 +338,7 @@ class Decoder(serialize.SerializableModule):
             scores[:, time] = step.scores
             attentions[:, time] = step.attentions
             tokens[:, time] = inputs
-
-            # Prepare for the next one.
-            h = step.h
-            c = step.c
-            h_lm = step.h_lm
-            c_lm = step.c_lm
+            state = step.state
 
         return DecoderOutput(
             captions=self.indexer.reconstruct(tokens.tolist()),
@@ -354,13 +347,38 @@ class Decoder(serialize.SerializableModule):
             attentions=attentions,
         )
 
+    def init_state(self,
+                   features: torch.Tensor,
+                   lm: bool = True) -> DecoderState:
+        """Initialize decoder state for a fresh decoding.
+
+        Args:
+            features (torch.Tensor): Visualf features. Should have shape
+                (batch_size, num_features, feature_size).
+            lm (bool, optional): Initialize LM hidden state as well, if
+                possible. Defaults to True.
+
+        Returns:
+            DecoderState: The freshly initialized decoder state.
+
+        """
+        # Compute initial hidden state and cell value.
+        pooled = features.mean(dim=1)
+        h, c = self.init_h(pooled), self.init_c(pooled)
+
+        # If necessary, compute LM initial hidden state and cell value.
+        h_lm, c_lm = None, None
+        if self.lm is not None and lm:
+            batch_size = len(features)
+            h_lm = h.new_zeros(self.lm.layers, batch_size, self.lm.hidden_size)
+            c_lm = c.new_zeros(self.lm.layers, batch_size, self.lm.hidden_size)
+
+        return DecoderState(h, c, h_lm, c_lm)
+
     def step(self,
              features: torch.Tensor,
              inputs: torch.Tensor,
-             h: torch.Tensor,
-             c: torch.Tensor,
-             h_lm: Optional[torch.Tensor] = None,
-             c_lm: Optional[torch.Tensor] = None,
+             state: DecoderState,
              temperature: Optional[float] = None) -> DecoderStep:
         """Take one decoding step.
 
@@ -372,18 +390,7 @@ class Decoder(serialize.SerializableModule):
                 (batch_size, n_features, feature_size).
             inputs (torch.Tensor): The current token inputs for the LSTM.
                 Should be an integer tensor of shape (batch_size,).
-            h (torch.Tensor): Current decoder LSTM hidden state. Should have
-                shape (batch_size, hidden_size).
-            c (torch.Tensor): Current decoder LSTM cell state. Should have
-                shape (batch_size, hidden_size).
-            h_lm (Optional[torch.Tensor], optional): Current LM hidden state.
-                If set, lm field must be set and you must also provide c_lm.
-                Should have shape (num_layers, batch_size, lm.hidden_size).
-                Defaults to None.
-            c_lm (Optional[torch.Tensor], optional): Current LM cell state.
-                If set, lm field must be set and you must also provide h_lm.
-                Should have shape (num_layers, batch_size, lm.hidden_size).
-                Defaults to None.
+            state (DecoderState): The current decoder state.
             temperature (Optional[float], optional): Temperature to use when MI
                 decoding. If not MI decoding, does nothing. Defaults to
                 `self.temperature`.
@@ -396,10 +403,11 @@ class Decoder(serialize.SerializableModule):
             DecoderStep: Result of taking the step.
 
         """
+        h, c, h_lm, c_lm = state
         if (h_lm is None) != (c_lm is None):
-            raise ValueError('must set both h_lm and c_lm or neither')
+            raise ValueError('state must have both h_lm and c_lm or neither')
         if h_lm is not None and self.lm is None:
-            raise ValueError('cannot set h_lm or c_lm: decoder has no lm')
+            raise ValueError('state has h_lm or c_lm, but decoder has no lm')
         temperature = self.temperature if temperature is None else temperature
 
         # Attend over visual features and gate them.
@@ -425,10 +433,7 @@ class Decoder(serialize.SerializableModule):
 
         return DecoderStep(scores=scores,
                            attentions=attentions,
-                           h=h,
-                           c=c,
-                           h_lm=h_lm,
-                           c_lm=c_lm)
+                           state=DecoderState(h=h, c=c, h_lm=h_lm, c_lm=c_lm))
 
     def bleu(self,
              dataset: data.Dataset,
