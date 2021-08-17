@@ -156,7 +156,8 @@ class Decoder(serialize.SerializableModule):
                  dropout: float = .5,
                  length: int = 15,
                  strategy: str = STRATEGY_GREEDY,
-                 temperature: float = .3):
+                 temperature: float = .3,
+                 beam_size: int = 5):
         """Initialize the decoder.
 
         Args:
@@ -182,6 +183,9 @@ class Decoder(serialize.SerializableModule):
             temperature (float, optional): Default temperature parameter to use
                 when MI decoding. When not MI decoding, this parameter does
                 nothing. Defaults to .3.
+            beam_size (int, optional): Default beam size for beam search
+                decoding. When not decoding with beam search, this parameter
+                does nothing. Defaults to 5.
 
         Raises:
             ValueError: If LM is set but has a different vocabulary than the
@@ -208,6 +212,7 @@ class Decoder(serialize.SerializableModule):
         self.length = length
         self.strategy = strategy
         self.temperature = temperature
+        self.beam_size = beam_size
 
         self.init_h = nn.Sequential(nn.Linear(self.feature_size, hidden_size),
                                     nn.Tanh())
@@ -290,6 +295,7 @@ class Decoder(serialize.SerializableModule):
                 strategy: Optional[Strategy] = None,
                 mi: Optional[bool] = None,
                 temperature: Optional[float] = None,
+                beam_size: Optional[int] = None,
                 **_: Any) -> DecoderOutput:
         """Implement both overloads."""
         if length is None:
@@ -298,6 +304,8 @@ class Decoder(serialize.SerializableModule):
             strategy = self.strategy
         if mi is None:
             mi = self.lm is not None and not self.training
+        if beam_size is None:
+            beam_size = self.beam_size
 
         # Validate arguments.
         if mi and self.lm is None:
@@ -325,36 +333,45 @@ class Decoder(serialize.SerializableModule):
         else:
             features = images.view(batch_size, -1, self.feature_size)
 
-        # Prepare outputs.
-        tokens = images.new_zeros(batch_size, length, dtype=torch.long)
-        scores = images.new_zeros(batch_size, length, self.vocab_size)
-        attentions = images.new_zeros(batch_size, length, features.shape[1])
-
         # Compute initial decoder state and initial inputs.
         state = self.init_state(features, lm=mi)
-        inputs = tokens.new_empty(batch_size).fill_(self.indexer.start_index)
+        inputs = images.new_empty(batch_size, dtype=torch.long)
+        inputs.fill_(self.indexer.start_index)
 
         # Begin decoding.
-        for time in range(length):
-            step = self.step(features, inputs, state, temperature=temperature)
+        if strategy != STRATEGY_BEAM:
+            tokens = inputs.new_zeros(batch_size, length)
+            scores = images.new_zeros(batch_size, length, self.vocab_size)
+            attentions = images.new_zeros(batch_size, length,
+                                          features.shape[1])
+            for time in range(length):
+                step = self.step(features,
+                                 inputs,
+                                 state,
+                                 temperature=temperature)
 
-            # Pick next token by applying the decoding strategy.
-            if isinstance(strategy, torch.Tensor):
-                inputs = strategy[:, time]
-            elif strategy == STRATEGY_GREEDY:
-                inputs = step.scores.argmax(dim=1)
-            else:
-                assert strategy == STRATEGY_SAMPLE
-                for index, logprobs in enumerate(step.scores):
-                    probs = torch.exp(logprobs)
-                    distribution = categorical.Categorical(probs=probs)
-                    inputs[index] = distribution.sample()
+                # Pick next token by applying the decoding strategy.
+                if isinstance(strategy, torch.Tensor):
+                    inputs = strategy[:, time]
+                elif strategy == STRATEGY_GREEDY:
+                    inputs = step.scores.argmax(dim=1)
+                else:
+                    assert strategy == STRATEGY_SAMPLE
+                    for index, logprobs in enumerate(step.scores):
+                        probs = torch.exp(logprobs)
+                        distribution = categorical.Categorical(probs=probs)
+                        inputs[index] = distribution.sample()
 
-            # Record step results.
-            scores[:, time] = step.scores
-            attentions[:, time] = step.attentions
-            tokens[:, time] = inputs
-            state = step.state
+                # Record step results.
+                scores[:, time] = step.scores
+                attentions[:, time] = step.attentions
+                tokens[:, time] = inputs
+                state = step.state
+
+        # If we're doing beam search, it's a tad more complicated.
+        # TODO(evandez): Implement.
+        else:
+            raise NotImplementedError
 
         return DecoderOutput(
             captions=self.indexer.reconstruct(tokens.tolist()),
@@ -851,6 +868,7 @@ class Decoder(serialize.SerializableModule):
             'length': self.length,
             'strategy': self.strategy,
             'temperature': self.temperature,
+            'beam_size': self.beam_size,
         }
 
     def serializable(self) -> serialize.Children:
