@@ -330,11 +330,11 @@ class Decoder(serialize.SerializableModule):
         scores = images.new_zeros(batch_size, length, self.vocab_size)
         attentions = images.new_zeros(batch_size, length, features.shape[1])
 
-        # Compute initial decoder state.
+        # Compute initial decoder state and initial inputs.
         state = self.init_state(features, lm=mi)
+        inputs = tokens.new_empty(batch_size).fill_(self.indexer.start_index)
 
         # Begin decoding.
-        inputs = tokens.new_empty(batch_size).fill_(self.indexer.start_index)
         for time in range(length):
             step = self.step(features, inputs, state, temperature=temperature)
 
@@ -345,8 +345,9 @@ class Decoder(serialize.SerializableModule):
                 inputs = step.scores.argmax(dim=1)
             else:
                 assert strategy == STRATEGY_SAMPLE
-                for index, lp in enumerate(step.scores):
-                    distribution = categorical.Categorical(probs=torch.exp(lp))
+                for index, logprobs in enumerate(step.scores):
+                    probs = torch.exp(logprobs)
+                    distribution = categorical.Categorical(probs=probs)
                     inputs[index] = distribution.sample()
 
             # Record step results.
