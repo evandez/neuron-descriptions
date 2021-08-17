@@ -338,7 +338,7 @@ class Decoder(serialize.SerializableModule):
         inputs = images.new_empty(batch_size, dtype=torch.long)
         inputs.fill_(self.indexer.start_index)
 
-        # Begin decoding.
+        # Begin decoding. If we're not doing beam search, it's easy!
         if strategy != STRATEGY_BEAM:
             tokens = inputs.new_zeros(batch_size, length)
             scores = images.new_zeros(batch_size, length, self.vocab_size)
@@ -368,10 +368,70 @@ class Decoder(serialize.SerializableModule):
                 tokens[:, time] = inputs
                 state = step.state
 
-        # If we're doing beam search, it's a tad more complicated.
-        # TODO(evandez): Implement.
+        # Otherwise, if we're doing beam search, life is hard.
         else:
-            raise NotImplementedError
+            tokens = inputs.new_zeros(batch_size, beam_size, length)
+            scores = images.new_zeros(batch_size, beam_size, length,
+                                      self.vocab_size)
+            attentions = images.new_zeros(batch_size, beam_size, length,
+                                          features.shape[1])
+            totals = images.new_zeros(batch_size, beam_size, 1)
+
+            # Take the first step, setting up the beam.
+            step = self.step(features, inputs, state, temperature=temperature)
+            topk = step.scores.topk(k=beam_size, dim=-1)
+            tokens[:, :, 0] = topk.indices
+            scores[:, :, 0] = step.scores
+            attentions[:, :, 0] = step.attentions
+            totals[:] = topk.values
+
+            # Adjust the features and state to have the right shape.
+            features = features.repeat_interleave(beam_size, 1, 1)
+            state = DecoderState(*(  # type: ignore
+                tensor.repeat_interleave(beam_size, 1)  # Note interleaves...
+                if tensor is not None else None for tensor in state))
+
+            # Take the remaining steps.
+            for time in range(1, length):
+                inputs = tokens[:, :, time - 1].view(-1)
+                step = self.step(features,
+                                 inputs,
+                                 state,
+                                 temperature=temperature)
+
+                # Determine which sequences (s) in the beam, and which next
+                # tokens (t) for those sequences, will comprise the next beam.
+                topk_t = step.scores.topk(k=beam_size, dim=-1)
+                topk_s = totals\
+                    .add(topk_t.values.view(batch_size, beam_size, beam_size))\
+                    .view(batch_size, beam_size**2)\
+                    .topk(k=beam_size, dim=-1)
+                idx_s = (topk_s.indices // beam_size).view(-1)
+                idx_t = (topk_s.indices % beam_size).view(-1)
+                idx_b = torch.arange(batch_size).repeat_interleave(beam_size)
+
+                # Update the beam. The fancy indexing here allows us to forgo
+                # for loops, which generally impose a big performance penalty.
+                tokens[:, :, time] = topk_t\
+                    .indices[idx_b, idx_s, idx_t]\
+                    .view(batch_size, beam_size)
+                scores[:, :, time] = step\
+                    .scores[idx_b, idx_s]\
+                    .view(batch_size, beam_size, self.vocab_size)
+                attentions[:, :, time] = step\
+                    .attentions[idx_b, idx_s]\
+                    .view(batch_size, beam_size, step.attentions.shape[-1])
+                totals[:] = topk_s.values
+
+                # Don't forget to update RNN state as well!
+                state = DecoderState(*(  # type: ignore
+                    tensor[idx_b, idx_s] if tensor is not None else None
+                    for tensor in state))
+
+            # Throw away everything but the best.
+            tokens = tokens[:, 0].clone()
+            scores = scores[:, 0].clone()
+            attentions = attentions[:, 0].clone()
 
         return DecoderOutput(
             captions=self.indexer.reconstruct(tokens.tolist()),
