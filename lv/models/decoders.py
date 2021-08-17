@@ -154,6 +154,8 @@ class Decoder(serialize.SerializableModule):
                  hidden_size: int = 512,
                  attention_hidden_size: Optional[int] = None,
                  dropout: float = .5,
+                 length: int = 15,
+                 strategy: str = STRATEGY_GREEDY,
                  temperature: float = .3):
         """Initialize the decoder.
 
@@ -173,6 +175,10 @@ class Decoder(serialize.SerializableModule):
                 size and `hidden_size`.
             dropout (float, optional): Dropout probability, applied before
                 output layer of LSTM. Defaults to .5.
+            length (int, optional): Default decoding length. Defaults to 15.
+            strategy (str, optional): Default decoding strategy. Note that
+                force decoding is not supported as a default.
+                Defaults to 'greedy'.
             temperature (float, optional): Default temperature parameter to use
                 when MI decoding. When not MI decoding, this parameter does
                 nothing. Defaults to .3.
@@ -199,6 +205,8 @@ class Decoder(serialize.SerializableModule):
         self.hidden_size = hidden_size
         self.attention_hidden_size = attention_hidden_size
         self.dropout = dropout
+        self.length = length
+        self.strategy = strategy
         self.temperature = temperature
 
         self.init_h = nn.Sequential(nn.Linear(self.feature_size, hidden_size),
@@ -236,7 +244,7 @@ class Decoder(serialize.SerializableModule):
     def forward(self,
                 images: torch.Tensor,
                 masks: torch.Tensor,
-                length: int = ...,
+                length: Optional[int] = ...,
                 strategy: Strategy = ...,
                 mi: Optional[bool] = ...,
                 temperature: Optional[float] = ...,
@@ -248,7 +256,8 @@ class Decoder(serialize.SerializableModule):
                 Should have shape (batch_size, k, 3, height, width).
             masks (torch.Tensor): Top-k image masks for a neuron.
                 Should have shape (batch_size, k, 1, height, width).
-            length (int, optional): Decode for this many steps. Defaults to 15.
+            length (Optional[int], optional): Decode for this many steps.
+                Defaults to `self.length`.
             strategy (Strategy, optional): Decoding strategy. If a tensor,
                 values will be used as inputs at each time step, so it should
                 have shape (batch_size, length). Other options include 'greedy'
@@ -277,14 +286,20 @@ class Decoder(serialize.SerializableModule):
     def forward(self,
                 images: torch.Tensor,
                 masks: Optional[torch.Tensor] = None,
-                length: int = 15,
-                strategy: Strategy = STRATEGY_GREEDY,
+                length: Optional[int] = None,
+                strategy: Optional[Strategy] = None,
                 mi: Optional[bool] = None,
                 temperature: Optional[float] = None,
                 **_: Any) -> DecoderOutput:
         """Implement both overloads."""
+        if length is None:
+            length = self.length
+        if strategy is None:
+            strategy = self.strategy
         if mi is None:
             mi = self.lm is not None and not self.training
+
+        # Validate arguments.
         if mi and self.lm is None:
             raise ValueError('cannot use MI decoding without an LM')
         if mi and self.training:
@@ -832,6 +847,9 @@ class Decoder(serialize.SerializableModule):
             'hidden_size': self.hidden_size,
             'attention_hidden_size': self.attention_hidden_size,
             'dropout': self.dropout,
+            'length': self.length,
+            'strategy': self.strategy,
+            'temperature': self.temperature,
         }
 
     def serializable(self) -> serialize.Children:
