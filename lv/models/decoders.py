@@ -392,7 +392,7 @@ class Decoder(serialize.SerializableModule):
             features = features.repeat_interleave(beam_size, dim=0)
             state = DecoderState(*(  # type: ignore
                 tensor.repeat_interleave(beam_size, dim=0)  # Beamify state.
-                if tensor is not None else None for tensor in state))
+                if tensor is not None else None for tensor in step.state))
 
             # Take the remaining steps.
             for time in range(1, length):
