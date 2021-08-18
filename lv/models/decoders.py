@@ -335,42 +335,42 @@ class Decoder(serialize.SerializableModule):
 
         # Compute initial decoder state and initial inputs.
         state = self.init_state(features, lm=mi)
-        inputs = images.new_empty(batch_size, dtype=torch.long)
-        inputs.fill_(self.indexer.start_index)
+        currents = images.new_empty(batch_size, dtype=torch.long)
+        currents.fill_(self.indexer.start_index)
 
         # Begin decoding. If we're not doing beam search, it's easy!
         if strategy != STRATEGY_BEAM:
-            tokens = inputs.new_zeros(batch_size, length)
+            tokens = currents.new_zeros(batch_size, length)
             scores = images.new_zeros(batch_size, length, self.vocab_size)
             attentions = images.new_zeros(batch_size, length,
                                           features.shape[1])
             for time in range(length):
                 step = self.step(features,
-                                 inputs,
+                                 currents,
                                  state,
                                  temperature=temperature)
 
                 # Pick next token by applying the decoding strategy.
                 if isinstance(strategy, torch.Tensor):
-                    inputs = strategy[:, time]
+                    currents = strategy[:, time]
                 elif strategy == STRATEGY_GREEDY:
-                    inputs = step.scores.argmax(dim=1)
+                    currents = step.scores.argmax(dim=1)
                 else:
                     assert strategy == STRATEGY_SAMPLE
                     for index, logprobs in enumerate(step.scores):
                         probs = torch.exp(logprobs)
                         distribution = categorical.Categorical(probs=probs)
-                        inputs[index] = distribution.sample()
+                        currents[index] = distribution.sample()
 
                 # Record step results.
                 scores[:, time] = step.scores
                 attentions[:, time] = step.attentions
-                tokens[:, time] = inputs
+                tokens[:, time] = currents
                 state = step.state
 
         # Otherwise, if we're doing beam search, life is hard.
         else:
-            tokens = inputs.new_zeros(batch_size, beam_size, length)
+            tokens = currents.new_zeros(batch_size, beam_size, length)
             scores = images.new_zeros(batch_size, beam_size, length,
                                       self.vocab_size)
             attentions = images.new_zeros(batch_size, beam_size, length,
@@ -378,7 +378,10 @@ class Decoder(serialize.SerializableModule):
             totals = images.new_zeros(batch_size, beam_size, 1)
 
             # Take the first step, setting up the beam.
-            step = self.step(features, inputs, state, temperature=temperature)
+            step = self.step(features,
+                             currents,
+                             state,
+                             temperature=temperature)
             topk = step.scores.topk(k=beam_size, dim=-1)
             tokens[:, :, 0] = topk.indices
             scores[:, :, 0] = step.scores
@@ -393,9 +396,9 @@ class Decoder(serialize.SerializableModule):
 
             # Take the remaining steps.
             for time in range(1, length):
-                inputs = tokens[:, :, time - 1].view(-1)
+                currents = tokens[:, :, time - 1].view(-1)
                 step = self.step(features,
-                                 inputs,
+                                 currents,
                                  state,
                                  temperature=temperature)
 
@@ -470,7 +473,7 @@ class Decoder(serialize.SerializableModule):
 
     def step(self,
              features: torch.Tensor,
-             inputs: torch.Tensor,
+             tokens: torch.Tensor,
              state: DecoderState,
              temperature: Optional[float] = None) -> DecoderStep:
         """Take one decoding step.
@@ -481,7 +484,7 @@ class Decoder(serialize.SerializableModule):
         Args:
             features (torch.Tensor): The visual features. Should have shape
                 (batch_size, n_features, feature_size).
-            inputs (torch.Tensor): The current token inputs for the LSTM.
+            tokens (torch.Tensor): The current token inputs for the LSTM.
                 Should be an integer tensor of shape (batch_size,).
             state (DecoderState): The current decoder state.
             temperature (Optional[float], optional): Temperature to use when MI
@@ -510,7 +513,7 @@ class Decoder(serialize.SerializableModule):
         gated = attenuated * gate
 
         # Prepare LSTM inputs and take a step.
-        embeddings = self.embedding(inputs)
+        embeddings = self.embedding(tokens)
         inputs = torch.cat((embeddings, gated), dim=-1)
         h, c = self.lstm(inputs, (h, c))
         scores = log_p_w = self.output(h)
@@ -518,7 +521,7 @@ class Decoder(serialize.SerializableModule):
         # If MI decoding, convert likelihood into mutual information.
         if self.lm is not None and h_lm is not None and c_lm is not None:
             with torch.no_grad():
-                inputs_lm = self.lm.embedding(inputs)[:, None]
+                inputs_lm = self.lm.embedding(tokens)[:, None]
                 _, (h_lm, c_lm) = self.lm.lstm(inputs_lm, (h_lm, c_lm))
                 assert h_lm is not None and c_lm is not None
                 log_p_w_lm = self.lm.output(h_lm[-1])
