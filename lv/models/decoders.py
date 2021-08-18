@@ -415,19 +415,16 @@ class Decoder(serialize.SerializableModule):
 
                 # Update the beam. The fancy indexing here allows us to forgo
                 # for loops, which generally impose a big performance penalty.
-                tokens[:, :, time] = topk_t.indices\
-                    .view(batch_size, beam_size, beam_size)[
-                        idx_b, idx_s, idx_t]\
+                tokens[:, :, time] = topk_t\
+                    .indices[idx_b, idx_s, idx_t]\
                     .view(batch_size, beam_size)
-                scores[:, :, time] = step.scores\
-                    .view(batch_size, beam_size, self.vocab_size)[
-                        idx_b, idx_s]\
+                scores[:, :, time] = step\
+                    .scores[idx_b, idx_s]\
                     .view(batch_size, beam_size, self.vocab_size)
-                attentions[:, :, time] = step.attentions\
-                    .view(batch_size, beam_size, step.attentions.shape[-1])[
-                        idx_b, idx_s]\
+                attentions[:, :, time] = step\
+                    .attentions[idx_b, idx_s]\
                     .view(batch_size, beam_size, step.attentions.shape[-1])
-                totals[:] = topk_s.values.view(batch_size, beam_size)
+                totals[:] = topk_s.values
 
                 # Don't forget to update RNN state as well!
                 state = DecoderState(*(  # type: ignore
