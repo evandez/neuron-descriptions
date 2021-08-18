@@ -384,8 +384,8 @@ class Decoder(serialize.SerializableModule):
                              temperature=temperature)
             topk = step.scores.topk(k=beam_size, dim=-1)
             tokens[:, :, 0] = topk.indices
-            scores[:, :, 0] = step.scores
-            attentions[:, :, 0] = step.attentions
+            scores[:, :, 0] = step.scores[:, None]
+            attentions[:, :, 0] = step.attentions[:, None]
             totals[:] = topk.values.view(batch_size, beam_size, 1)
 
             # Adjust the features and state to have the right shape.
@@ -423,21 +423,27 @@ class Decoder(serialize.SerializableModule):
 
                 # Update the beam. The fancy indexing here allows us to forgo
                 # for loops, which generally impose a big performance penalty.
-                tokens[:, :, :time] = tokens[idx_b, idx_s, :time]
+                tokens[:, :, :time] = tokens[idx_b, idx_s, :time]\
+                    .view(batch_size, beam_size, time)
                 tokens[:, :, time] = topk_t.indices\
                     .view(batch_size, beam_size, beam_size)[
                         idx_b, idx_s, idx_t]\
                     .view(batch_size, beam_size)
-                scores[:, :, :time] = scores[idx_b, idx_s, :time]
+
+                scores[:, :, :time] = scores[idx_b, idx_s, :time]\
+                    .view(batch_size, beam_size, time, self.vocab_size)
                 scores[:, :, time] = step.scores\
                     .view(batch_size, beam_size, self.vocab_size)[
                         idx_b, idx_s]\
                     .view(batch_size, beam_size, self.vocab_size)
-                attentions[:, :, :time] = attentions[idx_b, idx_s, :time]
+
+                attentions[:, :, :time] = attentions[idx_b, idx_s, :time]\
+                    .view(batch_size, beam_size, time, attentions.shape[-1])
                 attentions[:, :, time] = step.attentions\
                     .view(batch_size, beam_size, step.attentions.shape[-1])[
                         idx_b, idx_s]\
                     .view(batch_size, beam_size, step.attentions.shape[-1])
+
                 totals[:] = topk_s.values.view(batch_size, beam_size, 1)
 
                 # Don't forget to update RNN state as well!
