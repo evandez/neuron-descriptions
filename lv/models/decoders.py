@@ -450,11 +450,11 @@ class Decoder(serialize.SerializableModule):
                         .arange(self.lm.layers)\
                         .repeat_interleave(batch_size * beam_size)
                     h_lm = step.state.h_lm\
-                        .view(self.lm.layers, batch_size, beam_size)[
+                        .view(self.lm.layers, batch_size, beam_size, -1)[
                             idx_lm, idx_b, idx_s]\
                         .view(self.lm.layers, batch_size * beam_size, -1)
                     c_lm = step.state.c_lm\
-                        .view(self.lm.layers, batch_size, beam_size)[
+                        .view(self.lm.layers, batch_size, beam_size, -1)[
                             idx_lm, idx_b, idx_s]\
                         .view(self.lm.layers, batch_size * beam_size, -1)
 
