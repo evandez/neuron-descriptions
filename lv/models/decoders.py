@@ -431,7 +431,8 @@ class Decoder(serialize.SerializableModule):
 
                 # Don't forget to update RNN state as well!
                 state = DecoderState(*(  # type: ignore
-                    tensor[idx_b, idx_s] if tensor is not None else None
+                    tensor.view(batch_size, beam_size, -1)[
+                        idx_b, idx_s] if tensor is not None else None
                     for tensor in state))
 
             # Throw away everything but the best.
