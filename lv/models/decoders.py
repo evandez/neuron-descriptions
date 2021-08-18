@@ -448,14 +448,18 @@ class Decoder(serialize.SerializableModule):
                     assert step.state.c_lm is not None
                     h_lm = step.state.h_lm\
                         .permute(1, 0, 2)\
+                        .contiguous()\
                         .view(batch_size, beam_size, -1)[idx_b, idx_s]\
                         .view(batch_size * beam_size, self.lm.layers, -1)\
-                        .permute(1, 0, 2)
+                        .permute(1, 0, 2)\
+                        .contiguous()
                     c_lm = step.state.c_lm\
                         .permute(1, 0, 2)\
+                        .contiguous()\
                         .view(batch_size, beam_size, -1)[idx_b, idx_s]\
                         .view(batch_size * beam_size, self.lm.layers, -1)\
-                        .permute(1, 0, 2)
+                        .permute(1, 0, 2)\
+                        .contiguous()
 
                 state = DecoderState(h, c, h_lm, c_lm)
 
