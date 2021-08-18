@@ -390,9 +390,17 @@ class Decoder(serialize.SerializableModule):
 
             # Adjust the features and state to have the right shape.
             features = features.repeat_interleave(beam_size, dim=0)
-            state = DecoderState(*(  # type: ignore
-                tensor.repeat_interleave(beam_size, dim=0)  # Beamify state.
-                if tensor is not None else None for tensor in step.state))
+
+            h = step.state.h.repeat_interleave(beam_size, dim=0)
+            c = step.state.c.repeat_interleave(beam_size, dim=0)
+            h_lm, c_lm = None, None
+            if mi:
+                assert self.lm is not None
+                assert step.state.h_lm is not None
+                assert step.state.c_lm is not None
+                h_lm = step.state.h_lm.repeat_interleave(beam_size, dim=1)
+                c_lm = step.state.c_lm.repeat_interleave(beam_size, dim=1)
+            state = DecoderState(h, c, h_lm, c_lm)
 
             # Take the remaining steps.
             for time in range(1, length):
@@ -430,10 +438,27 @@ class Decoder(serialize.SerializableModule):
                 totals[:] = topk_s.values.view(batch_size, beam_size, 1)
 
                 # Don't forget to update RNN state as well!
-                state = DecoderState(*(  # type: ignore
-                    tensor.view(batch_size, beam_size, -1)[
-                        idx_b, idx_s] if tensor is not None else None
-                    for tensor in step.state))
+                h = step.state.h.view(batch_size, beam_size, -1)[idx_b, idx_s]
+                c = step.state.c.view(batch_size, beam_size, -1)[idx_b, idx_s]
+
+                h_lm, c_lm = None, None
+                if mi:
+                    assert self.lm is not None
+                    assert step.state.h_lm is not None
+                    assert step.state.c_lm is not None
+                    idx_lm = torch\
+                        .arange(self.lm.layers)\
+                        .repeat_interleave(batch_size * beam_size)
+                    h_lm = step.state.h_lm\
+                        .view(self.lm.layers, batch_size, beam_size)[
+                            idx_lm, idx_b, idx_s]\
+                        .view(self.lm.layers, batch_size * beam_size, -1)
+                    c_lm = step.state.c_lm\
+                        .view(self.lm.layers, batch_size, beam_size)[
+                            idx_lm, idx_b, idx_s]\
+                        .view(self.lm.layers, batch_size * beam_size, -1)
+
+                state = DecoderState(h, c, h_lm, c_lm)
 
             # Throw away everything but the best.
             tokens = tokens[:, 0].clone()
