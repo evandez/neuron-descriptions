@@ -446,17 +446,16 @@ class Decoder(serialize.SerializableModule):
                     assert self.lm is not None
                     assert step.state.h_lm is not None
                     assert step.state.c_lm is not None
-                    idx_lm = torch\
-                        .arange(self.lm.layers)\
-                        .repeat_interleave(batch_size * beam_size)
                     h_lm = step.state.h_lm\
-                        .view(self.lm.layers, batch_size, beam_size, -1)[
-                            idx_lm, idx_b, idx_s]\
-                        .view(self.lm.layers, batch_size * beam_size, -1)
+                        .permute(1, 0, 2)\
+                        .view(batch_size, beam_size, -1)[idx_b, idx_s]\
+                        .view(batch_size * beam_size, self.lm.layers, -1)\
+                        .permute(1, 0, 2)
                     c_lm = step.state.c_lm\
-                        .view(self.lm.layers, batch_size, beam_size, -1)[
-                            idx_lm, idx_b, idx_s]\
-                        .view(self.lm.layers, batch_size * beam_size, -1)
+                        .permute(1, 0, 2)\
+                        .view(batch_size, beam_size, -1)[idx_b, idx_s]\
+                        .view(batch_size * beam_size, self.lm.layers, -1)\
+                        .permute(1, 0, 2)
 
                 state = DecoderState(h, c, h_lm, c_lm)
 
