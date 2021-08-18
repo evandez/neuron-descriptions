@@ -423,14 +423,17 @@ class Decoder(serialize.SerializableModule):
 
                 # Update the beam. The fancy indexing here allows us to forgo
                 # for loops, which generally impose a big performance penalty.
+                tokens[:, :, :time] = tokens[idx_b, idx_s, :time]
                 tokens[:, :, time] = topk_t.indices\
                     .view(batch_size, beam_size, beam_size)[
                         idx_b, idx_s, idx_t]\
                     .view(batch_size, beam_size)
+                scores[:, :, :time] = scores[idx_b, idx_s, :time]
                 scores[:, :, time] = step.scores\
                     .view(batch_size, beam_size, self.vocab_size)[
                         idx_b, idx_s]\
                     .view(batch_size, beam_size, self.vocab_size)
+                attentions[:, :, :time] = attentions[idx_b, idx_s, :time]
                 attentions[:, :, time] = step.attentions\
                     .view(batch_size, beam_size, step.attentions.shape[-1])[
                         idx_b, idx_s]\
