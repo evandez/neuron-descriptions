@@ -427,7 +427,7 @@ class Decoder(serialize.SerializableModule):
                     .view(batch_size, beam_size, step.attentions.shape[-1])[
                         idx_b, idx_s]\
                     .view(batch_size, beam_size, step.attentions.shape[-1])
-                totals[:] = topk_s.values.view(batch_size, beam_size)
+                totals[:] = topk_s.values.view(batch_size, beam_size, 1)
 
                 # Don't forget to update RNN state as well!
                 state = DecoderState(*(  # type: ignore
