@@ -386,7 +386,7 @@ class Decoder(serialize.SerializableModule):
             tokens[:, :, 0] = topk.indices
             scores[:, :, 0] = step.scores
             attentions[:, :, 0] = step.attentions
-            totals[:] = topk.values
+            totals[:] = topk.values.view(batch_size, beam_size, 1)
 
             # Adjust the features and state to have the right shape.
             features = features.repeat_interleave(beam_size, 1, 1)
