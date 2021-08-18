@@ -389,7 +389,7 @@ class Decoder(serialize.SerializableModule):
             totals[:] = topk.values.view(batch_size, beam_size, 1)
 
             # Adjust the features and state to have the right shape.
-            features = features.repeat(beam_size, dim=0)
+            features = features.repeat_interleave(beam_size, dim=0)
             state = DecoderState(*(  # type: ignore
                 tensor.repeat_interleave(beam_size, dim=0)  # Beamify state.
                 if tensor is not None else None for tensor in state))
