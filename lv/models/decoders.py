@@ -247,7 +247,7 @@ class Decoder(serialize.SerializableModule):
 
     @overload
     def forward(self,
-                images: torch.Tensor,
+                images_or_features: torch.Tensor,
                 masks: torch.Tensor,
                 length: Optional[int] = ...,
                 strategy: Strategy = ...,
@@ -257,7 +257,7 @@ class Decoder(serialize.SerializableModule):
         """Decode captions for the given top images and masks.
 
         Args:
-            images (torch.Tensor): Top-k images for a neuron.
+            images_or_features (torch.Tensor): Top-k images for a neuron.
                 Should have shape (batch_size, k, 3, height, width).
             masks (torch.Tensor): Top-k image masks for a neuron.
                 Should have shape (batch_size, k, 1, height, width).
@@ -281,15 +281,16 @@ class Decoder(serialize.SerializableModule):
         ...
 
     @overload
-    def forward(self, images: torch.Tensor, **kwargs: Any) -> DecoderOutput:
-        """Decode captions for the given visual features.
+    def forward(self, images_or_features: torch.Tensor,
+                **kwargs: Any) -> DecoderOutput:
+        """Decode captions for the given images or visual features.
 
         Same as the other overload, but inputs are visual features.
         """
         ...
 
     def forward(self,
-                images: torch.Tensor,
+                images_or_features: torch.Tensor,
                 masks: Optional[torch.Tensor] = None,
                 length: Optional[int] = None,
                 strategy: Optional[Strategy] = None,
@@ -322,28 +323,30 @@ class Decoder(serialize.SerializableModule):
                 raise ValueError(f'strategy must have length {length}, '
                                  f'got {strategy.shape[-1]}')
 
-        batch_size = len(images)
+        batch_size = len(images_or_features)
 
         # If necessary, obtain visual features.
         if masks is not None:
-            images = images.view(-1, 3, *images.shape[-2:])
-            masks = masks.view(-1, 1, *masks.shape[-2:])
+            images = images_or_features
+            images = images.view(-1, *images.shape[-3:])
+            masks = masks.view(-1, *masks.shape[-3:])
             with torch.no_grad():
                 features = self.encoder(images, masks)
         else:
-            features = images.view(batch_size, -1, self.feature_size)
+            features = images_or_features
+        features = features.view(batch_size, -1, self.feature_size)
 
         # Compute initial decoder state and initial inputs.
         state = self.init_state(features, lm=mi)
-        currents = images.new_empty(batch_size, dtype=torch.long)
+        currents = features.new_empty(batch_size, dtype=torch.long)
         currents.fill_(self.indexer.start_index)
 
         # Begin decoding. If we're not doing beam search, it's easy!
         if strategy != STRATEGY_BEAM:
             tokens = currents.new_zeros(batch_size, length)
-            scores = images.new_zeros(batch_size, length, self.vocab_size)
-            attentions = images.new_zeros(batch_size, length,
-                                          features.shape[1])
+            scores = features.new_zeros(batch_size, length, self.vocab_size)
+            attentions = features.new_zeros(batch_size, length,
+                                            features.shape[1])
             for time in range(length):
                 step = self.step(features,
                                  currents,
@@ -371,11 +374,11 @@ class Decoder(serialize.SerializableModule):
         # Otherwise, if we're doing beam search, life is hard.
         else:
             tokens = currents.new_zeros(batch_size, beam_size, length)
-            scores = images.new_zeros(batch_size, beam_size, length,
-                                      self.vocab_size)
-            attentions = images.new_zeros(batch_size, beam_size, length,
-                                          features.shape[1])
-            totals = images.new_zeros(batch_size, beam_size, 1)
+            scores = features.new_zeros(batch_size, beam_size, length,
+                                        self.vocab_size)
+            attentions = features.new_zeros(batch_size, beam_size, length,
+                                            features.shape[1])
+            totals = features.new_zeros(batch_size, beam_size, 1)
 
             # Take the first step, setting up the beam.
             step = self.step(features,
