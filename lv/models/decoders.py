@@ -772,26 +772,23 @@ class Decoder(serialize.SerializableModule):
         """
         if device is not None:
             self.to(device)
-        if features is None:
-            features = self.encoder.map(dataset,
-                                        mask=mask,
-                                        image_index=image_index,
-                                        mask_index=mask_index,
-                                        batch_size=batch_size,
-                                        device=device,
-                                        display_progress_as=display_progress_as
-                                        is not None)
 
-        loader = data.DataLoader(features,
+        loader = data.DataLoader(dataset if features is None else features,
                                  batch_size=batch_size,
                                  num_workers=num_workers)
         if display_progress_as is not None:
             loader = tqdm(loader, desc=display_progress_as)
 
         outputs = []
-        for (inputs,) in loader:
+        for batch in loader:
+            if features is not None:
+                inputs, = batch
+            else:
+                images = batch[image_index].to(device)
+                masks = batch[mask_index].to(device) if mask else None
+                inputs = (images, masks)
             with torch.no_grad():
-                output = self(inputs.to(device), **kwargs)
+                output = self(*inputs, **kwargs)
             outputs.append(output)
 
         captions = []
