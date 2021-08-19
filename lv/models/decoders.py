@@ -770,8 +770,6 @@ class Decoder(serialize.SerializableModule):
             StrSequence: Captions for entire dataset.
 
         """
-        if 'captions' in kwargs:
-            raise ValueError('setting captions= not supported')
         if device is not None:
             self.to(device)
         if features is None:
