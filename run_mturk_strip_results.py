@@ -37,8 +37,16 @@ hits.strip_results_csv(
         'these are ',
         'these have ',
         'there are ',
+        'they are ',
+        'they all are ',
         'this is ',
         'most images contain ',
+        'all are ',
+        'the is the ',
+        'all images are ',
+        'all images include ',
+        'all images contain ',
+        'all the above are ',
         'most images ',
         'the images show ',
         'images of ',
@@ -46,4 +54,5 @@ hits.strip_results_csv(
         'nice ',
     ),
     remove_substrings=(' these are ', ' nice '),
-    remove_suffixes=('.', ',', ' i can see', ' nice'))
+    remove_suffixes=('.', ',', ' i can see', ' nice'),
+    replace_substrings={'none of the above': 'nothing'})
