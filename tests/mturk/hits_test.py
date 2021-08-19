@@ -158,6 +158,33 @@ def test_strip_results_csv(results_csv_file, out_csv_file):
     ]
 
 
+@pytest.mark.parametrize('out_csv_file', (None, 'out.csv'))
+def test_strip_results_csv_cleaning(results_csv_file, out_csv_file):
+    """Test strip_results_csv correctly cleans annotations."""
+    if out_csv_file is not None:
+        out_csv_file = results_csv_file.parent / out_csv_file
+
+    hits.strip_results_csv(results_csv_file,
+                           out_csv_file=out_csv_file,
+                           remove_prefixes=('(', 'l'),
+                           remove_substrings=(')',),
+                           remove_suffixes=('tation', ' anno'),
+                           replace_substrings={'ayer-': ''})
+
+    if out_csv_file is None:
+        out_csv_file = results_csv_file
+
+    with out_csv_file.open('r') as handle:
+        rows = list(csv.reader(handle))
+
+    assert rows == [
+        ['layer', 'unit', 'summary'],
+        [conftest.layer(0), '0', '0, 0'],
+        [conftest.layer(1), '1', '1, 1'],
+        [conftest.layer(2), '2', '2, 2'],
+    ]
+
+
 def test_strip_results_csv_keep_rejected(results_csv_file):
     """Test strip_results_csv keeps rejected HITs when told to do so."""
     out_csv_file = results_csv_file.parent / 'out.csv'

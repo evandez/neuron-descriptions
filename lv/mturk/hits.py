@@ -1,13 +1,16 @@
 """Tools for generating MTurk HITS."""
+import collections
 import csv
 import pathlib
 import random
-from typing import Callable, Optional, Sequence
+from typing import Callable, Mapping, Optional, Sequence
 from urllib import request
 
 from lv import datasets
-from lv.utils.typing import Layer, PathLike
+from lv.utils import lang
+from lv.utils.typing import Layer, PathLike, StrSequence
 
+import spellchecker
 from tqdm.auto import tqdm
 
 
@@ -95,16 +98,25 @@ def generate_hits_csv(
         writer.writerows(rows)
 
 
-def strip_results_csv(results_csv_file: PathLike,
-                      out_csv_file: Optional[PathLike] = None,
-                      in_layer_column: str = 'Input.layer',
-                      in_unit_column: str = 'Input.unit',
-                      in_annotation_column: str = 'Answer.summary',
-                      in_rejection_column: str = 'RejectionTime',
-                      out_layer_column: str = 'layer',
-                      out_unit_column: str = 'unit',
-                      out_annotation_column: str = 'summary',
-                      keep_rejected: bool = False) -> None:
+def strip_results_csv(
+    results_csv_file: PathLike,
+    out_csv_file: Optional[PathLike] = None,
+    in_layer_column: str = 'Input.layer',
+    in_unit_column: str = 'Input.unit',
+    in_annotation_column: str = 'Answer.summary',
+    in_rejection_column: str = 'RejectionTime',
+    out_layer_column: str = 'layer',
+    out_unit_column: str = 'unit',
+    out_annotation_column: str = 'summary',
+    keep_rejected: bool = False,
+    spellcheck: bool = False,
+    remove_prefixes: Optional[StrSequence] = None,
+    remove_substrings: Optional[StrSequence] = None,
+    remove_suffixes: Optional[StrSequence] = None,
+    replace_prefixes: Optional[Mapping[str, str]] = None,
+    replace_substrings: Optional[Mapping[str, str]] = None,
+    replace_suffixes: Optional[Mapping[str, str]] = None,
+) -> None:
     """Strip the results CSV of everything but layer, unit, and annotation.
 
     Args:
@@ -127,6 +139,20 @@ def strip_results_csv(results_csv_file: PathLike,
             Defaults to 'summary'.
         keep_rejected (bool, optional): If set, keep rejected HITs. Otherwise
             they will be removed. Defaults to False.
+        spellcheck (bool, optional): Spellcheck and correct the annotations.
+            Defaults to False.
+        remove_prefixes (Optional[StrSequence], optional): Remove these
+            prefixes from annotations in this order. Defaults to None.
+        remove_substrings (Optional[StrSequence], optional): Remove these
+            substrings from annotations in this order. Defaults to None.
+        remove_suffixes (Optional[StrSequence], optional): Remove these
+            suffixes from annotations in this order. Defaults to None.
+        replace_prefixes (Optional[Mapping[str, str]], optional): Replace
+            prefixes (keys) with new strings (values). Defaults to None.
+        replace_substrings (Optional[Mapping[str, str]], optional): Replace
+            substrings (keys) with new strings (values). Defaults to None.
+        replace_suffixes (Optional[Mapping[str, str]], optional): Replace
+            suffixes (keys) with new strings (values). Defaults to None.
 
     """
     results_csv_file = pathlib.Path(results_csv_file)
@@ -149,13 +175,51 @@ def strip_results_csv(results_csv_file: PathLike,
         if column not in fields:
             raise KeyError(f'mturk results csv missing column: {column}')
 
+    # Set up all of our cleaning dictionaries.
+    replace_prefixes = collections.OrderedDict(replace_prefixes or {})
+    if remove_prefixes is not None:
+        for prefix in remove_prefixes:
+            replace_prefixes[prefix] = ''
+
+    replace_substrings = collections.OrderedDict(replace_substrings or {})
+    if remove_substrings is not None:
+        for substring in remove_substrings:
+            replace_substrings[substring] = ''
+
+    replace_suffixes = collections.OrderedDict(replace_suffixes or {})
+    if remove_suffixes is not None:
+        for suffix in remove_suffixes:
+            replace_suffixes[suffix] = ''
+
+    if spellcheck:
+        spell = spellchecker.SpellChecker()
+        vocab = lang.vocab([input[in_annotation_column] for input in inputs])
+        for word in tqdm(spell.unknown(vocab.tokens), desc='spellchecking'):
+            correction = spell.correction(word)
+            replace_prefixes[f'{word} '] = f'{correction} '
+            replace_substrings[f' {word} '] = f' {correction} '
+            replace_suffixes[f' {word}'] = f' {correction}'
+
+    # Okay, now construct the output CSV.
     header = (out_layer_column, out_unit_column, out_annotation_column)
     outputs = [header]
     for input in inputs:
         if not keep_rejected and input[in_rejection_column].strip():
             continue
-        output = (input[in_layer_column], input[in_unit_column],
-                  input[in_annotation_column])
+
+        # We always lowercase the annotation before cleaning.
+        annotation = input[in_annotation_column].lower()
+        for prefix, replacement in replace_prefixes.items():
+            if annotation.startswith(prefix):
+                annotation = replacement + annotation[len(prefix):]
+        for substring, replacement in replace_substrings.items():
+            annotation = annotation.replace(substring, replacement)
+        for suffix, replacement in replace_suffixes.items():
+            if annotation.endswith(suffix):
+                annotation = annotation[:-len(suffix)] + replacement
+        annotation = annotation.strip()
+
+        output = (input[in_layer_column], input[in_unit_column], annotation)
         outputs.append(output)
 
     with out_csv_file.open('w') as handle:
