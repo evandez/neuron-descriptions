@@ -1,11 +1,11 @@
 """Models for decoding neuron captions."""
 import warnings
 from typing import (Any, Dict, Mapping, NamedTuple, Optional, Sized, Tuple,
-                    Type, Union, cast, overload)
+                    Type, Union, cast)
 
 from lv.models import encoders, lms
 from lv.utils import lang, serialize, training
-from lv.utils.typing import Device, StrSequence
+from lv.utils.typing import Device, OptionalTensors, StrSequence
 
 import bert_score
 import rouge
@@ -245,60 +245,53 @@ class Decoder(serialize.SerializableModule):
         """Return the vocab size."""
         return len(self.indexer)
 
-    @overload
-    def forward(self,
-                images_or_features: torch.Tensor,
-                masks: torch.Tensor,
-                length: Optional[int] = ...,
-                strategy: Strategy = ...,
-                mi: Optional[bool] = ...,
-                temperature: Optional[float] = ...,
-                **kwargs: Any) -> DecoderOutput:
-        """Decode captions for the given top images and masks.
-
-        Args:
-            images_or_features (torch.Tensor): Top-k images for a neuron.
-                Should have shape (batch_size, k, 3, height, width).
-            masks (torch.Tensor): Top-k image masks for a neuron.
-                Should have shape (batch_size, k, 1, height, width).
-            length (Optional[int], optional): Decode for this many steps.
-                Defaults to `self.length`.
-            strategy (Strategy, optional): Decoding strategy. If a tensor,
-                values will be used as inputs at each time step, so it should
-                have shape (batch_size, length). Other options include 'greedy'
-                and 'sample'. Defaults to 'greedy'.
-            mi (bool, optional): If True, use MI decoding. If False, use
-                likelihood decoding. By default, MI decoding is used if the
-                decoder has an LM and is itself not in training mode.
-            temperature (Optional[float], optional): Temperature parameter for
-                MI decoding. Does nothing if not MI decoding.
-                Defaults to `self.temperature`.
-
-        Returns:
-            DecoderOutput: Decoder outputs.
-
-        """
-        ...
-
-    @overload
-    def forward(self, images_or_features: torch.Tensor,
-                **kwargs: Any) -> DecoderOutput:
-        """Decode captions for the given images or visual features.
-
-        Same as the other overload, but inputs are visual features.
-        """
-        ...
-
     def forward(self,
                 images_or_features: torch.Tensor,
                 masks: Optional[torch.Tensor] = None,
+                encode: Optional[bool] = None,
                 length: Optional[int] = None,
                 strategy: Optional[Strategy] = None,
                 mi: Optional[bool] = None,
                 temperature: Optional[float] = None,
                 beam_size: Optional[int] = None,
                 **_: Any) -> DecoderOutput:
-        """Implement both overloads."""
+        """Decode captions for the given top images and masks.
+
+        Args:
+            images_or_features (torch.Tensor): Images to caption or
+                precomputed image features. If images, should have shape
+                (*, 3, height, width), where * is any shape. If features,
+                should have shape (batch_size, num_features, feature_size).
+            masks (Optional[torch.Tensor], optional): Masks to use with images
+                if `encode` is True. Should have shape (*, 1, height, width),
+                where * is the same as in the `images` argument.
+                Defaults to None.
+            encode (Optional[bool], optional): If True, treat
+                `images_or_features` as images and pass it through the encoder,
+                regardless of whether `masks` is set. If False, do not encode
+                even if `masks` is set. By default, `images_or_features` are
+                passed to encoder iff `masks` is set.
+            length (Optional[int], optional): Decode for this many steps.
+                Defaults to `self.length`.
+            strategy (Strategy, optional): Decoding strategy. If a tensor,
+                values will be used as inputs at each time step, so it should
+                have shape (batch_size, length). Other options include
+                'greedy', 'sample', and 'beam'. Defaults to 'greedy'.
+            mi (bool, optional): If True, use MI decoding. If False, use
+                likelihood decoding. By default, MI decoding is used if the
+                decoder has an LM and is itself not in training mode.
+            temperature (Optional[float], optional): Temperature parameter for
+                MI decoding. Does nothing if not MI decoding.
+                Defaults to `self.temperature`.
+            beam_size (Optional[int], optional): Beam size to use when decoding
+                strategy is beam search. Defaults to `self.beam_size`.
+
+        Returns:
+            DecoderOutput: Decoder outputs.
+
+        """
+        if encode is None:
+            encode = masks is not None
         if length is None:
             length = self.length
         if strategy is None:
@@ -326,15 +319,10 @@ class Decoder(serialize.SerializableModule):
         batch_size = len(images_or_features)
 
         # If necessary, obtain visual features.
-        if masks is not None:
-            images = images_or_features
-            images = images.view(-1, *images.shape[-3:])
-            masks = masks.view(-1, *masks.shape[-3:])
-            with torch.no_grad():
-                features = self.encoder(images, masks)
+        if encode:
+            features = self.encode(images_or_features, masks=masks)
         else:
             features = images_or_features
-        features = features.view(batch_size, -1, self.feature_size)
 
         # Compute initial decoder state and initial inputs.
         state = self.init_state(features, lm=mi)
@@ -486,6 +474,28 @@ class Decoder(serialize.SerializableModule):
             tokens=tokens,
             attentions=attentions,
         )
+
+    def encode(self,
+               images: torch.Tensor,
+               masks: Optional[torch.Tensor] = None) -> torch.Tensor:
+        """Encode the images and masks into visual features.
+
+        Args:
+            images (torch.Tensor): Images to encode. Should have shape
+                (*, 3, height, width), where * is any shape.
+            masks (Optional[torch.Tensor]): Masks for images. Should have shape
+                (*, 1, height, width), where * is any shape, but must be the
+                same shape as `images`. Defaults to None.
+
+        Returns:
+            torch.Tensor: The masked image features.
+
+        """
+        images = images.view(-1, *images.shape[-3:])
+        if masks is not None:
+            masks = masks.view(-1, *masks.shape[-3:])
+        features = self.encoder(images, masks=masks)
+        return features.view(len(images), -1, self.feature_size)
 
     def init_state(self,
                    features: torch.Tensor,
@@ -813,8 +823,8 @@ class Decoder(serialize.SerializableModule):
 
         Args:
             dataset (data.Dataset): Dataset to train on.
-            mask (bool, optional): Use masks when computing features. Exact
-                behavior depends on the featurizer. Defaults to True.
+            mask (bool, optional): Use masks when computing features, if
+                precomputed features are not provided. Defaults to True.
             image_index (int, optional): Index of images in dataset samples.
                 Defaults to 2 to be compatible with AnnotatedTopImagesDataset.
             mask_index (int, optional): Index of masks in dataset samples.
@@ -852,15 +862,6 @@ class Decoder(serialize.SerializableModule):
             self.to(device)
         if optimizer_kwargs is None:
             optimizer_kwargs = {}
-        if features is None:
-            features = self.encoder.map(dataset,
-                                        mask=mask,
-                                        image_index=image_index,
-                                        mask_index=mask_index,
-                                        batch_size=batch_size,
-                                        device=device,
-                                        display_progress_as=display_progress_as
-                                        is not None)
 
         # Prepare dataset and data loader. Use an anonymous dataset class to
         # make this easier, since we want to split train/val by neuron, but
@@ -870,27 +871,33 @@ class Decoder(serialize.SerializableModule):
             def __init__(self, subset: data.Subset):
                 self.samples = []
                 for index in subset.indices:
-                    assert features is not None
-                    feature, = features[index]
+                    images_or_features: OptionalTensors
+                    if features is None:
+                        images = dataset[index][image_index]
+                        masks = dataset[index][mask_index] if mask else None
+                        images_or_features = (images, masks)
+                    else:
+                        images_or_features = features[index]
 
                     annotations = dataset[index][annotation_index]
                     if isinstance(annotations, str):
-                        sample = (feature, annotations)
+                        sample = (images_or_features, annotations)
                         self.samples.append(sample)
                         continue
 
                     for annotation in annotations:
-                        sample = (feature, annotation)
+                        sample = (images_or_features, annotation)
                         self.samples.append(sample)
 
-            def __getitem__(self, index: int) -> Tuple[torch.Tensor, str]:
+            def __getitem__(self, index: int) -> Tuple[OptionalTensors, str]:
                 return self.samples[index]
 
             def __len__(self) -> int:
                 return len(self.samples)
 
-        val_size = int(hold_out * len(features))
-        train_size = len(features) - val_size
+        size = len(cast(Sized, dataset))
+        val_size = int(hold_out * size)
+        train_size = size - val_size
         train, val = data.random_split(dataset, (train_size, val_size))
         train_loader = data.DataLoader(WrapperDataset(train),
                                        num_workers=num_workers,
@@ -905,6 +912,41 @@ class Decoder(serialize.SerializableModule):
         criterion = nn.NLLLoss(ignore_index=self.indexer.pad_index)
         stopper = training.EarlyStopping(patience=patience)
 
+        # Wrap the batch -> loss computation in a fn since we use it for both
+        # training and validation.
+        def process(batch: Tuple[OptionalTensors, str],
+                    regularize: bool = True) -> torch.Tensor:
+            images_or_features, captions = batch
+            if features is None:
+                assert len(images_or_features) == 2
+
+                images, masks = images_or_features
+                assert images is not None
+
+                with torch.no_grad():
+                    inputs = self.encode(
+                        images.to(device),
+                        masks=masks.to(device) if masks is not None else None)
+            else:
+                inputs, = cast(torch.Tensor, images_or_features)
+                assert inputs is not None
+
+            targets = torch.tensor(self.indexer(captions), device=device)
+            targets = targets[:, 1:]
+            _, length = targets.shape
+
+            outputs: DecoderOutput = self(inputs.to(device),
+                                          length=length,
+                                          strategy=targets,
+                                          mi=False)
+
+            loss = criterion(outputs.scores.permute(0, 2, 1), targets)
+            if regularize:
+                attentions = outputs.attentions
+                regularizer = ((1 - attentions.sum(dim=1))**2).mean()
+                loss += regularization_weight * regularizer
+            return loss
+
         progress = range(max_epochs)
         if display_progress_as is not None:
             progress = tqdm(progress, desc=display_progress_as)
@@ -914,42 +956,19 @@ class Decoder(serialize.SerializableModule):
             self.train()
             self.encoder.eval()
             train_loss = 0.
-            for features_v, captions in train_loader:
-                targets = torch.tensor(self.indexer(captions),
-                                       device=device)[:, 1:]
-                _, length = targets.shape
-
-                outputs: DecoderOutput = self(features_v.to(device),
-                                              length=length,
-                                              strategy=targets,
-                                              mi=False)
-
-                loss = criterion(outputs.scores.permute(0, 2, 1), targets)
-
-                attentions = outputs.attentions
-                regularizer = ((1 - attentions.sum(dim=1))**2).mean()
-                loss += regularization_weight * regularizer
-
+            for batch in train_loader:
+                loss = process(batch, regularize=True)
                 loss.backward()
                 optimizer.step()
                 optimizer.zero_grad()
-
                 train_loss += loss.item()
             train_loss /= len(train_loader)
 
             self.eval()
             val_loss = 0.
-            for features_v, captions in val_loader:
-                targets = torch.tensor(self.indexer(captions),
-                                       device=device)[:, 1:]
-                _, length = targets.shape
-
+            for batch in val_loader:
                 with torch.no_grad():
-                    outputs = self(features_v,
-                                   length=length,
-                                   strategy=targets,
-                                   mi=False)
-                    loss = criterion(outputs.scores.permute(0, 2, 1), targets)
+                    loss = process(batch, regularize=False)
                 val_loss += loss.item()
             val_loss /= len(val_loader)
 

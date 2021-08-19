@@ -1,6 +1,6 @@
 """Some useful type aliases relevant to this project."""
 import pathlib
-from typing import AbstractSet, Callable, List, Tuple, Union
+from typing import AbstractSet, Callable, List, Optional, Tuple, Union
 
 import torch
 
@@ -11,6 +11,7 @@ PathLike = Union[str, pathlib.Path]
 
 TensorPair = Tuple[torch.Tensor, torch.Tensor]
 TensorTriplet = Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+OptionalTensors = Tuple[Optional[torch.Tensor], ...]
 
 Device = Union[str, torch.device]
 
