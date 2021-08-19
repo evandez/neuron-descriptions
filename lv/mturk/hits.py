@@ -116,6 +116,8 @@ def strip_results_csv(
     replace_prefixes: Optional[Mapping[str, str]] = None,
     replace_substrings: Optional[Mapping[str, str]] = None,
     replace_suffixes: Optional[Mapping[str, str]] = None,
+    transform_layer: Optional[Callable[[str], str]] = None,
+    transform_unit: Optional[Callable[[str], str]] = None,
 ) -> None:
     """Strip the results CSV of everything but layer, unit, and annotation.
 
@@ -153,6 +155,10 @@ def strip_results_csv(
             substrings (keys) with new strings (values). Defaults to None.
         replace_suffixes (Optional[Mapping[str, str]], optional): Replace
             suffixes (keys) with new strings (values). Defaults to None.
+        transform_layer (Optional[Callable[[str], str]], optional): Tranform
+            raw value from layer column with this fn. Defaults to None.
+        transform_unit (Optional[Callable[[str], str]], optional): Transform
+            raw value from unit column with this fn. Defaults to None.
 
     """
     results_csv_file = pathlib.Path(results_csv_file)
@@ -207,6 +213,17 @@ def strip_results_csv(
         if not keep_rejected and input[in_rejection_column].strip():
             continue
 
+        # Read layer.
+        layer = input[in_layer_column]
+        if transform_layer is not None:
+            layer = transform_layer(layer)
+
+        # Read unit.
+        unit = input[in_unit_column]
+        if transform_unit is not None:
+            unit = transform_unit(unit)
+
+        # Read annotation.
         # We always lowercase the annotation before cleaning.
         annotation = input[in_annotation_column].lower()
         for prefix, replacement in replace_prefixes.items():
@@ -219,7 +236,8 @@ def strip_results_csv(
                 annotation = annotation[:-len(suffix)] + replacement
         annotation = annotation.strip()
 
-        output = (input[in_layer_column], input[in_unit_column], annotation)
+        # Add row to output.
+        output = (layer, unit, annotation)
         outputs.append(output)
 
     with out_csv_file.open('w') as handle:

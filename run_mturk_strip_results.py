@@ -11,26 +11,39 @@ parser.add_argument(
     type=pathlib.Path,
     help='write stripped results here; by default, overwrites input file '
     '(default: overwrite original)')
+parser.add_argument('--legacy',
+                    action='store_true',
+                    help='if set, parse layer/unit from image url '
+                    '(default: use layer/unit columns)')
 args = parser.parse_args()
 
-hits.strip_results_csv(args.results_csv_file,
-                       out_csv_file=args.out_csv_file,
-                       keep_rejected=False,
-                       spellcheck=True,
-                       remove_prefixes=(
-                           'these areas are ',
-                           'these areas have ',
-                           'these areas',
-                           'these are ',
-                           'these have ',
-                           'there are ',
-                           'this is ',
-                           'most images contain ',
-                           'most images ',
-                           'the images show ',
-                           'images of ',
-                           'i see ',
-                           'nice ',
-                       ),
-                       remove_substrings=(' these are ', ' nice '),
-                       remove_suffixes=('.', ',', ' i can see', ' nice'))
+results_csv_file = args.results_csv_file
+out_csv_file = args.out_csv_file
+legacy = args.legacy
+
+hits.strip_results_csv(
+    results_csv_file,
+    out_csv_file=out_csv_file,
+    in_layer_column='Input.image_url_1' if args.legacy else 'Input.layer',
+    in_unit_column='Input.image_url_1' if args.legacy else 'Input.unit',
+    transform_layer=(lambda url: url.split('/')[-5]) if legacy else None,
+    transform_unit=(lambda url: url.split('/')[-2][5:]) if legacy else None,
+    keep_rejected=False,
+    spellcheck=True,
+    remove_prefixes=(
+        'these areas are ',
+        'these areas have ',
+        'these areas',
+        'these are ',
+        'these have ',
+        'there are ',
+        'this is ',
+        'most images contain ',
+        'most images ',
+        'the images show ',
+        'images of ',
+        'i see ',
+        'nice ',
+    ),
+    remove_substrings=(' these are ', ' nice '),
+    remove_suffixes=('.', ',', ' i can see', ' nice'))
