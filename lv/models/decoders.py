@@ -491,11 +491,12 @@ class Decoder(serialize.SerializableModule):
             torch.Tensor: The masked image features.
 
         """
+        batch_size = len(images)
         images = images.view(-1, *images.shape[-3:])
         if masks is not None:
             masks = masks.view(-1, *masks.shape[-3:])
         features = self.encoder(images, masks=masks)
-        return features.view(len(images), -1, self.feature_size)
+        return features.view(batch_size, -1, self.feature_size)
 
     def init_state(self,
                    features: torch.Tensor,
