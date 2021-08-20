@@ -58,7 +58,7 @@ class Encoder(serialize.SerializableModule):
             mask: bool = True,
             image_index: Union[int, str] = -3,
             mask_index: Union[int, str] = -2,
-            batch_size: int = 128,
+            batch_size: int = 64,
             num_workers: int = 0,
             device: Optional[Device] = None,
             display_progress_as: Union[bool, str] = True,
@@ -80,7 +80,7 @@ class Encoder(serialize.SerializableModule):
                 sample. Defaults to -2 to be compatible with
                 AnnotatedTopImagesDataset.
             batch_size (int, optional): Featurize images in batches of this
-                size. Defaults to 128.
+                size. Defaults to 64.
             num_workers (int, optional): Number of workers for loading data.
                 Defaults to 0.
             device (Optional[Device], optional): Run preprocessing on this
