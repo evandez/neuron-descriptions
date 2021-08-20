@@ -11,6 +11,20 @@ from PIL import Image
 from torch.utils import data
 
 
+def kwargs_to_str(**kwargs: Any) -> str:
+    """Return metadata as a compact string."""
+    kvs = []
+    for key, value in kwargs.items():
+        if isinstance(value, float):
+            kv = f'{key}={value:.2f}'
+        elif isinstance(value, str):
+            kv = f'{key}="{value}"'
+        else:
+            kv = f'{key}={value}'
+        kvs.append(kv)
+    return ', '.join(kvs)
+
+
 def wandb_image(image: Image.Image, caption: str,
                 **kwargs: Any) -> wandb.Image:
     """Create a wandb image.
@@ -25,7 +39,7 @@ def wandb_image(image: Image.Image, caption: str,
         wandb.Image: The wandb image.
 
     """
-    metadata = ', '.join(f'{k}={v}' for k, v in kwargs.items())
+    metadata = kwargs_to_str(**kwargs)
     return wandb.Image(image, caption=f'({metadata}) {caption}')
 
 
@@ -109,11 +123,10 @@ def random_wandb_images(
     return wandb_images(images, captions, **metadata)
 
 
-AnyTopImagesDataset = Union[datasets.TopImagesDataset,
-                            datasets.AnnotatedTopImagesDataset]
+AnyTopImages = Union[datasets.TopImages, datasets.AnnotatedTopImages]
 
 
-def random_neuron_wandb_images(dataset: AnyTopImagesDataset,
+def random_neuron_wandb_images(dataset: data.Dataset[datasets.TopImages],
                                captions: StrSequence,
                                indices: Optional[Sequence[int]] = None,
                                k: int = 25,
@@ -124,7 +137,7 @@ def random_neuron_wandb_images(dataset: AnyTopImagesDataset,
     overridden by the caller.
 
     Args:
-        dataset (AnyTopImagesDataset): The dataset to sample from.
+        dataset (data.Dataset[datasets.TopImages]): The dataset to sample from.
         captions (Sequence[str]): Captions for the top images.
         indices (Optional[Sequence[int]], optional): Indices to sample from.
             By default, uses all indices.
