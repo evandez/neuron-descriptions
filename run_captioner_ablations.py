@@ -203,7 +203,7 @@ for config in args.encoders:
 
         wandb.log(log)
 
-    for ablation in args.ablation:
+    for ablation in args.ablations:
         if ablation == ABLATION_BASE:
             evaluate(strategy='greedy', mi=False)
         elif ablation == ABLATION_BEAM:
