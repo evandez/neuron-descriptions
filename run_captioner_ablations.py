@@ -155,8 +155,14 @@ for config in args.encoders:
 
     train_features, test_features = None, None
     if args.precompute_features:
-        train_features = encoder.map(train, device=device)
-        test_features = encoder.map(test, device=device)
+        train_features = encoder.map(
+            train,
+            device=device,
+            display_progress_as=f'(encoder={config}) featurize train set')
+        test_features = encoder.map(
+            test,
+            device=device,
+            display_progress_as=f'(encoder={config}) featurize test set')
 
     decoder.fit(train, features=train_features, device=device)
 

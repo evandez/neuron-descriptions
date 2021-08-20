@@ -782,9 +782,8 @@ class Decoder(serialize.SerializableModule):
 
         outputs = []
         for batch in loader:
-            if features is not None:
-                inputs, = batch
-            else:
+            inputs = batch
+            if features is None:
                 images = batch[image_index].to(device)
                 masks = batch[mask_index].to(device) if mask else None
                 inputs = (images, masks)
