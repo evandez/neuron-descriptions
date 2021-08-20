@@ -678,7 +678,7 @@ class Decoder(serialize.SerializableModule):
     def bert_score(self,
                    dataset: data.Dataset,
                    annotation_index: int = 4,
-                   batch_size: int = 32,
+                   batch_size: int = 16,
                    predictions: Optional[StrSequence] = None,
                    device: Optional[Device] = None,
                    bert_scorer: Optional[bert_score.BERTScorer] = None,
@@ -691,7 +691,7 @@ class Decoder(serialize.SerializableModule):
                 dataset samples. Defaults to 4 to be compatible with
                 AnnotatedTopImagesDataset.
             batch_size (int, optional): Batch size to use when computing
-                BERTScore. Defaults to 32.
+                BERTScore. Defaults to 16.
             predictions (Optional[StrSequence], optional): Precomputed
                 predicted captions for all images in the dataset.
                 By default, computed from the dataset using `Decoder.predict`.
