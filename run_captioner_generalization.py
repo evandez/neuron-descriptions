@@ -4,9 +4,9 @@ import pathlib
 from typing import Mapping, Sequence, Sized, Tuple, cast
 
 from lv import zoo
+from lv.ext import bert_score
 from lv.models import decoders, encoders
 
-import bert_score
 import wandb
 from torch.utils import data
 

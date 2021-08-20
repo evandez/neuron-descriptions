@@ -3,10 +3,10 @@ import argparse
 from typing import Any
 
 from lv import zoo
+from lv.ext import bert_score
 from lv.models import decoders, encoders, lms
 from lv.utils import logging, training
 
-import bert_score
 import numpy
 import wandb
 

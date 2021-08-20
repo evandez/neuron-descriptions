@@ -3,11 +3,11 @@ import warnings
 from typing import (Any, Dict, Mapping, NamedTuple, Optional, Sized, Tuple,
                     Type, Union, cast)
 
+from lv.ext import bert_score
 from lv.models import encoders, lms
 from lv.utils import lang, serialize, training
 from lv.utils.typing import Device, OptionalTensors, StrSequence
 
-import bert_score
 import rouge
 import sacrebleu
 import torch
