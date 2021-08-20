@@ -133,7 +133,8 @@ device = 'cuda' if args.cuda else 'cpu'
 
 bert_scorer = None
 if SCORE_BERT_SCORE in args.scores:
-    bert_scorer = bert_score.BERTScorer(idf=True,
+    bert_scorer = bert_score.BERTScorer(lang='en',
+                                        idf=True,
                                         rescale_with_baseline=True,
                                         use_fast_tokenizer=True,
                                         device=device)
