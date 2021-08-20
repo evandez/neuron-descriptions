@@ -230,6 +230,4 @@ for config in args.encoders:
                 for temperature in numpy.arange(args.mi_temperature_min,
                                                 args.mi_temperature_max,
                                                 args.mi_temperature_step):
-                    evaluate(strategy='greedy',
-                             mi=True,
-                             temperature=temperature)
+                    evaluate(strategy='beam', mi=True, temperature=temperature)
