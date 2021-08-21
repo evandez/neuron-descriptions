@@ -193,7 +193,7 @@ for experiment in args.experiments:
         # Now that we have the trained model, dissect it on the validation set.
         dissection_root = args.out_root / experiment / version / args.cnn
         for layer in layers:
-            dissect.sequential(
+            dissect.discriminative(
                 cnn,
                 val,
                 layer=layer,

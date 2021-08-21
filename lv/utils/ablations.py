@@ -1,7 +1,7 @@
 """Ablation utilities."""
 import collections
 import contextlib
-from typing import Callable, ContextManager, Sequence
+from typing import Callable, Iterator, Sequence
 
 from lv.deps.netdissect import nethook
 from lv.utils.typing import Unit
@@ -38,33 +38,29 @@ def zero(units: Sequence[int]) -> Callable[[torch.Tensor], torch.Tensor]:
     return fn
 
 
+@contextlib.contextmanager
 def ablated(
-    model: nn.Sequential,
+    model: nn.Module,
     units: Sequence[Unit],
     rule: RuleFactory = zero,
-) -> ContextManager[nethook.InstrumentedModel]:
+) -> Iterator[nethook.InstrumentedModel]:
     """Ablate the given units according to the given rule.
 
     Args:
-        model (nn.Sequential): The model to ablate.
+        model (nn.Module): The model to ablate.
         units (Sequence[Unit]): The (layer, unit) pairs to ablate.
         rule (RuleFactory, optional): The rule to ablate to. Defaults to
             zeroing the units.
 
     Yields:
-        ContextManager[nn.Sequential]: An InstrumentedModel configured to
+        Iterator[nethook.InstrumentedModel]: An InstrumentedModel configured to
             ablate the units.
 
     """
-    # Dirty hack to get type checking to work.
-    @contextlib.contextmanager
-    def wrapper():  # type: ignore
-        with nethook.InstrumentedModel(model) as instrumented:
-            edits = collections.defaultdict(list)
-            for la, un in units:
-                edits[la].append(un)
-            for la, uns in edits.items():
-                instrumented.edit_layer(la, rule=rule(sorted(uns)))
-            yield instrumented
-
-    return wrapper()
+    with nethook.InstrumentedModel(model) as instrumented:
+        edits = collections.defaultdict(list)
+        for la, un in units:
+            edits[la].append(un)
+        for la, uns in edits.items():
+            instrumented.edit_layer(la, rule=rule(sorted(uns)))
+        yield instrumented

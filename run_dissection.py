@@ -56,10 +56,10 @@ for layer in layers:
                            device=device,
                            **config.dissection.kwargs)
     else:
-        dissect.sequential(model,
-                           dataset,
-                           layer=layer,
-                           results_dir=results_dir,
-                           viz_dir=viz_dir,
-                           device=device,
-                           **config.dissection.kwargs)
+        dissect.discriminative(model,
+                               dataset,
+                               layer=layer,
+                               results_dir=results_dir,
+                               viz_dir=viz_dir,
+                               device=device,
+                               **config.dissection.kwargs)

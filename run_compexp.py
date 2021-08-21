@@ -88,15 +88,15 @@ for layer in layers:
                                    tally_cache_file=tally_cache_file,
                                    **config.dissection.kwargs)
     else:
-        _, rq = dissect.sequential(model,
-                                   dataset,
-                                   layer=layer,
-                                   device=device,
-                                   batch_size=args.batch_size,
-                                   save_results=False,
-                                   save_viz=False,
-                                   tally_cache_file=tally_cache_file,
-                                   **config.dissection.kwargs)
+        _, rq = dissect.discriminative(model,
+                                       dataset,
+                                       layer=layer,
+                                       device=device,
+                                       batch_size=args.batch_size,
+                                       save_results=False,
+                                       save_viz=False,
+                                       tally_cache_file=tally_cache_file,
+                                       **config.dissection.kwargs)
     levels = rq.quantiles(args.quantile).reshape(1, -1, 1, 1).to(device)
 
     # Compute unit masks and "ground truth" segmentation masks for every

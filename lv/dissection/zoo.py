@@ -65,7 +65,7 @@ class DiscriminativeModelDissectionConfig(ModelDissectionConfig):
     """Dissection configuration for a discriminative model."""
 
     transform_inputs: Optional[lv_transforms.TransformToTuple] = None
-    transform_outputs: Optional[lv_transforms.TransformToTensor] = None
+    transform_hiddens: Optional[lv_transforms.TransformToTensor] = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -112,7 +112,7 @@ class ModelConfig(zoo.ModelConfig):
         self.dissection = dissection or ModelDissectionConfig()
 
 
-Model = Tuple[nn.Sequential, Iterable[Layer], ModelConfig]
+Model = Tuple[nn.Module, Iterable[Layer], ModelConfig]
 ModelConfigs = Mapping[str, Mapping[str, ModelConfig]]
 
 

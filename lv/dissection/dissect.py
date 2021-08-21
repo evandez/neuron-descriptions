@@ -218,13 +218,16 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
 
 
 def discriminative(
-        model: nn.Module,
-        dataset: data.Dataset,
-        device: Optional[Device] = None,
-        results_dir: Optional[PathLike] = None,
-        transform_inputs: transforms.TransformToTuple = transforms.first,
-        transform_outputs: transforms.TransformToTensor = transforms.identity,
-        **kwargs: Any) -> DissectionResults:
+    model: nn.Module,
+    dataset: data.Dataset,
+    layer: Optional[Layer] = None,
+    device: Optional[Device] = None,
+    results_dir: Optional[PathLike] = None,
+    viz_dir: Optional[PathLike] = None,
+    transform_inputs: transforms.TransformToTuple = transforms.first,
+    transform_hiddens: transforms.TransformToTensor = transforms.identity,
+    **kwargs: Any,
+) -> DissectionResults:
     """Run dissection on a discriminative model.
 
     That is, a model for which image goes in, prediction comes out. Its outputs
@@ -236,15 +239,23 @@ def discriminative(
         model (nn.Module): The model to dissect.
         dataset (data.Dataset): Dataset of images used to compute the
             top-activating images.
+        layer (Optional[Layer], optional): Track unit activations for this
+            layer. If not set, NetDissect will only look at the final output
+            of the model. Defaults to None.
         device (Optional[Device], optional): Run all computations on this
             device. Defaults to None.
         results_dir (PathLike, optional): Directory to write results to.
+            If set and layer is also set, layer name will be appended to path.
+            Defaults to same as `run`.
+        viz_dir (Optional[PathLike], optional): Directory to write top image
+            visualizations to (e.g., individual png images, lightbox, etc.).
+            If set and layer is also set, layer name will be appended to path.
             Defaults to same as `run`.
         transform_inputs (transforms.TransformToTuple, optional): Pass batch
             as *args to this function and use output as *args to model.
             Defaults to identity, i.e. entire batch is passed to model.
-        transform_outputs (transforms.TransformToTensor, optional): Pass output
-            of entire model, i.e. the activations, to this function and hand
+        transform_hiddens (transforms.TransformToTensor, optional): Pass hidden
+            representations, i.e. the activations, to this function and hand
             result to netdissect. Defaults to identity function, i.e. the raw
             data will be tracked by netdissect.
 
@@ -254,105 +265,69 @@ def discriminative(
     """
     model.to(device)
 
-    def compute_topk_and_quantile(*inputs: Any) -> TensorPair:
-        inputs = transform_inputs(*transforms.map_location(inputs, device))
-        with torch.no_grad():
-            outputs = model(*inputs)
-        outputs = transform_outputs(outputs)
-        batch_size, channels, *_ = outputs.shape
-        activations = outputs.permute(0, 2, 3, 1).reshape(-1, channels)
-        pooled, _ = outputs.view(batch_size, channels, -1).max(dim=2)
-        return pooled, activations
-
-    def compute_activations(*inputs: Any) -> torch.Tensor:
-        inputs = transform_inputs(*transforms.map_location(inputs, device))
-        with torch.no_grad():
-            outputs = model(*inputs)
-        outputs = transform_outputs(outputs)
-        return outputs
-
-    return run(compute_topk_and_quantile,
-               compute_activations,
-               dataset,
-               results_dir=results_dir,
-               **kwargs)
-
-
-def sequential(model: nn.Sequential,
-               dataset: data.Dataset,
-               layer: Optional[Layer] = None,
-               results_dir: Optional[PathLike] = None,
-               viz_dir: Optional[PathLike] = None,
-               **kwargs: Any) -> DissectionResults:
-    """Run dissection on a sequential discriminative model.
-
-    That is, a model for which image goes in, prediction comes out.
-    Because this function assumes the model is a `torch.nn.Sequential`,
-    you can specify the layer to look at activations for.
-
-    Keyword arguments are forwarded to `discriminative`.
-
-    Args:
-        model (nn.Sequential): The sequential model to dissect.
-        dataset (data.Dataset): Dataset of images used to compute the
-            top-activating images.
-        layer (Optional[Layer], optional): Track unit activations for this
-            layer. If not set, NetDissect will only look at the final output
-            of the model. Defaults to None.
-        results_dir (PathLike, optional): Directory to write results to.
-            If set and layer is also set, layer name will be appended to path.
-            Defaults to same as `run`.
-        viz_dir (Optional[PathLike], optional): Directory to write top image
-            visualizations to (e.g., individual png images, lightbox, etc.).
-            If set and layer is also set, layer name will be appended to path.
-            Defaults to same as `run`.
-
-    Returns:
-        DissectionResults: The top-k and quantile statistics for every unit.
-
-    """
-    if layer is not None:
-        model = nethook.subsequence(model,
-                                    last_layer=str(layer),
-                                    share_weights=True)
-
     def resolve(directory: Optional[PathLike]) -> Optional[pathlib.Path]:
         if directory is not None:
             directory = pathlib.Path(directory)
             directory /= str(layer) if layer is not None else 'outputs'
         return directory
 
-    return discriminative(model,
-                          dataset,
-                          results_dir=resolve(results_dir),
-                          viz_dir=resolve(viz_dir),
-                          **kwargs)
+    results_dir = resolve(results_dir)
+    viz_dir = resolve(viz_dir)
+
+    with nethook.InstrumentedModel(model) as instr:
+        if layer is not None:
+            layer = str(layer)
+            instr.retain_layer(layer, detach=False)
+
+        def compute_topk_and_quantile(*inputs: Any) -> TensorPair:
+            inputs = transform_inputs(*transforms.map_location(inputs, device))
+            with torch.no_grad():
+                outputs = instr(*inputs)
+            hiddens = outputs if layer is None else instr.retained_layer(layer)
+            hiddens = transform_hiddens(hiddens)
+            batch_size, channels, *_ = hiddens.shape
+            activations = hiddens.permute(0, 2, 3, 1).reshape(-1, channels)
+            pooled, _ = hiddens.view(batch_size, channels, -1).max(dim=2)
+            return pooled, activations
+
+        def compute_activations(*inputs: Any) -> torch.Tensor:
+            inputs = transform_inputs(*transforms.map_location(inputs, device))
+            with torch.no_grad():
+                outputs = instr(*inputs)
+            hiddens = outputs if layer is None else instr.retained_layer(layer)
+            hiddens = transform_hiddens(hiddens)
+            return hiddens
+
+        return run(compute_topk_and_quantile,
+                   compute_activations,
+                   dataset,
+                   results_dir=results_dir,
+                   viz_dir=viz_dir,
+                   **kwargs)
 
 
 def generative(
-        model: nn.Sequential,
-        dataset: data.Dataset,
-        layer: Layer,
-        device: Optional[Device] = None,
-        results_dir: Optional[PathLike] = None,
-        viz_dir: Optional[PathLike] = None,
-        transform_inputs: transforms.TransformToTuple = transforms.identities,
-        transform_hiddens: transforms.TransformToTensor = transforms.identity,
-        transform_outputs: transforms.TransformToTensor = transforms.identity,
-        **kwargs: Any) -> DissectionResults:
+    model: nn.Module,
+    dataset: data.Dataset,
+    layer: Layer,
+    device: Optional[Device] = None,
+    results_dir: Optional[PathLike] = None,
+    viz_dir: Optional[PathLike] = None,
+    transform_inputs: transforms.TransformToTuple = transforms.identities,
+    transform_hiddens: transforms.TransformToTensor = transforms.identity,
+    transform_outputs: transforms.TransformToTensor = transforms.identity,
+    **kwargs: Any,
+) -> DissectionResults:
     """Run dissection on a generative model of images.
 
     That is, a model for which representation goes in, image comes out.
     Because of the way these models are structured, we need both the generated
-    images and the intermediate activation. To facilitate this, we require the
-    model be implemented as a `torch.nn.Sequential` so we can slice it up and
-    look at intermediate values while also saving the generated images for
-    visualization downstream.
+    images and the intermediate activation.
 
     Keyword arguments are forwarded to `run`.
 
     Args:
-        model (nn.Sequential): The model to dissect.
+        model (nn.Module): The model to dissect.
         dataset (data.Dataset): Dataset of representations used to generate
             images. The top-activating images will be taken from them.
         layer (Layer): Track unit activations for this layer.
@@ -389,14 +364,14 @@ def generative(
         viz_dir = pathlib.Path(viz_dir) / str(layer)
 
     model.to(device)
-    with nethook.InstrumentedModel(model) as instrumented:
-        instrumented.retain_layer(layer, detach=False)
+    with nethook.InstrumentedModel(model) as instr:
+        instr.retain_layer(layer, detach=False)
 
         def compute_topk_and_quantile(*inputs: Any) -> TensorPair:
             inputs = transform_inputs(*transforms.map_location(inputs, device))
             with torch.no_grad():
                 model(*inputs)
-            hiddens = transform_hiddens(instrumented.retained_layer(layer))
+            hiddens = transform_hiddens(instr.retained_layer(layer))
             batch_size, channels, *_ = hiddens.shape
             activations = hiddens.permute(0, 2, 3, 1).reshape(-1, channels)
             pooled, _ = hiddens.view(batch_size, channels, -1).max(dim=2)
@@ -406,7 +381,7 @@ def generative(
             inputs = transform_inputs(*transforms.map_location(inputs, device))
             with torch.no_grad():
                 images = model(*inputs)
-            hiddens = transform_hiddens(instrumented.retained_layer(layer))
+            hiddens = transform_hiddens(instr.retained_layer(layer))
             images = transform_outputs(images)
             return hiddens, images
 

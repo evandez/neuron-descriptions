@@ -1,5 +1,4 @@
 """Wrappers around image classifiers."""
-import collections
 from typing import Any, Mapping, Optional, Sequence, Sized, Type, Union, cast
 
 from lv.utils import ablations, training
@@ -11,17 +10,22 @@ from torch.utils import data
 from tqdm.auto import tqdm
 
 
-class ImageClassifier(nn.Sequential):
-    """Wraps an image classifier and adds some nice utilities."""
+class ImageClassifier(nn.Module):
+    """Wraps an image classifier and adds some ablation utilities."""
 
-    def __init__(self, classifier: nn.Sequential):
+    def __init__(self, model: nn.Module):
         """Initialize the classifier.
 
         Args:
-            classifier (nn.Sequential): The classification model.
+            model (nn.Module): The classification model.
 
         """
-        super().__init__(collections.OrderedDict(classifier.named_children()))
+        super().__init__()
+        self.model = model
+
+    def forward(self, *args: Any, **kwargs: Any) -> Any:
+        """Call `self.model.forward`."""
+        return self.model(*args, **kwargs)
 
     def fit(self,
             dataset: data.Dataset,
@@ -93,13 +97,16 @@ class ImageClassifier(nn.Sequential):
         if layers is None:
             parameters = list(self.parameters())
         else:
+            missing = {str(layer) for layer in layers}
+
             parameters = []
-            for layer in layers:
-                if isinstance(layer, str):
-                    submodule = getattr(self, layer)
-                else:
-                    submodule = self[layer]
-                parameters += list(submodule.parameters())
+            for name, submodule in self.model.named_modules():
+                if name in missing:
+                    parameters += list(submodule.parameters())
+                    missing -= {name}
+
+            if missing:
+                raise KeyError(f'could not find layers: {sorted(missing)}')
 
         optimizer = optimizer_t(parameters, **optimizer_kwargs)
         criterion = nn.CrossEntropyLoss()
@@ -109,14 +116,14 @@ class ImageClassifier(nn.Sequential):
         if display_progress_as is not None:
             progress = tqdm(progress, desc=display_progress_as)
 
-        with ablations.ablated(self, ablate or []) as model:
+        with ablations.ablated(self.model, ablate or []) as ablated:
             for _ in progress:
-                model.train()
+                ablated.train()
                 train_loss = 0.
                 for batch in train_loader:
                     images = batch[image_index].to(device)
                     targets = batch[target_index].to(device)
-                    predictions = model(images)
+                    predictions = ablated(images)
                     loss = criterion(predictions, targets)
                     loss.backward()
                     optimizer.step()
@@ -124,13 +131,13 @@ class ImageClassifier(nn.Sequential):
                     train_loss += loss.item()
                 train_loss /= len(train_loader)
 
-                model.eval()
+                ablated.eval()
                 val_loss = 0.
                 for batch in val_loader:
                     images = batch[image_index].to(device)
                     targets = batch[target_index].to(device)
                     with torch.no_grad():
-                        predictions = model(images)
+                        predictions = ablated(images)
                         loss = criterion(predictions, targets)
                     val_loss += loss.item()
                 val_loss /= len(val_loader)
@@ -179,7 +186,7 @@ class ImageClassifier(nn.Sequential):
         if device is not None:
             self.to(device)
 
-        with ablations.ablated(self, ablate or []) as model:
+        with ablations.ablated(self.model, ablate or []) as ablated:
             loader = data.DataLoader(dataset,
                                      num_workers=num_workers,
                                      batch_size=batch_size)
@@ -191,7 +198,7 @@ class ImageClassifier(nn.Sequential):
                 images = batch[image_index].to(device)
                 targets = batch[target_index].to(device)
                 with torch.no_grad():
-                    predictions = model(images)
+                    predictions = ablated(images)
                 correct += predictions.argmax(dim=-1).eq(targets).sum().item()
 
         return correct / len(cast(Sized, dataset))
