@@ -504,7 +504,7 @@ class Decoder(serialize.SerializableModule):
         """Initialize decoder state for a fresh decoding.
 
         Args:
-            features (torch.Tensor): Visualf features. Should have shape
+            features (torch.Tensor): Visual features. Should have shape
                 (batch_size, num_features, feature_size).
             lm (bool, optional): Initialize LM hidden state as well, if
                 possible. Defaults to True.
@@ -696,7 +696,7 @@ class Decoder(serialize.SerializableModule):
                 predicted captions for all images in the dataset.
                 By default, computed from the dataset using `Decoder.predict`.
             bert_scorer (Optional[bert_score.BERTScorer], optional): Pre-
-                instantiated BERTScorer object. Defaults to none.
+                instantiated BERTScorer object. Defaults to None.
             device (Optional[Device], optional): Run BERT on this device.
                 Defaults to torch default.
 

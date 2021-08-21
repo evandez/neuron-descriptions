@@ -51,7 +51,7 @@ class Tokenizer(serialize.Serializable):
         self,
         texts: Union[str, StrSequence],
     ) -> Union[StrSequence, Sequence[StrSequence]]:
-        """Implement both oberloads."""
+        """Implement both overloads."""
         tokenized = []
         for doc in self.nlp.pipe([texts] if isinstance(texts, str) else texts):
             tokens = []
