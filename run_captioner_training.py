@@ -40,9 +40,9 @@ parser.add_argument('--precompute-features',
 parser.add_argument(
     '--hold-out',
     type=float,
-    default=.1,
+    default=.05,
     help='hold out and validate on this fraction of training data '
-    '(default: .1)')
+    '(default: .05)')
 parser.add_argument('--cuda',
                     action='store_true',
                     help='use cuda device (default: cpu)')
