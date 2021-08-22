@@ -54,5 +54,17 @@ hits.strip_results_csv(
         'nice ',
     ),
     remove_substrings=(' these are ', ' nice '),
-    remove_suffixes=('.', ',', ' i can see', ' nice'),
-    replace_substrings={'none of the above': 'nothing'})
+    remove_suffixes=(
+        '.',
+        ',',
+        ' i can see',
+        ' nice',
+        ', is shown',
+        ', are shown',
+        ' is shown',
+        ' are shown',
+    ),
+    replace_substrings={
+        'none of the above': 'nothing',
+        ' og ': ' of ',
+    })
