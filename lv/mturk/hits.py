@@ -212,12 +212,18 @@ def strip_results_csv(
         for word in tqdm(spell.unknown(vocab.tokens), desc='spellchecking'):
             correction = spell.correction(word)
             for punct in (' ', ',', '--', '-', "'", ':', ';'):
+                if word in replace_prefixes:
+                    continue
                 replace_prefixes[f'{word}{punct}'] = f'{correction}{punct}'
             for punct in (' ', ',', '.', "'", '--', '-'):
+                if word in replace_substrings:
+                    continue
                 replace_substrings[f' {word}{punct}'] = f' {correction}{punct}'
                 # Sometimes the reverse happens, so factor that in...
                 replace_substrings[f'{punct}{word} '] = f'{punct}{correction} '
             for punct in ('', '.', "'"):
+                if word in replace_suffixes:
+                    continue
                 replace_suffixes[f' {word}{punct}'] = f' {correction}{punct}'
             replace_exact[word] = correction
 
