@@ -116,6 +116,7 @@ def strip_results_csv(
     replace_prefixes: Optional[Mapping[str, str]] = None,
     replace_substrings: Optional[Mapping[str, str]] = None,
     replace_suffixes: Optional[Mapping[str, str]] = None,
+    replace_exact: Optional[Mapping[str, str]] = None,
     transform_layer: Optional[Callable[[str], str]] = None,
     transform_unit: Optional[Callable[[str], str]] = None,
 ) -> None:
@@ -155,6 +156,9 @@ def strip_results_csv(
             substrings (keys) with new strings (values). Defaults to None.
         replace_suffixes (Optional[Mapping[str, str]], optional): Replace
             suffixes (keys) with new strings (values). Defaults to None.
+        replace_exact (Optional[Mapping[str, str]], optional): Replace string
+            (key) with value if it exactly matches the annotation.
+            Defaults to None.
         transform_layer (Optional[Callable[[str], str]], optional): Tranform
             raw value from layer column with this fn. Defaults to None.
         transform_unit (Optional[Callable[[str], str]], optional): Transform
@@ -197,6 +201,8 @@ def strip_results_csv(
         for suffix in remove_suffixes:
             replace_suffixes[suffix] = ''
 
+    replace_exact = collections.OrderedDict(replace_exact or {})
+
     if spellcheck:
         spell = spellchecker.SpellChecker()
         vocab = lang.vocab([input[in_annotation_column] for input in inputs],
@@ -205,12 +211,13 @@ def strip_results_csv(
                                                    ignore_punct=False))
         for word in tqdm(spell.unknown(vocab.tokens), desc='spellchecking'):
             correction = spell.correction(word)
-            for punct in (' ', ',', '--', '-', ':', ';'):
+            for punct in (' ', ',', '--', '-', "'", ':', ';'):
                 replace_prefixes[f'{word}{punct}'] = f'{correction}{punct}'
-            for punct in (' ', ',', '.', '--', '-'):
+            for punct in (' ', ',', '.', "'", '--', '-'):
                 replace_substrings[f' {word}{punct}'] = f' {correction}{punct}'
-            for punct in ('', '.'):
+            for punct in ('', '.', "'"):
                 replace_suffixes[f' {word}{punct}'] = f' {correction}{punct}'
+            replace_exact[word] = correction
 
     # Okay, now construct the output CSV.
     header = (out_layer_column, out_unit_column, out_annotation_column)
@@ -240,6 +247,9 @@ def strip_results_csv(
         for suffix, replacement in replace_suffixes.items():
             if annotation.endswith(suffix):
                 annotation = annotation[:-len(suffix)] + replacement
+        for string, replacement in replace_exact.items():
+            if annotation == string:
+                annotation = replacement
         annotation = annotation.strip()
 
         # Add row to output.
