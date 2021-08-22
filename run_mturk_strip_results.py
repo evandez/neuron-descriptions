@@ -52,6 +52,9 @@ hits.strip_results_csv(
         'images of ',
         'i see ',
         'nice ',
+        'it shows an image that ',
+        'it shows an image ',
+        'it shows ',
     ),
     remove_substrings=(' these are ', ' nice '),
     remove_suffixes=(

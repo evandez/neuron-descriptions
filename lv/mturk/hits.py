@@ -199,7 +199,10 @@ def strip_results_csv(
 
     if spellcheck:
         spell = spellchecker.SpellChecker()
-        vocab = lang.vocab([input[in_annotation_column] for input in inputs])
+        vocab = lang.vocab([input[in_annotation_column] for input in inputs],
+                           tokenize=lang.tokenizer(lemmatize=False,
+                                                   ignore_stop=False,
+                                                   ignore_punct=False))
         for word in tqdm(spell.unknown(vocab.tokens), desc='spellchecking'):
             correction = spell.correction(word)
             for punct in (' ', ',', '--', '-', ':', ';'):
