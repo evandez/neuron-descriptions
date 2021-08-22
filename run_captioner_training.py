@@ -63,7 +63,7 @@ features = None
 if args.precompute_features:
     features = encoder.map(dataset, device=device)
 
-decoder = decoders.decoder(dataset, encoder)
+decoder = decoders.decoder(dataset, encoder, lm=lm)
 decoder.fit(dataset, features=features, device=device)
 
 out_file = args.out_file
