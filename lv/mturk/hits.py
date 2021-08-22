@@ -215,6 +215,8 @@ def strip_results_csv(
                 replace_prefixes[f'{word}{punct}'] = f'{correction}{punct}'
             for punct in (' ', ',', '.', "'", '--', '-'):
                 replace_substrings[f' {word}{punct}'] = f' {correction}{punct}'
+                # Sometimes the reverse happens, so factor that in...
+                replace_substrings[f'{punct}{word} '] = f'{punct}{correction} '
             for punct in ('', '.', "'"):
                 replace_suffixes[f' {word}{punct}'] = f' {correction}{punct}'
             replace_exact[word] = correction
