@@ -211,20 +211,31 @@ def strip_results_csv(
                                                    ignore_punct=False))
         for word in tqdm(spell.unknown(vocab.tokens), desc='spellchecking'):
             correction = spell.correction(word)
-            for punct in (' ', ',', '--', '-', "'", ':', ';'):
-                if word in replace_prefixes:
+
+            for punct in (' ', ',', '--', '-', "'", '"', ':', ';'):
+                key = f'{word}{punct}'
+                if key in replace_prefixes:
                     continue
-                replace_prefixes[f'{word}{punct}'] = f'{correction}{punct}'
-            for punct in (' ', ',', '.', "'", '--', '-'):
-                if word in replace_substrings:
+                replace_prefixes[key] = f'{correction}{punct}'
+
+            for punct in (' ', ',', '.', "'", '"', '--', '-'):
+                key = f' {word}{punct}'
+                if key in replace_substrings:
                     continue
-                replace_substrings[f' {word}{punct}'] = f' {correction}{punct}'
+                replace_substrings[key] = f' {correction}{punct}'
+
                 # Sometimes the reverse happens, so factor that in...
-                replace_substrings[f'{punct}{word} '] = f'{punct}{correction} '
-            for punct in ('', '.', "'"):
-                if word in replace_suffixes:
+                key = f'{punct}{word} '
+                if key in replace_substrings:
                     continue
-                replace_suffixes[f' {word}{punct}'] = f' {correction}{punct}'
+                replace_substrings[key] = f'{punct}{correction} '
+
+            for punct in ('', '.', "'"):
+                key = f' {word}{punct}'
+                if key in replace_suffixes:
+                    continue
+                replace_suffixes[key] = f' {correction}{punct}'
+
             replace_exact[word] = correction
 
     # Okay, now construct the output CSV.

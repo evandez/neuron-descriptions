@@ -69,8 +69,6 @@ hits.strip_results_csv(
         ' are shown',
     ),
     replace_substrings={
-        ' og ': ' of ',
-
         # Words that are commonly accidentally joined...
         'andflower': 'and flower',
         'andvehicles': 'and vehicles',
@@ -155,6 +153,7 @@ hits.strip_results_csv(
         "''": "'",
 
         # Typos not caught by spellcheck.
+        ' og ': ' of ',
         'aanndanimals': 'and animals',
         'aorunditem': 'around item',
         'aqauticlife': 'aquatic life',
