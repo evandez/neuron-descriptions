@@ -34,10 +34,9 @@ DATASETS = (
     # zoo.KEY_BIGGAN_PLACES365,
 )
 
-ENCODERS = (
-    'resnet18',
-    'resnet50',
-)
+ENCODER_RESNET18 = 'resnet18'
+ENCODER_RESNET50 = 'resnet50'
+ENCODERS = (ENCODER_RESNET18, ENCODER_RESNET50)
 
 SCORE_BLEU = 'bleu'
 SCORE_ROUGE = 'rouge'
