@@ -708,6 +708,7 @@ class Decoder(serialize.SerializableModule):
             bert_scorer = bert_score.BERTScorer(idf=True,
                                                 lang='en',
                                                 rescale_with_baseline=True,
+                                                use_fast_tokenizer=True,
                                                 device=device)
         if predictions is None:
             predictions = self.predict(dataset, **kwargs)

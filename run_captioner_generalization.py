@@ -1,16 +1,29 @@
 """Run captioner generalization experiments."""
 import argparse
 import pathlib
-from typing import Mapping, Sequence, Sized, Tuple, cast
+import shutil
+from typing import Dict, Mapping, NamedTuple, Optional, Tuple
 
 from lv import zoo
 from lv.ext import bert_score
-from lv.models import decoders, encoders
+from lv.models import decoders, encoders, lms
+from lv.utils import env, logging, training
+from lv.utils.typing import StrSequence
 
 import wandb
 from torch.utils import data
 
-DatasetNames = Sequence[str]
+
+class LoadedSplit(NamedTuple):
+    """Wrap a loaded train/test split and its metadata."""
+
+    train: data.Dataset
+    test: data.Dataset
+    train_keys: StrSequence
+    test_keys: StrSequence
+
+
+DatasetNames = StrSequence
 Splits = Tuple[DatasetNames, ...]
 
 EXPERIMENT_WITHIN_NETWORK = 'within-network'
@@ -67,13 +80,23 @@ parser = argparse.ArgumentParser(
 parser.add_argument('--experiments',
                     nargs='+',
                     help='experiments to run (default: all experiments)')
-parser.add_argument('--datasets-root',
+parser.add_argument('--data-dir',
                     type=pathlib.Path,
-                    help='root dir for datasets (default: .zoo/datasets)')
+                    help='root dir for datasets (default: project data dir)')
+parser.add_argument('--results-dir',
+                    type=pathlib.Path,
+                    help='root dir for intermediate and final results '
+                    '(default: project results dir)')
+parser.add_argument('--clear-results-dir',
+                    action='store_true',
+                    help='if set, clear results dir (default: do not)')
 parser.add_argument('--hold-out',
                     type=float,
                     default=.1,
                     help='hold out this fraction of data for testing')
+parser.add_argument('--precompute-features',
+                    action='store_true',
+                    help='precompute visual features (default: do not)')
 parser.add_argument('--wandb-project',
                     default='lv',
                     help='wandb project name (default: lv)')
@@ -102,13 +125,23 @@ assert run is not None, 'failed to initialize wandb?'
 
 device = 'cuda' if args.cuda else 'cpu'
 
+# Prepare necessary directories.
+data_dir = args.data_dir or env.data_dir()
+results_dir = args.results_dir or (env.results_dir() /
+                                   'captioner-generalization')
+if args.clear_results_dir and results_dir.exists():
+    shutil.rmtree(results_dir)
+results_dir.mkdir(exist_ok=True, parents=True)
+
 # Load BERTScorer once up front.
 bert_scorer = bert_score.BERTScorer(lang='en',
+                                    idf=True,
                                     rescale_with_baseline=True,
+                                    use_fast_tokenizer=True,
                                     device=device)
 
 # Load encoder.
-encoder = encoders.PyramidConvEncoder().to(device)
+encoder = encoders.PyramidConvEncoder(config='resnet50').to(device)
 
 # Start experiments.
 for experiment in args.experiments or EXPERIMENTS.keys():
@@ -117,58 +150,74 @@ for experiment in args.experiments or EXPERIMENTS.keys():
     # Have to handle within-network and across-* experiments differently.
     splits = EXPERIMENTS[experiment]
     if len(splits) == 2:
-        left = zoo.datasets(*splits[0], path=args.datasets_root)
-        right = zoo.datasets(*splits[1], path=args.datasets_root)
-        configs = [(left, right, *splits), (right, left, *reversed(splits))]
+        left = zoo.datasets(*splits[0], path=data_dir)
+        right = zoo.datasets(*splits[1], path=data_dir)
+        configs = [
+            LoadedSplit(left, right, *splits),
+            LoadedSplit(right, left, *reversed(splits)),
+        ]
     elif experiment == EXPERIMENT_WITHIN_NETWORK:
         assert len(splits) == 1
         names, = splits
         configs = []
         for name in names:
-            dataset = zoo.datasets(name, path=args.datasets_root)
-            size = len(cast(Sized, dataset))
-            test_size = int(.1 * size)
-            train_size = size - test_size
-            split = data.random_split(dataset, (train_size, test_size))
-            configs.append((*split, (name,), (name,)))
+            dataset = zoo.datasets(name, path=data_dir)
+            split = training.random_split(dataset, hold_out=.1)
+            configs.append(LoadedSplit(*split, (name,), (name,)))
     else:
         assert len(splits) == 1
         assert experiment == EXPERIMENT_LEAVE_ONE_OUT
 
         names, = splits
 
-        datasets_by_name = {}
+        datasets_by_name: Dict[str, data.Dataset] = {}
         for name in names:
-            dataset = zoo.datasets(name, path=args.datasets_root)
+            dataset = zoo.datasets(name, path=data_dir)
             datasets_by_name[name] = dataset
 
         unique = set(names)
         configs = []
         for name in unique:
 
-            test_keys = (name,)
+            test_keys: StrSequence = (name,)
             test = datasets_by_name[name]
 
-            train_keys = unique - {name}
+            train_keys: StrSequence = tuple(sorted(unique - {name}))
             assert train_keys
 
-            train = None
+            train: Optional[data.Dataset] = None
             for other in train_keys:
                 if train is None:
                     train = datasets_by_name[other]
                 else:
+                    assert train is not None
                     train += datasets_by_name[other]
 
-            configs.append((train, test, train_keys, test_keys))
+            assert train is not None
+            configs.append(LoadedSplit(train, test, train_keys, test_keys))
 
     # For every train/test set, train the captioner, test it, and log.
-    for train, test, train_keys, test_keys in configs:
-        train_features = encoder.map(cast(data.Dataset, train), device=device)
-        test_features = encoder.map(cast(data.Dataset, test), device=device)
+    for index, (train, test, train_keys, test_keys) in enumerate(configs):
+        assert isinstance(train, data.Dataset)
+        assert isinstance(test, data.Dataset)
 
-        # Train the model.
-        decoder = decoders.decoder(train, encoder)
+        # Train the LM.
+        lm = lms.lm(train)
+        lm.fit(train, device=device)
+        lm.save(f'{experiment}-split{index}-lm.pth')
+
+        # Maybe precompute image features.
+        train_features, test_features = None, None
+        if args.precompute_features:
+            train_features = encoder.map(train, device=device)
+            test_features = encoder.map(test, device=device)
+
+        # Train the decoder.
+        decoder = decoders.decoder(train, encoder, lm=lm)
         decoder.fit(train, features=train_features, device=device)
+        decoder.save(f'{experiment}-split{index}-captioner.pth')
+
+        # Test the decoder.
         predictions = decoder.predict(test,
                                       features=test_features,
                                       device=device)
@@ -192,10 +241,11 @@ for experiment in args.experiments or EXPERIMENTS.keys():
                 log[f'{kind}-{key}'] = score
         for kind, score in bert_scores.items():
             log[f'bert_score-{kind}'] = score
-        log['samples'] = [
-            wandb.Image(
-                test[index].as_pil_image_grid(),
-                caption=f'({experiment.upper()}) {predictions[index]}',
-            ) for index in range(min(len(test), args.wandb_n_samples))
-        ]
+        log['samples'] = logging.random_neuron_wandb_images(
+            test,
+            captions=predictions,
+            k=args.wandb_n_samples,
+            experiment=experiment,
+            train=tuple(train_keys),
+            test=tuple(test_keys))
         wandb.log(log)
