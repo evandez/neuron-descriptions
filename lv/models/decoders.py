@@ -156,8 +156,8 @@ class Decoder(serialize.SerializableModule):
                  dropout: float = .5,
                  length: int = 15,
                  strategy: str = STRATEGY_GREEDY,
-                 temperature: float = .3,
-                 beam_size: int = 5):
+                 temperature: float = .075,
+                 beam_size: int = 20):
         """Initialize the decoder.
 
         Args:
@@ -182,10 +182,10 @@ class Decoder(serialize.SerializableModule):
                 Defaults to 'greedy'.
             temperature (float, optional): Default temperature parameter to use
                 when MI decoding. When not MI decoding, this parameter does
-                nothing. Defaults to .3.
+                nothing. Defaults to .075.
             beam_size (int, optional): Default beam size for beam search
                 decoding. When not decoding with beam search, this parameter
-                does nothing. Defaults to 5.
+                does nothing. Defaults to 20.
 
         Raises:
             ValueError: If LM is set but has a different vocabulary than the
