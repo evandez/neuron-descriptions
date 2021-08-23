@@ -1,14 +1,18 @@
 """Run a series of ablations on the captioning model."""
 import argparse
+import pathlib
+import shutil
 from typing import Any
 
 from lv import zoo
 from lv.ext import bert_score
 from lv.models import decoders, encoders, lms
-from lv.utils import logging, training
+from lv.utils import env, logging, training
 
 import numpy
+import torch
 import wandb
+from torch.utils import data
 
 ABLATION_BASE = 'base'
 ABLATION_BEAM = 'beam'
@@ -99,6 +103,16 @@ parser.add_argument(
     type=float,
     default=.05,
     help='step size for temperatures to try in mi ablations (default: .05)')
+parser.add_argument('--data-dir',
+                    type=pathlib.Path,
+                    help='root dir for datasets (default: project data dir)')
+parser.add_argument('--results-dir',
+                    type=pathlib.Path,
+                    help='directory to write intermediate and final results '
+                    '(default: <project results dir>/captioner-ablations)')
+parser.add_argument('--clear-results-dir',
+                    action='store_true',
+                    help='if set, clear results dir (default: do not)')
 parser.add_argument('--wandb-project',
                     default='lv',
                     help='wandb project name (default: lv)')
@@ -131,6 +145,13 @@ assert run is not None, 'failed to initialize wandb?'
 
 device = 'cuda' if args.cuda else 'cpu'
 
+# Prepare necessary directories.
+data_dir = args.data_dir or env.data_dir()
+results_dir = args.results_dir or (env.results_dir() / 'captioner-ablations')
+if args.clear_results_dir and results_dir.exists():
+    shutil.rmtree(results_dir)
+results_dir.mkdir(exist_ok=True, parents=True)
+
 bert_scorer = None
 if SCORE_BERT_SCORE in args.scores:
     bert_scorer = bert_score.BERTScorer(lang='en',
@@ -141,30 +162,59 @@ if SCORE_BERT_SCORE in args.scores:
 
 dataset = zoo.datasets(*args.datasets)
 for config in args.encoders:
-    train, test = training.random_split(dataset, hold_out=args.hold_out)
+    print(f'---- begin ablations for {config} model ----')
+
+    splits_file = results_dir / f'{config}-splits.pth'
+    if splits_file.exists():
+        print(f'loading cached train/test splits from {splits_file}')
+        splits = torch.load(splits_file)
+        train = data.Subset(dataset, splits['train'])
+        test = data.Subset(dataset, splits['test'])
+    else:
+        train, test = training.random_split(dataset, hold_out=args.hold_out)
+        print(f'writing train/test splits to {splits_file}')
+        torch.save({'train': train.indices, 'test': test.indices}, splits_file)
 
     lm = None
-    if ABLATION_MI in args.ablations or ABLATION_BEAM_MI in args.ablations:
+    lm_file = results_dir / f'{config}-lm.pth'
+    if lm_file.exists():
+        print(f'loading cached lm from {lm_file}')
+        lm = lms.LanguageModel.load(lm_file, map_location=device)
+    elif ABLATION_MI in args.ablations or ABLATION_BEAM_MI in args.ablations:
         lm = lms.lm(train).to(device)
         lm.fit(train,
                device=device,
                display_progress_as=f'(encoder={config}) train lm')
+        print(f'saving lm to {lm_file}')
+        lm.save(lm_file)
 
-    encoder = encoders.PyramidConvEncoder(config=config).to(device)
-    decoder = decoders.decoder(train, encoder, lm=lm).to(device)
+    captioner_file = results_dir / f'{config}-captioner.pth'
+    if captioner_file.is_file() and splits_file.is_file():
+        print(f'loading cached captioner from {captioner_file}')
+        decoder = decoders.Decoder.load(captioner_file, map_location=device)
+        encoder = decoder.encoder
+    else:
+        encoder = encoders.PyramidConvEncoder(config=config).to(device)
+        decoder = decoders.decoder(train, encoder, lm=lm).to(device)
 
-    train_features, test_features = None, None
-    if args.precompute_features:
-        train_features = encoder.map(
-            train,
-            device=device,
-            display_progress_as=f'(encoder={config}) featurize train set')
-        test_features = encoder.map(
-            test,
-            device=device,
-            display_progress_as=f'(encoder={config}) featurize test set')
+        train_features, test_features = None, None
+        if args.precompute_features:
+            train_features = encoder.map(
+                train,
+                device=device,
+                display_progress_as=f'(encoder={config}) featurize train set')
+            test_features = encoder.map(
+                test,
+                device=device,
+                display_progress_as=f'(encoder={config}) featurize test set')
 
-    decoder.fit(train, features=train_features, device=device)
+        decoder.fit(train,
+                    features=train_features,
+                    display_progress_as=f'(encoder={config}) train decoder',
+                    device=device)
+
+        print(f'saving captinoer to {captioner_file}')
+        decoder.save(captioner_file)
 
     def evaluate(**kwargs: Any) -> None:
         """Evaluate the captioner with the given args."""

@@ -50,7 +50,7 @@ class EarlyStopping:
 
 
 def random_split(dataset: data.Dataset,
-                 hold_out: float = .1) -> Tuple[data.Dataset, data.Dataset]:
+                 hold_out: float = .1) -> Tuple[data.Subset, data.Subset]:
     """Randomly split the dataset into a train and val set.
 
     Args:
@@ -59,7 +59,7 @@ def random_split(dataset: data.Dataset,
             val set. Defaults to .1.
 
     Returns:
-        Tuple[data.Dataset, data.Dataset]: The train and val sets.
+        Tuple[data.Subset, data.Subset]: The train and val sets.
 
     """
     if hold_out <= 0 or hold_out >= 1:
