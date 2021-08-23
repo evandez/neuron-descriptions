@@ -85,7 +85,7 @@ def test_model_no_path(model, model_path):
     """Test model correctly reads config."""
     expected = FakeModelConfig(model,
                                pathlib.Path(__file__).parents[2] /
-                               f'.zoo/models/{MODEL}-{DATASET}.pth',
+                               f'models/{MODEL}-{DATASET}.pth',
                                flag=True)
     source = {
         MODEL: {
@@ -176,7 +176,7 @@ def test_dataset_no_path(dataset):
     """Test dataset correctly reads config when no path provided."""
     expected = FakeDatasetConfig(dataset,
                                  path=pathlib.Path(__file__).parents[2] /
-                                 f'.zoo/datasets/{DATASET}',
+                                 f'data/{DATASET}',
                                  flag=True)
     source = {DATASET: expected, 'bad': DangerConfig()}
     actual = loaders.dataset(DATASET, source=source, flag=True)

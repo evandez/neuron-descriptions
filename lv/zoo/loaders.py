@@ -2,13 +2,14 @@
 import pathlib
 from typing import Any, Iterable, Mapping, Optional, Tuple
 
+from lv.utils import env
 from lv.utils.typing import Layer, PathLike
 from lv.zoo import configs, core
 
 from torch import nn
 from torch.utils import data
 
-Model = Tuple[nn.Sequential, Iterable[Layer], core.ModelConfig]
+Model = Tuple[nn.Module, Iterable[Layer], core.ModelConfig]
 
 
 def model(name: str,
@@ -22,7 +23,7 @@ def model(name: str,
         name (str): Name of the model.
         dataset (str): Name of the dataset.
         path (Optional[PathLike], optional): Path to the model weights.
-            If not set, defaults to `.zoo/models/{name}-{dataset}.pth`.
+            If not set, defaults to `<project model dir>/{name}-{dataset}.pth`.
             If path does not exist but `url` is set on the model config,
             weights will be downloaded from URL to the path.
         source (Optional[core.ModelConfigs], optional): Mapping from model
@@ -34,7 +35,7 @@ def model(name: str,
             weights for the given dataset.
 
     Returns:
-        Model: The loaded model as an `nn.Sequential` along with its layers.
+        Model: The loaded model along with its layers.
 
     """
     if source is None:
@@ -46,8 +47,7 @@ def model(name: str,
     config = source[name][dataset]
 
     if path is None:
-        path = pathlib.Path(
-            __file__).parents[2] / '.zoo/models' / f'{name}-{dataset}.pth'
+        path = env.models_dir() / f'{name}-{dataset}.pth'
 
     model, layers = config.load(path, **kwargs)
     return model, layers, config
@@ -63,7 +63,7 @@ def dataset(name: str,
         name (str): Dataset configuration name. See `DATASET_CONFIGS` for
             all options.
         path (Optional[PathLike], optional): Path to dataset. Defaults to
-            .zoo/datasets/{name} at the root of this repository.
+            project default (see `lv.utils.env`).
         source (Optional[Mapping[str, DatasetConfig]], optional): Mapping
             from config names to dataset configs. By default, calls
             `lv.zoo.configs.datasets()`.
@@ -82,7 +82,7 @@ def dataset(name: str,
     config = source[name]
 
     if path is None and config.requires_path:
-        path = pathlib.Path(__file__).parents[2] / '.zoo/datasets' / name
+        path = env.data_dir() / name
 
     dataset = config.load(path=path, **kwargs)
 
@@ -100,15 +100,14 @@ def datasets(name: str,
             this argument. See `DATASET_CONFIGS` for all options.
         path (Optional[PathLike], optional): Root path for all datasets.
             Individual paths will be computed by appending dataset name to
-            this path. Defaults to None.
+            this path. Defaults to project default.
 
     Returns:
         data.Dataset: All datasets concatenated into one.
 
     """
     if path is None:
-        # TODO(evandez): Find somewhere to commonize this line.
-        path = pathlib.Path(__file__).parents[2] / '.zoo/datasets'
+        path = env.data_dir()
     concated = dataset(name, path=pathlib.Path(path) / name, **kwargs)
     for other in others:
         concated += dataset(other, path=pathlib.Path(path) / other, **kwargs)
