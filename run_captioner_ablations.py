@@ -96,12 +96,12 @@ parser.add_argument(
 parser.add_argument(
     '--mi-temperature-max',
     type=float,
-    default=.3,
+    default=.25,
     help='max temperature to try in mi ablations (default: .3)')
 parser.add_argument(
     '--mi-temperature-step',
     type=float,
-    default=.05,
+    default=.025,
     help='step size for temperatures to try in mi ablations (default: .05)')
 parser.add_argument('--data-dir',
                     type=pathlib.Path,
