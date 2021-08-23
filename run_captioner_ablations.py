@@ -213,7 +213,7 @@ for config in args.encoders:
                     display_progress_as=f'(encoder={config}) train decoder',
                     device=device)
 
-        print(f'saving captinoer to {captioner_file}')
+        print(f'saving captioner to {captioner_file}')
         decoder.save(captioner_file)
 
     def evaluate(**kwargs: Any) -> None:
