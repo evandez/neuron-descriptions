@@ -224,12 +224,6 @@ def strip_results_csv(
                     continue
                 replace_substrings[key] = f' {correction}{punct}'
 
-                # Sometimes the reverse happens, so factor that in...
-                key = f'{punct}{word} '
-                if key in replace_substrings:
-                    continue
-                replace_substrings[key] = f'{punct}{correction} '
-
             for punct in ('', '.', "'"):
                 key = f' {word}{punct}'
                 if key in replace_suffixes:
