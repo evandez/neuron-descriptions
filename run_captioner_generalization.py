@@ -219,7 +219,7 @@ for experiment in args.experiments or EXPERIMENTS.keys():
         # Train the LM.
         lm = lms.lm(train)
         lm.fit(train, device=device)
-        lm.save(f'{experiment}-split{index}-lm.pth')
+        lm.save(results_dir / f'{experiment}-split{index}-lm.pth')
 
         # Maybe precompute image features.
         train_features, test_features = None, None
@@ -235,7 +235,7 @@ for experiment in args.experiments or EXPERIMENTS.keys():
                                    beam_size=args.beam_size,
                                    temperature=args.temperature)
         decoder.fit(train, features=train_features, device=device)
-        decoder.save(f'{experiment}-split{index}-captioner.pth')
+        decoder.save(results_dir / f'{experiment}-split{index}-captioner.pth')
 
         # Test the decoder.
         predictions = decoder.predict(test,
