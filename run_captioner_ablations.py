@@ -161,7 +161,7 @@ if SCORE_BERT_SCORE in args.scores:
 
 dataset = zoo.datasets(*args.datasets)
 for config in args.encoders:
-    print(f'---- begin ablations for {config} model ----')
+    print(f'---- begin ablations for {config} encoder ----')
 
     splits_file = results_dir / f'{config}-splits.pth'
     if splits_file.exists():
