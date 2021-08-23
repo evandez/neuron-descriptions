@@ -9,9 +9,10 @@ from lv import datasets
 from lv.deps.netdissect import renormalize
 from lv.dissection import dissect, zoo
 from lv.models import classifiers, decoders, encoders
-from lv.utils import logging, training
+from lv.utils import env, logging, training
 
 import numpy
+import shutil
 import torch
 import wandb
 
@@ -73,16 +74,18 @@ parser.add_argument('--annotations',
                     default=ANNOTATIONS,
                     nargs='+',
                     help='annotations to train captioner on (default: all)')
-parser.add_argument('--datasets-root',
+parser.add_argument('--data-dir',
                     type=pathlib.Path,
-                    default='.zoo/datasets',
-                    help='root dir for datasets (default: .zoo/datasets)')
+                    help='root dir for datasets (default: project data dir)')
 parser.add_argument(
-    '--out-root',
+    '--results-dir',
     type=pathlib.Path,
     default='cnn-repair',
     help='output directory to write models and dissection data '
-    '(default: "./cnn-repair")')
+    '(default: "<project results dir>/cnn-repair")')
+parser.add_argument('--clear-results-dir',
+                    action='store_true',
+                    help='if set, clear results dir (default: do not)')
 parser.add_argument('--batch-size',
                     type=int,
                     default=128,
@@ -148,11 +151,16 @@ wandb.init(project=args.wandb_project,
 
 device = 'cuda' if args.cuda else 'cpu'
 
-args.out_root.mkdir(exist_ok=True, parents=True)
+# Prepare necessary directories.
+data_dir = args.data_dir or env.data_dir()
+results_dir = args.results_dir or (env.results_dir() / 'cnn-repair')
+if args.clear_results_dir and results_dir.exists():
+    shutil.rmtree(results_dir)
+results_dir.mkdir(exist_ok=True, parents=True)
 
 # Before diving into experiments, train a captioner on all the data.
 # TODO(evandez): Use a pretrained captioner.
-annotations = lv.zoo.datasets(*args.annotations, path=args.datasets_root)
+annotations = lv.zoo.datasets(*args.annotations, path=data_dir)
 encoder = encoders.PyramidConvEncoder().to(device)
 decoder = decoders.decoder(annotations, encoder).to(device)
 decoder.fit(annotations,
@@ -166,12 +174,10 @@ for experiment in args.experiments:
 
         # Start by training the classifier on spurious data.
         dataset = zoo.dataset(experiment,
-                              path=args.datasets_root / experiment / version /
-                              'train',
+                              path=data_dir / experiment / version / 'train',
                               factory=training.PreloadedImageFolder)
         test = zoo.dataset(experiment,
-                           path=args.datasets_root / experiment / version /
-                           'test',
+                           path=data_dir / experiment / version / 'test',
                            factory=training.PreloadedImageFolder)
         train, val = training.random_split(dataset, hold_out=args.hold_out)
 
@@ -188,10 +194,10 @@ for experiment in args.experiments:
                 device=device,
                 display_progress_as=f'train {args.cnn}')
         torch.save(cnn.state_dict(),
-                   args.out_root / experiment / f'{args.cnn}-{version}.pth')
+                   results_dir / experiment / f'{args.cnn}-{version}.pth')
 
         # Now that we have the trained model, dissect it on the validation set.
-        dissection_root = args.out_root / experiment / version / args.cnn
+        dissection_root = results_dir / experiment / version / args.cnn
         for layer in layers:
             dissect.discriminative(
                 cnn,

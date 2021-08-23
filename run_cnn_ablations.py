@@ -7,7 +7,7 @@ import lv.dissection.zoo
 import lv.zoo
 from lv import datasets
 from lv.models import classifiers, decoders, encoders
-from lv.utils import logging, training
+from lv.utils import env, logging, training
 from lv.utils.typing import StrSequence
 
 import nltk
@@ -147,10 +147,9 @@ parser.add_argument('--orders',
                     choices=ORDERS,
                     default=(ORDER_DECREASING,),
                     help='ablation orders to try (default: decreasing)')
-parser.add_argument('--datasets-root',
+parser.add_argument('--data-dir',
                     type=pathlib.Path,
-                    default='.zoo/datasets',
-                    help='root dir for datasets (default: .zoo/datasets)')
+                    help='root dir for datasets (default: project data dir)')
 parser.add_argument('--ablation-min',
                     type=float,
                     default=0,
@@ -201,6 +200,9 @@ wandb.init(project=args.wandb_project,
 
 device = 'cuda' if args.cuda else 'cpu'
 
+# Prepare necessary directories.
+data_dir = args.data_dir or env.data_dir()
+
 experiments = set(args.experiments)
 if args.groups:
     for group in args.groups:
@@ -231,15 +233,14 @@ if set(experiments) & set(EXPERIMENTS_BY_GROUP[GROUP_SEMANTIC]):
 
 for dataset_name in args.datasets:
     dataset = lv.dissection.zoo.dataset(dataset_name,
-                                        path=args.datasets_root /
-                                        dataset_name / 'val',
+                                        path=data_dir / dataset_name / 'val',
                                         factory=training.PreloadedImageFolder)
     for cnn_name in args.cnns:
         cnn, *_ = lv.dissection.zoo.model(cnn_name, dataset_name)
         cnn = classifiers.ImageClassifier(cnn).to(device).eval()
 
         annotations = lv.zoo.datasets(f'{cnn_name}/{dataset_name}',
-                                      path=args.datasets_root)
+                                      path=data_dir)
         assert isinstance(annotations, datasets.AnnotatedTopImagesDataset)
 
         # Obtain captions for every neuron in the CNN.
@@ -251,7 +252,7 @@ for dataset_name in args.datasets:
                 captions.append(caption)
         else:
             assert args.captions == CAPTIONS_LEARNED
-            train = lv.zoo.datasets(*TRAIN[cnn_name], path=args.datasets_root)
+            train = lv.zoo.datasets(*TRAIN[cnn_name], path=data_dir)
             encoder = encoders.PyramidConvEncoder().to(device)
             decoder = decoders.decoder(train, encoder).to(device)
             decoder.fit(train, device=device)
