@@ -159,7 +159,7 @@ hits.strip_results_csv(
         'aqauticlife': 'aquatic life',
         'bridgewalkay': 'bridge walkway',
         'ciggerate': 'cigarette',
-        'passangarcar': 'passenger car',
+        'passangercar': 'passenger car',
         'rockclif': 'rock cliff',
         'showbtwo': 'show two',
         'spacearoudn': 'space around',
