@@ -196,16 +196,12 @@ for config in args.encoders:
         encoder = encoders.PyramidConvEncoder(config=config).to(device)
         decoder = decoders.decoder(train, encoder, lm=lm).to(device)
 
-        train_features, test_features = None, None
+        train_features = None
         if args.precompute_features:
             train_features = encoder.map(
                 train,
                 device=device,
                 display_progress_as=f'(encoder={config}) featurize train set')
-            test_features = encoder.map(
-                test,
-                device=device,
-                display_progress_as=f'(encoder={config}) featurize test set')
 
         decoder.fit(train,
                     features=train_features,
@@ -214,6 +210,13 @@ for config in args.encoders:
 
         print(f'saving captioner to {captioner_file}')
         decoder.save(captioner_file)
+
+        test_features = None
+        if args.precompute_features:
+            test_features = encoder.map(
+                test,
+                device=device,
+                display_progress_as=f'(encoder={config}) featurize test set')
 
     def evaluate(**kwargs: Any) -> None:
         """Evaluate the captioner with the given args."""
