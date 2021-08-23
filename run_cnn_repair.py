@@ -3,6 +3,7 @@ import argparse
 import copy
 import pathlib
 import random
+import shutil
 
 import lv.zoo
 from lv import datasets
@@ -12,7 +13,6 @@ from lv.models import classifiers, decoders, encoders
 from lv.utils import env, logging, training
 
 import numpy
-import shutil
 import torch
 import wandb
 
