@@ -809,7 +809,7 @@ class Decoder(serialize.SerializableModule):
             patience: int = 4,
             hold_out: float = .1,
             regularization_weight: float = 1.,
-            optimizer_t: Type[optim.Optimizer] = optim.Adam,
+            optimizer_t: Type[optim.Optimizer] = optim.AdamW,
             optimizer_kwargs: Optional[Mapping[str, Any]] = None,
             features: Optional[data.TensorDataset] = None,
             num_workers: int = 0,
@@ -840,7 +840,7 @@ class Decoder(serialize.SerializableModule):
                 stochasticity regularization. See [Xu et al., 2015] for
                 details. Defaults to 1..
             optimizer_t (Type[optim.Optimizer], optional): Optimizer type.
-                Defaults to optim.Adam.
+                Defaults to AdamW.
             optimizer_kwargs (Optional[Mapping[str, Any]], optional): Optimizer
                 options. By default, no kwargs are passed to optimizer.
             features (Optional[data.TensorDataset], optional): Precomputed

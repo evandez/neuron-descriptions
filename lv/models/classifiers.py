@@ -35,7 +35,7 @@ class ImageClassifier(nn.Module):
             max_epochs: int = 100,
             patience: int = 4,
             hold_out: Union[float, data.Dataset] = .1,
-            optimizer_t: Type[optim.Optimizer] = optim.Adam,
+            optimizer_t: Type[optim.Optimizer] = optim.AdamW,
             optimizer_kwargs: Optional[Mapping[str, Any]] = None,
             num_workers: int = 0,
             ablate: Optional[Sequence[Unit]] = None,
