@@ -230,7 +230,8 @@ def strip_results_csv(
                     continue
                 replace_suffixes[key] = f' {correction}{punct}'
 
-            replace_exact[word] = correction
+            if word not in replace_exact:
+                replace_exact[word] = correction
 
     # Okay, now construct the output CSV.
     header = (out_layer_column, out_unit_column, out_annotation_column)

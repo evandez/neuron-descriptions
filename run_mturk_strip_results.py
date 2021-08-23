@@ -57,7 +57,6 @@ hits.strip_results_csv(
         'it shows an image ',
         'it shows ',
     ),
-    remove_substrings=(' these are ', ' nice '),
     remove_suffixes=(
         '.',
         ',',
@@ -175,6 +174,10 @@ hits.strip_results_csv(
         'designs.regions': 'designs. regions',
         'food.space': 'food. space',
         ',sappce': ', space',
+
+        # Other boilerplate phrases that need to be carefully deleted.
+        ' these are ': ' ',
+        ' nice ': ' ',
     },
     replace_exact={
         'none of the above': 'nothing',
