@@ -1,7 +1,7 @@
 """Models for decoding neuron captions."""
 import warnings
-from typing import (Any, Dict, Mapping, NamedTuple, Optional, Sized, Tuple,
-                    Type, Union, cast)
+from typing import (Any, Dict, List, Mapping, NamedTuple, Optional, Sized,
+                    Tuple, Type, Union, cast)
 
 from lv.ext import bert_score
 from lv.models import encoders, lms
@@ -808,6 +808,7 @@ class Decoder(serialize.SerializableModule):
             max_epochs: int = 100,
             patience: int = 4,
             hold_out: float = .1,
+            stop_on_bleu: bool = True,
             regularization_weight: float = 1.,
             optimizer_t: Type[optim.Optimizer] = optim.AdamW,
             optimizer_kwargs: Optional[Mapping[str, Any]] = None,
@@ -836,6 +837,8 @@ class Decoder(serialize.SerializableModule):
                 epochs, stop training. Defaults to 4.
             hold_out (float, optional): Fraction of data to hold out as a
                 validation set. Defaults to .1.
+            stop_on_bleu (bool, optional): Use BLEU as the early stopping
+                criterion. Defaults to True.
             regularization_weight (float, optional): Weight for double
                 stochasticity regularization. See [Xu et al., 2015] for
                 details. Defaults to 1..
@@ -910,8 +913,10 @@ class Decoder(serialize.SerializableModule):
 
         # Wrap the batch -> loss computation in a fn since we use it for both
         # training and validation.
-        def process(batch: Tuple[OptionalTensors, str],
-                    regularize: bool = True) -> torch.Tensor:
+        def process(
+            batch: Tuple[OptionalTensors, str],
+            regularize: bool = True,
+        ) -> Tuple[torch.Tensor, DecoderOutput]:
             images_or_features, captions = batch
             if features is None:
                 assert len(images_or_features) == 2
@@ -941,7 +946,7 @@ class Decoder(serialize.SerializableModule):
                 attentions = outputs.attentions
                 regularizer = ((1 - attentions.sum(dim=1))**2).mean()
                 loss += regularization_weight * regularizer
-            return loss
+            return loss, outputs
 
         progress = range(max_epochs)
         if display_progress_as is not None:
@@ -954,7 +959,7 @@ class Decoder(serialize.SerializableModule):
             self.encoder.eval()
             train_loss = 0.
             for batch in train_loader:
-                loss = process(batch, regularize=True)
+                loss, _ = process(batch, regularize=True)
                 loss.backward()
                 optimizer.step()
                 optimizer.zero_grad()
@@ -963,19 +968,25 @@ class Decoder(serialize.SerializableModule):
 
             self.eval()
             val_loss = 0.
+            val_predictions: List[str] = []
             for batch in val_loader:
                 with torch.no_grad():
-                    loss = process(batch, regularize=False)
+                    loss, outputs = process(batch, regularize=False)
                 val_loss += loss.item()
+                val_predictions += outputs.captions
             val_loss /= len(val_loader)
+            val_bleu = self.bleu(val, predictions=val_predictions).score
 
             if display_progress_as is not None:
                 assert not isinstance(progress, range)
                 progress.set_description(f'{display_progress_as} '
                                          f'[train_loss={train_loss:.3f}, '
-                                         f'val_loss={val_loss:.3f}]')
+                                         f'val_loss={val_loss:.3f}, '
+                                         f'val_bleu={val_bleu:.1f}]')
 
-            if stopper(val_loss):
+            stop = stop_on_bleu and stopper(val_bleu)
+            stop |= not stop_on_bleu and stopper(val_loss)
+            if stop:
                 self.load_state_dict(best)
                 break
 
