@@ -948,6 +948,7 @@ class Decoder(serialize.SerializableModule):
             progress = tqdm(progress, desc=display_progress_as)
 
         # Begin training!
+        best = self.state_dict()
         for _ in progress:
             self.train()
             self.encoder.eval()
@@ -975,7 +976,11 @@ class Decoder(serialize.SerializableModule):
                                          f'val_loss={val_loss:.3f}]')
 
             if stopper(val_loss):
+                self.load_state_dict(best)
                 break
+
+            if stopper.improved:
+                best = self.state_dict()
 
     def properties(self) -> serialize.Properties:
         """Override `Serializable.properties`."""

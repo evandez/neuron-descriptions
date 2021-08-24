@@ -44,3 +44,17 @@ def test_early_stopping_call_increasing():
     for i in range(PATIENCE):
         assert not early_stopping(i)
     assert early_stopping(0)
+
+
+def test_early_stopping_improved():
+    """Test EarlyStopping.improved returns True when value improves."""
+    early_stopping = training.EarlyStopping(patience=PATIENCE, decreasing=True)
+
+    early_stopping(0)
+    assert early_stopping.improved
+
+    early_stopping(1)
+    assert not early_stopping.improved
+
+    early_stopping(-1)
+    assert early_stopping.improved

@@ -117,6 +117,7 @@ class ImageClassifier(nn.Module):
             progress = tqdm(progress, desc=display_progress_as)
 
         with ablations.ablated(self.model, ablate or []) as ablated:
+            best = self.state_dict()
             for _ in progress:
                 ablated.train()
                 train_loss = 0.
@@ -149,7 +150,11 @@ class ImageClassifier(nn.Module):
                                              f'val_loss={val_loss:.3f}]')
 
                 if stopper(val_loss):
+                    self.load_state_dict(best)
                     break
+
+                if stopper.improved:
+                    best = self.state_dict()
 
     def accuracy(
         self,

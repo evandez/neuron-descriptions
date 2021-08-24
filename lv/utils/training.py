@@ -48,6 +48,11 @@ class EarlyStopping:
 
         return self.num_bad > self.patience
 
+    @property
+    def improved(self) -> bool:
+        """Check if the running value just improved."""
+        return self.num_bad == 0
+
 
 def random_split(dataset: data.Dataset,
                  hold_out: float = .1) -> Tuple[data.Subset, data.Subset]:
