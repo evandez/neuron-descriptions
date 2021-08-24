@@ -909,7 +909,8 @@ class Decoder(serialize.SerializableModule):
         # Prepare model and training tools.
         optimizer = optimizer_t(self.parameters(), **optimizer_kwargs)
         criterion = nn.NLLLoss(ignore_index=self.indexer.pad_index)
-        stopper = training.EarlyStopping(patience=patience)
+        stopper = training.EarlyStopping(patience=patience,
+                                         decreasing=not stop_on_bleu)
 
         # Wrap the batch -> loss computation in a fn since we use it for both
         # training and validation.
