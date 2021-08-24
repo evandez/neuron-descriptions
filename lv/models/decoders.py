@@ -245,6 +245,11 @@ class Decoder(serialize.SerializableModule):
         """Return the vocab size."""
         return len(self.indexer)
 
+    @property
+    def mi(self) -> bool:
+        """Return True if MI decoding should be used by default."""
+        return self.lm is not None and not self.training
+
     def forward(self,
                 images_or_features: torch.Tensor,
                 masks: Optional[torch.Tensor] = None,
@@ -297,7 +302,7 @@ class Decoder(serialize.SerializableModule):
         if strategy is None:
             strategy = self.strategy
         if mi is None:
-            mi = self.lm is not None and not self.training
+            mi = self.mi
         if beam_size is None:
             beam_size = self.beam_size
 
@@ -585,6 +590,55 @@ class Decoder(serialize.SerializableModule):
         return DecoderStep(scores=scores,
                            attentions=attentions,
                            state=DecoderState(h=h, c=c, h_lm=h_lm, c_lm=c_lm))
+
+    def force(self,
+              captions: StrSequence,
+              *args: Any,
+              device: Optional[Device] = None,
+              **kwargs: Any) -> torch.Tensor:
+        """Force decode the given captions, returning their total scores.
+
+        The *args are the standard arguments to forward(...). Likewise, all
+        **kwargs are also passed to forward(...); note that some options like
+        `strategy=` and `length=` are disallowed, however.
+
+        Args:
+            captions (StrSequence): The captions to force decode.
+            device (Optional[Device], optional): [description].
+                Defaults to Device.
+
+        Returns:
+            torch.Tensor: Length (len(captions,) tensor containing log
+                probabilities (if `mi=False`) or mutual informations
+                (if `mi=True) for each sequence.
+
+        """
+        for forbidden in ('strategy', 'length'):
+            if forbidden in kwargs:
+                raise ValueError(f'option disallowed: {forbidden}')
+
+        if device is not None:
+            self.to(device)
+
+        targets = torch.tensor(self.indexer(captions), device=device)
+        targets = targets[:, 1:]
+        _, length = targets.shape
+
+        outputs = self(*args, strategy=targets, length=length, **kwargs)
+
+        # Coding wise, it's easier to just reindex the captions without
+        # special tokens than it is to work with the special tokens...
+        # so we'll be a little wasteful here.
+        indexed = self.indexer(captions,
+                               start=False,
+                               stop=True,
+                               pad=False,
+                               unk=True)
+        totals = []
+        for scores, indices in zip(outputs.scores, indexed):
+            total = scores[torch.arange(len(indices)), indices].sum()
+            totals.append(total.item())
+        return torch.tensor(totals, device=device)
 
     def bleu(self,
              dataset: data.Dataset,
