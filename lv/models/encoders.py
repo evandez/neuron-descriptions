@@ -338,6 +338,11 @@ class PyramidConvEncoder(Encoder, serialize.SerializableModule):
                 ('conv1', 'layer1', 'layer2', 'layer3', 'layer4'),
                 3904,
             ),
+            'resnet101': (
+                models.resnet101,
+                ('conv1', 'layer1', 'layer2', 'layer3', 'layer4'),
+                3904,
+            ),
         }
 
 
