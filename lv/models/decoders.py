@@ -1,7 +1,7 @@
 """Models for decoding neuron captions."""
 import warnings
-from typing import (Any, Dict, List, Mapping, NamedTuple, Optional, Sized,
-                    Tuple, Type, Union, cast)
+from typing import (Any, Dict, Mapping, NamedTuple, Optional, Sized, Tuple,
+                    Type, Union, cast)
 
 from lv.ext import bert_score
 from lv.models import encoders, lms
@@ -914,10 +914,8 @@ class Decoder(serialize.SerializableModule):
 
         # Wrap the batch -> loss computation in a fn since we use it for both
         # training and validation.
-        def process(
-            batch: Tuple[OptionalTensors, str],
-            regularize: bool = True,
-        ) -> Tuple[torch.Tensor, DecoderOutput]:
+        def process(batch: Tuple[OptionalTensors, str],
+                    regularize: bool = True) -> torch.Tensor:
             images_or_features, captions = batch
             if features is None:
                 assert len(images_or_features) == 2
@@ -947,7 +945,7 @@ class Decoder(serialize.SerializableModule):
                 attentions = outputs.attentions
                 regularizer = ((1 - attentions.sum(dim=1))**2).mean()
                 loss += regularization_weight * regularizer
-            return loss, outputs
+            return loss
 
         progress = range(max_epochs)
         if display_progress_as is not None:
@@ -960,7 +958,7 @@ class Decoder(serialize.SerializableModule):
             self.encoder.eval()
             train_loss = 0.
             for batch in train_loader:
-                loss, _ = process(batch, regularize=True)
+                loss = process(batch, regularize=True)
                 loss.backward()
                 optimizer.step()
                 optimizer.zero_grad()
@@ -969,14 +967,15 @@ class Decoder(serialize.SerializableModule):
 
             self.eval()
             val_loss = 0.
-            val_predictions: List[str] = []
             for batch in val_loader:
                 with torch.no_grad():
-                    loss, outputs = process(batch, regularize=False)
+                    loss = process(batch, regularize=False)
                 val_loss += loss.item()
-                val_predictions += outputs.captions
             val_loss /= len(val_loader)
-            val_bleu = self.bleu(val, predictions=val_predictions).score
+            val_bleu = self.bleu(val,
+                                 mi=False,
+                                 device=device,
+                                 display_progress_as=None).score
 
             if display_progress_as is not None:
                 assert not isinstance(progress, range)
