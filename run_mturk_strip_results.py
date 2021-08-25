@@ -22,9 +22,6 @@ parser.add_argument('--legacy',
                     '(default: use layer/unit columns)')
 args = parser.parse_args()
 
-print(args.replacements_by_worker)
-exit()
-
 
 def replace_worker_specific(annotation: str, row: hits.ResultsRow) -> str:
     """Make a worker-specific transformation to the annotation."""
