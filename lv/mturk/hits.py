@@ -173,7 +173,7 @@ def strip_results_csv(
             function before processing unit. Function takes both the unit
             and CSV row as arguments. Defaults to None.
         transform_annotation (Optional[TransformAnnotation], optional): Apply
-            this function to annotation before processing it (e.g., to make
+            this function to annotation after processing it (e.g., to make
             worker-specific corrections to it). Function takes both the
             annotation and the CSV row as arguments. Defaults to None.
 
@@ -265,10 +265,6 @@ def strip_results_csv(
 
         # Read annotation. We always lowercase it before cleaning.
         annotation = input[in_annotation_column].lower()
-        if transform_annotation is not None:
-            annotation = transform_annotation(annotation, input)
-
-        # Read annotation.
         for prefix, replacement in replace_prefixes.items():
             if annotation.startswith(prefix):
                 annotation = replacement + annotation[len(prefix):]
@@ -281,6 +277,10 @@ def strip_results_csv(
             if annotation == string:
                 annotation = replacement
         annotation = annotation.strip()
+
+        # Apply the transformation after doing all these other fixes.
+        if transform_annotation is not None:
+            annotation = transform_annotation(annotation, input)
 
         # Add row to output.
         output = (layer, unit, annotation)

@@ -11,6 +11,11 @@ parser.add_argument(
     type=pathlib.Path,
     help='write stripped results here; by default, overwrites input file '
     '(default: overwrite original)')
+parser.add_argument(
+    '--replace-space-around-for',
+    nargs='+',
+    help='replace all "space around" phrases for these workers '
+    '(default: none)')
 parser.add_argument('--replace-for-worker',
                     dest='replacements_by_worker',
                     nargs=3,
@@ -21,6 +26,19 @@ parser.add_argument('--legacy',
                     help='if set, parse layer/unit from image url '
                     '(default: use layer/unit columns)')
 args = parser.parse_args()
+
+replacements_by_worker = list(args.replacements_by_worker or [])
+
+# One worker prefixed thousands of annotations with phrases like
+# "space around", making this phrase uninformative. Hence, we remove all
+# phrases like this from their annotations specifically. The ID must be passed
+# as an argument for privacy reasons.
+for worker_id in args.replace_space_around_for:
+    for noun in ('space', 'spaces'):
+        for preposition in ('around', 'along', 'to', 'in'):
+            for article in ('a ', 'an ', 'the ', ''):
+                phrase = f'{noun} {preposition} {article}'
+                replacements_by_worker.append((worker_id, phrase, ''))
 
 
 def replace_worker_specific(annotation: str, row: hits.ResultsRow) -> str:
@@ -49,18 +67,35 @@ hits.strip_results_csv(
         'these areas are ',
         'these areas have ',
         'these areas ',
+        'these area ',
+        'these items are ',
+        'these items ',
         'these regions have ',
         'these regions show ',
-        'there regions are ',
+        'these regions are ',
         'these regions ',
+        'these pictures all have ',
+        'these pictures all show ',
+        'these pictures are ',
+        'these pictures show ',
+        'these pictures have ',
+        'these pictures ',
         'these are ',
+        'these is ',
         'these have ',
+        'these show ',
+        'these contain ',
+        'these look like ',
         'there are ',
         'they are ',
         'they all are ',
         'this is ',
+        'there is ',
+        'this collection depicts ',
+        'this collection ',
         'most images contain ',
         'all are ',
+        'all have ',
         'the is the ',
         'all images are ',
         'all images include ',
@@ -75,6 +110,8 @@ hits.strip_results_csv(
         'it shows an image that ',
         'it shows an image ',
         'it shows ',
+        'of these ',
+        'a bunch of ',
     ),
     remove_suffixes=(
         '.',
@@ -145,6 +182,7 @@ hits.strip_results_csv(
         'streetcorner': 'street corner',
         'subwaycar': 'subway car',
         'telephonebox': 'telephone box',
+        'theback': 'the back',
         'thebackground': 'the background',
         'thecarpet': 'the carpet',
         'theclothing': 'the clothing',
@@ -153,6 +191,7 @@ hits.strip_results_csv(
         'thegravel': 'the gravel',
         'thepavement': 'the pavement',
         'thesethese': 'these',
+        'thesky': 'the sky',
         'thesticker': 'the sticker',
         'theswimming': 'the swimming',
         'theletter': 'the letter',
@@ -175,6 +214,7 @@ hits.strip_results_csv(
         ' og ': ' of ',
         'aanndanimals': 'and animals',
         'aorunditem': 'around item',
+        ' arounda ': ' around a ',
         'aqauticlife': 'aquatic life',
         'bridgewalkay': 'bridge walkway',
         'camoflouged': 'camoflauged',
@@ -194,9 +234,15 @@ hits.strip_results_csv(
         'food.space': 'food. space',
         ',sappce': ', space',
 
-        # Other boilerplate phrases that need to be carefully deleted.
+        # Other boilerplate phrases/mistakes that need to be carefully fixed.
         ' these are ': ' ',
         ' nice ': ' ',
+        ' i ': ' ',
+        'theface ': 'the face ',
+        ' asign': 'a sign',
+        ' dres,': ' dress,',
+        ' ona ': ' on a ',
+        ' ofa ': ' of a ',
     },
     replace_exact={
         'none of the above': 'nothing',
