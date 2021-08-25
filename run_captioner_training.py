@@ -16,7 +16,8 @@ DATASETS = (
 
 ENCODER_RESNET18 = 'resnet18'
 ENCODER_RESNET50 = 'resnet50'
-ENCODERS = (ENCODER_RESNET18, ENCODER_RESNET50)
+ENCODER_RESNET101 = 'resnet101'
+ENCODERS = (ENCODER_RESNET18, ENCODER_RESNET50, ENCODER_RESNET101)
 
 parser = argparse.ArgumentParser(description='train a captioner')
 parser.add_argument(
@@ -29,8 +30,8 @@ parser.add_argument('--datasets',
                     help='datasets to train on (default: all)')
 parser.add_argument('--encoder',
                     choices=ENCODERS,
-                    default=ENCODER_RESNET50,
-                    help='image encoder (default: resnet50)')
+                    default=ENCODER_RESNET101,
+                    help='image encoder (default: resnet101)')
 parser.add_argument('--no-lm',
                     action='store_true',
                     help='do not train lm (default: train lm)')
