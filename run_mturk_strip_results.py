@@ -43,7 +43,7 @@ if replace_space_around_for:
 
 def replace_worker_specific(annotation: str, row: hits.ResultsRow) -> str:
     """Make a worker-specific transformation to the annotation."""
-    for worker_id, old_str, new_str in args.replacements_by_worker:
+    for worker_id, old_str, new_str in replacements_by_worker:
         if row['WorkerId'] == worker_id:
             annotation = annotation.replace(old_str, new_str)
     return annotation
