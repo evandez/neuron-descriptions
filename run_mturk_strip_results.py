@@ -39,6 +39,16 @@ if replace_space_around_for:
                 phrase = f'{noun} {preposition} {article}'
                 replacements_by_worker.append(
                     (replace_space_around_for, phrase, ''))
+            for punct in ('.', ','):
+                phrase = f' {noun} {preposition}{punct}'
+                replacements_by_worker.append(
+                    (replace_space_around_for, phrase, ''))
+
+    # Some other oddball phrases...
+    for phrase in ('with space', 'with space around'):
+        for punct in (',', '.'):
+            replacements_by_worker.append(
+                (replacements_by_worker, f' {phrase}{punct}', ''))
 
 
 def replace_worker_specific(annotation: str, row: hits.ResultsRow) -> str:
@@ -216,11 +226,11 @@ hits.strip_results_csv(
         ' og ': ' of ',
         'aanndanimals': 'and animals',
         'aorunditem': 'around item',
-        ' arounda ': ' around a ',
         'aqauticlife': 'aquatic life',
         'bridgewalkay': 'bridge walkway',
         'camoflouged': 'camoflauged',
         'ciggerate': 'cigarette',
+        'limehouse': 'lighthouse',
         'passangercar': 'passenger car',
         'rockclif': 'rock cliff',
         'showbtwo': 'show two',
@@ -240,14 +250,15 @@ hits.strip_results_csv(
         ' these are ': ' ',
         ' nice ': ' ',
         ' i ': ' ',
+
+        # Some very specific mistakes...
         'theface ': 'the face ',
         ' asign': 'a sign',
         ' dres,': ' dress,',
         ' ona ': ' on a ',
         ' ofa ': ' of a ',
-
-        # One very specific mistake...
         'tree branch, space around a tree branch': 'tree branch',
+        'arounda': 'around a',
     },
     replace_exact={
         'none of the above': 'nothing',
