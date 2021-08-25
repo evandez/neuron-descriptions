@@ -11,11 +11,9 @@ parser.add_argument(
     type=pathlib.Path,
     help='write stripped results here; by default, overwrites input file '
     '(default: overwrite original)')
-parser.add_argument(
-    '--replace-space-around-for',
-    nargs='+',
-    help='replace all "space around" phrases for these workers '
-    '(default: none)')
+parser.add_argument('--replace-space-around-for',
+                    help='replace all "space around" phrases for this worker '
+                    '(default: none)')
 parser.add_argument('--replace-for-worker',
                     dest='replacements_by_worker',
                     nargs=3,
