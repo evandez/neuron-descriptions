@@ -33,7 +33,7 @@ replacements_by_worker = list(args.replacements_by_worker or [])
 # "space around", making this phrase uninformative. Hence, we remove all
 # phrases like this from their annotations specifically. The ID must be passed
 # as an argument for privacy reasons.
-for worker_id in args.replace_space_around_for:
+for worker_id in args.replace_space_around_for or []:
     for noun in ('space', 'spaces'):
         for preposition in ('around', 'along', 'to', 'in'):
             for article in ('a ', 'an ', 'the ', ''):
