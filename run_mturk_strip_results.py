@@ -31,12 +31,14 @@ replacements_by_worker = list(args.replacements_by_worker or [])
 # "space around", making this phrase uninformative. Hence, we remove all
 # phrases like this from their annotations specifically. The ID must be passed
 # as an argument for privacy reasons.
-for worker_id in args.replace_space_around_for or []:
+replace_space_around_for = args.replace_space_around_for
+if replace_space_around_for:
     for noun in ('space', 'spaces'):
         for preposition in ('around', 'along', 'to', 'in'):
             for article in ('a ', 'an ', 'the ', ''):
                 phrase = f'{noun} {preposition} {article}'
-                replacements_by_worker.append((worker_id, phrase, ''))
+                replacements_by_worker.append(
+                    (replace_space_around_for, phrase, ''))
 
 
 def replace_worker_specific(annotation: str, row: hits.ResultsRow) -> str:
