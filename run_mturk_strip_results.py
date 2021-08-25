@@ -101,6 +101,7 @@ hits.strip_results_csv(
         'all images include ',
         'all images contain ',
         'all the above are ',
+        'all ',
         'most images ',
         'most ',
         'the images show ',
@@ -122,6 +123,7 @@ hits.strip_results_csv(
         ', are shown',
         ' is shown',
         ' are shown',
+        ', space around',
     ),
     replace_substrings={
         # Words that are commonly accidentally joined...
@@ -243,6 +245,9 @@ hits.strip_results_csv(
         ' dres,': ' dress,',
         ' ona ': ' on a ',
         ' ofa ': ' of a ',
+
+        # One very specific mistake...
+        'tree branch, space around a tree branch': 'tree branch',
     },
     replace_exact={
         'none of the above': 'nothing',
