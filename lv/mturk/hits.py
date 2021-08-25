@@ -98,6 +98,12 @@ def generate_hits_csv(
         writer.writerows(rows)
 
 
+ResultsRow = Mapping[str, str]
+TransformLayer = Callable[[str, ResultsRow], str]
+TransformUnit = Callable[[str, ResultsRow], str]
+TransformAnnotation = Callable[[str, ResultsRow], str]
+
+
 def strip_results_csv(
     results_csv_file: PathLike,
     out_csv_file: Optional[PathLike] = None,
@@ -117,8 +123,9 @@ def strip_results_csv(
     replace_substrings: Optional[Mapping[str, str]] = None,
     replace_suffixes: Optional[Mapping[str, str]] = None,
     replace_exact: Optional[Mapping[str, str]] = None,
-    transform_layer: Optional[Callable[[str], str]] = None,
-    transform_unit: Optional[Callable[[str], str]] = None,
+    transform_layer: Optional[TransformLayer] = None,
+    transform_unit: Optional[TransformUnit] = None,
+    transform_annotation: Optional[TransformAnnotation] = None,
 ) -> None:
     """Strip the results CSV of everything but layer, unit, and annotation.
 
@@ -159,10 +166,16 @@ def strip_results_csv(
         replace_exact (Optional[Mapping[str, str]], optional): Replace string
             (key) with value if it exactly matches the annotation.
             Defaults to None.
-        transform_layer (Optional[Callable[[str], str]], optional): Tranform
-            raw value from layer column with this fn. Defaults to None.
-        transform_unit (Optional[Callable[[str], str]], optional): Transform
-            raw value from unit column with this fn. Defaults to None.
+        transform_layer (Optional[TransformLayer], optional): Apply this
+            function before processing layer. Function takes both the layer
+            and CSV row as arguments. Defaults to None.
+        transform_unit (Optional[TransformUnit], optional): Apply this
+            function before processing unit. Function takes both the unit
+            and CSV row as arguments. Defaults to None.
+        transform_annotation (Optional[TransformAnnotation], optional): Apply
+            this function to annotation before processing it (e.g., to make
+            worker-specific corrections to it). Function takes both the
+            annotation and the CSV row as arguments. Defaults to None.
 
     """
     results_csv_file = pathlib.Path(results_csv_file)
@@ -243,16 +256,19 @@ def strip_results_csv(
         # Read layer.
         layer = input[in_layer_column]
         if transform_layer is not None:
-            layer = transform_layer(layer)
+            layer = transform_layer(layer, input)
 
         # Read unit.
         unit = input[in_unit_column]
         if transform_unit is not None:
-            unit = transform_unit(unit)
+            unit = transform_unit(unit, input)
+
+        # Read annotation. We always lowercase it before cleaning.
+        annotation = input[in_annotation_column].lower()
+        if transform_annotation is not None:
+            annotation = transform_annotation(annotation, input)
 
         # Read annotation.
-        # We always lowercase the annotation before cleaning.
-        annotation = input[in_annotation_column].lower()
         for prefix, replacement in replace_prefixes.items():
             if annotation.startswith(prefix):
                 annotation = replacement + annotation[len(prefix):]

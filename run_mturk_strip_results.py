@@ -11,11 +11,28 @@ parser.add_argument(
     type=pathlib.Path,
     help='write stripped results here; by default, overwrites input file '
     '(default: overwrite original)')
+parser.add_argument('--replace-for-worker',
+                    dest='replacements_by_worker',
+                    nargs=3,
+                    action='append',
+                    help='replace substrings for this worker (default: none)')
 parser.add_argument('--legacy',
                     action='store_true',
                     help='if set, parse layer/unit from image url '
                     '(default: use layer/unit columns)')
 args = parser.parse_args()
+
+print(args.replacements_by_worker)
+exit()
+
+
+def replace_worker_specific(annotation: str, row: hits.ResultsRow) -> str:
+    """Make a worker-specific transformation to the annotation."""
+    for worker_id, old_str, new_str in args.replacements_by_worker:
+        if row['WorkerId'] == worker_id:
+            annotation = annotation.replace(old_str, new_str)
+    return annotation
+
 
 results_csv_file = args.results_csv_file
 out_csv_file = args.out_csv_file
@@ -26,14 +43,19 @@ hits.strip_results_csv(
     out_csv_file=out_csv_file,
     in_layer_column='Input.image_url_1' if args.legacy else 'Input.layer',
     in_unit_column='Input.image_url_1' if args.legacy else 'Input.unit',
-    transform_layer=(lambda url: url.split('/')[-5]) if legacy else None,
-    transform_unit=(lambda url: url.split('/')[-2][5:]) if legacy else None,
+    transform_layer=(lambda url, _: url.split('/')[-5]) if legacy else None,
+    transform_unit=(lambda url, _: url.split('/')[-2][5:]) if legacy else None,
+    transform_annotation=replace_worker_specific,
     keep_rejected=False,
     spellcheck=True,
     remove_prefixes=(
         'these areas are ',
         'these areas have ',
-        'these areas',
+        'these areas ',
+        'these regions have ',
+        'these regions show ',
+        'there regions are ',
+        'these regions ',
         'these are ',
         'these have ',
         'there are ',
