@@ -134,7 +134,8 @@ Strategy = Union[torch.Tensor, str]
 STRATEGY_GREEDY = 'greedy'
 STRATEGY_SAMPLE = 'sample'
 STRATEGY_BEAM = 'beam'
-STRATEGIES = (STRATEGY_GREEDY, STRATEGY_SAMPLE, STRATEGY_BEAM)
+STRATEGY_RERANK = 'rerank'
+STRATEGIES = (STRATEGY_GREEDY, STRATEGY_SAMPLE, STRATEGY_BEAM, STRATEGY_RERANK)
 
 
 class Decoder(serialize.SerializableModule):
@@ -302,15 +303,18 @@ class Decoder(serialize.SerializableModule):
         if strategy is None:
             strategy = self.strategy
         if mi is None:
-            mi = self.mi
+            mi = self.lm is not None and not self.training
+            mi &= not isinstance(strategy, str) or strategy != STRATEGY_RERANK
         if beam_size is None:
             beam_size = self.beam_size
 
         # Validate arguments.
-        if mi and self.lm is None:
-            raise ValueError('cannot use MI decoding without an LM')
-        if mi and self.training:
-            raise ValueError('cannot use MI decoding while training')
+        if mi and strategy == STRATEGY_RERANK:
+            raise ValueError('cannot set `mi=` decoding when reranking')
+        if (mi or strategy == STRATEGY_RERANK) and self.lm is None:
+            raise ValueError('cannot use MI/rerank decoding without an LM')
+        if (mi or strategy == STRATEGY_RERANK) and self.training:
+            raise ValueError('cannot use MI/rerank decoding while training')
 
         if isinstance(strategy, str) and strategy not in STRATEGIES:
             raise ValueError(f'unknown strategy: {strategy}')
@@ -335,7 +339,7 @@ class Decoder(serialize.SerializableModule):
         currents.fill_(self.indexer.start_index)
 
         # Begin decoding. If we're not doing beam search, it's easy!
-        if strategy != STRATEGY_BEAM:
+        if strategy not in {STRATEGY_BEAM, STRATEGY_RERANK}:
             tokens = currents.new_zeros(batch_size, length)
             scores = features.new_zeros(batch_size, length, self.vocab_size)
             attentions = features.new_zeros(batch_size, length,
@@ -469,9 +473,31 @@ class Decoder(serialize.SerializableModule):
                 state = DecoderState(h, c, h_lm, c_lm)
 
             # Throw away everything but the best.
-            tokens = tokens[:, 0].clone()
-            scores = scores[:, 0].clone()
-            attentions = attentions[:, 0].clone()
+            if strategy == STRATEGY_BEAM:
+                tokens = tokens[:, 0].clone()
+                scores = scores[:, 0].clone()
+                attentions = attentions[:, 0].clone()
+            else:
+                assert strategy == STRATEGY_RERANK
+                assert self.lm is not None
+
+                # TODO(evandez): I really don't like converting back to string
+                # and then to tokens again--seems error prone. Find a way to
+                # avoid this.
+                candidates = self.indexer.reconstruct(
+                    tokens.view(batch_size * beam_size, length).tolist())
+
+                totals_lm = self.lm.predict(candidates,
+                                            display_progress_as=None,
+                                            device=features.device)
+                totals_lm = totals_lm.view(batch_size, beam_size)
+                mis = totals - temperature * totals_lm
+
+                idx_batch = torch.arange(batch_size)
+                idx_beam = mis.argmax(dim=1)
+                tokens = tokens[idx_batch, idx_beam]
+                scores = scores[idx_batch, idx_beam]
+                attentions = attentions[idx_batch, idx_beam]
 
         return DecoderOutput(
             captions=self.indexer.reconstruct(tokens.tolist()),

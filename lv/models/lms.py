@@ -88,7 +88,7 @@ class LanguageModel(serialize.SerializableModule):
 
         Returns:
             torch.Tensor: Shape (len(sequences),) tensor containing the
-                probability for each sequence.
+                log probability for each sequence.
 
         """
         if device is not None:
@@ -121,7 +121,7 @@ class LanguageModel(serialize.SerializableModule):
             for output, target in zip(outputs, targets):
                 logprob = output[torch.arange(len(target)), target].sum()
                 logprobs.append(logprob.item())
-        return torch.exp(torch.tensor(logprobs, device=device))
+        return torch.tensor(logprobs, device=device)
 
     def fit(self,
             dataset: data.Dataset,
