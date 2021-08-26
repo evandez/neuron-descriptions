@@ -90,6 +90,7 @@ if not args.no_lm:
     else:
         lm = lms.lm(dataset)
         lm.fit(dataset, hold_out=val.indices, device=device)
+        lm.eval()
 
         print(f'saving lm to {lm_file}')
         lm.save(lm_file)
@@ -112,6 +113,7 @@ else:
                 features=features,
                 hold_out=val.indices,
                 device=device)
+    decoder.eval()
 
     print(f'saving decoder to {captioner_file}')
     decoder.save(captioner_file)
