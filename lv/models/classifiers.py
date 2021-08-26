@@ -34,7 +34,7 @@ class ImageClassifier(nn.Module):
             batch_size: int = 128,
             max_epochs: int = 100,
             patience: int = 4,
-            hold_out: Union[float, data.Dataset] = .1,
+            hold_out: Union[float, Sequence[int]] = .1,
             optimizer_t: Type[optim.Optimizer] = optim.AdamW,
             optimizer_kwargs: Optional[Mapping[str, Any]] = None,
             num_workers: int = 0,
@@ -56,10 +56,10 @@ class ImageClassifier(nn.Module):
                 Defaults to 100.
             patience (int, optional): Stop training if validation loss does not
                 improve for this many epochs. Defaults to 4.
-            hold_out (Union[float, data.Dataset], optional): If a float, hold
+            hold_out (Union[float, Sequence[int]], optional): If a float, hold
                 out this fraction of the training data as validation set.
-                If a `torch.utils.data.Dataset`, use this as the validation
-                set. Defaults to .1.
+                If an integer sequence, use samples at these indices to
+                construct the validation set. Defaults to .1.
             optimizer_t (Type[optim.Optimizer], optional): Optimizer to use.
                 Defaults to `torch.optim.Adam`.
             optimizer_kwargs (Optional[Mapping[str, Any]], optional): Optimizer
@@ -80,11 +80,10 @@ class ImageClassifier(nn.Module):
         if optimizer_kwargs is None:
             optimizer_kwargs = {}
 
-        if isinstance(hold_out, data.Dataset):
-            train = dataset
-            val = hold_out
-        else:
+        if isinstance(hold_out, float):
             train, val = training.random_split(dataset, hold_out=hold_out)
+        else:
+            train, val = training.fixed_split(dataset, hold_out)
 
         train_loader = data.DataLoader(train,
                                        batch_size=batch_size,

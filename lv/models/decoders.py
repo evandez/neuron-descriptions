@@ -1,7 +1,7 @@
 """Models for decoding neuron captions."""
 import warnings
-from typing import (Any, Dict, Mapping, NamedTuple, Optional, Sized, Tuple,
-                    Type, Union, cast)
+from typing import (Any, Dict, Mapping, NamedTuple, Optional, Sequence, Sized,
+                    Tuple, Type, Union, cast)
 
 from lv.ext import bert_score
 from lv.models import encoders, lms
@@ -861,7 +861,7 @@ class Decoder(serialize.SerializableModule):
             batch_size: int = 64,
             max_epochs: int = 100,
             patience: int = 4,
-            hold_out: float = .1,
+            hold_out: Union[float, Sequence[int]] = .1,
             stop_on_bleu: bool = True,
             regularization_weight: float = 1.,
             optimizer_t: Type[optim.Optimizer] = optim.AdamW,
@@ -948,10 +948,11 @@ class Decoder(serialize.SerializableModule):
             def __len__(self) -> int:
                 return len(self.samples)
 
-        size = len(cast(Sized, dataset))
-        val_size = int(hold_out * size)
-        train_size = size - val_size
-        train, val = data.random_split(dataset, (train_size, val_size))
+        if isinstance(hold_out, float):
+            train, val = training.random_split(dataset, hold_out=hold_out)
+        else:
+            train, val = training.fixed_split(dataset, hold_out)
+
         train_loader = data.DataLoader(WrapperDataset(train),
                                        num_workers=num_workers,
                                        batch_size=batch_size,

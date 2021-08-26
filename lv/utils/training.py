@@ -1,6 +1,6 @@
 """Utilities for training models."""
 import pathlib
-from typing import Any, Sized, Tuple, cast
+from typing import Any, Sequence, Sized, Tuple, cast
 
 from lv.utils.typing import PathLike
 
@@ -83,6 +83,31 @@ def random_split(dataset: data.Dataset,
     assert len(splits) == 2
     train, val = splits
     return train, val
+
+
+def fixed_split(dataset: data.Dataset,
+                indices: Sequence[int]) -> Tuple[data.Subset, data.Subset]:
+    """Split dataset on the given indices.
+
+    Args:
+        dataset (data.Dataset): The dataset to split.
+        indices (Sequence[int]): Indices comprising the right split.
+
+    Returns:
+        Tuple[data.Subset, data.Subseet]: The subset *not* for the indices,
+            followed by the subset *for* the indices.
+
+    """
+    size = len(cast(Sized, dataset))
+    for index in indices:
+        if index < 0 or index >= size:
+            raise IndexError(f'dataset index out of bounds: {index}')
+
+    others = sorted(set(range(size)) - set(indices))
+    if not others:
+        raise ValueError('indices cover entire dataset; nothing to split!')
+
+    return data.Subset(dataset, others), data.Subset(dataset, indices)
 
 
 # TODO(evandez): This really isn't a very elegant solution to the threading

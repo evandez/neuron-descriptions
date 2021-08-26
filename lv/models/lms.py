@@ -1,5 +1,5 @@
 """Generic RNN language models."""
-from typing import Any, Mapping, Optional, Sized, Type, cast
+from typing import Any, Mapping, Optional, Sequence, Sized, Type, Union, cast
 
 from lv.utils import lang, serialize, training
 from lv.utils.typing import Device, StrSequence
@@ -129,7 +129,7 @@ class LanguageModel(serialize.SerializableModule):
             batch_size: int = 128,
             max_epochs: int = 100,
             patience: int = 4,
-            hold_out: float = .1,
+            hold_out: Union[float, Sequence[int]] = .1,
             optimizer_t: Type[optim.Optimizer] = optim.AdamW,
             optimizer_kwargs: Optional[Mapping[str, Any]] = None,
             device: Optional[Device] = None,
@@ -147,8 +147,9 @@ class LanguageModel(serialize.SerializableModule):
                 Defaults to 100.
             patience (int, optional): Stop training if validation loss does
                 not improve for this many epochs. Defaults to 4.
-            hold_out (float, optional): Hold out this fraction of the dataset
-                as a validation set. Defaults to .1.
+            hold_out (Union[float, Sequence[int]], optional): Fraction of
+                dataset to use for validation, or indices of samples to hold
+                out. Defaults to .1.
             optimizer_t (Type[optim.Optimizer], optional): Optimizer type.
                 Defaults to optim.Adam.
             optimizer_kwargs (Optional[Mapping[str, Any]], optional): Optimizer
@@ -187,7 +188,10 @@ class LanguageModel(serialize.SerializableModule):
 
         # Prepare training data.
         dataset = SequenceDataset(dataset, annotation_index=annotation_index)
-        train, val = training.random_split(dataset, hold_out=hold_out)
+        if isinstance(hold_out, float):
+            train, val = training.random_split(dataset, hold_out=hold_out)
+        else:
+            train, val = training.fixed_split(dataset, hold_out)
         train_loader = data.DataLoader(train,
                                        batch_size=batch_size,
                                        shuffle=True)

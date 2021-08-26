@@ -186,7 +186,7 @@ for experiment in args.experiments:
                                    pretrained=False)
         cnn = classifiers.ImageClassifier(cnn).to(device)
         cnn.fit(train,
-                hold_out=val,
+                hold_out=val.indices,
                 batch_size=args.batch_size,
                 max_epochs=args.epochs,
                 patience=args.patience,
@@ -239,7 +239,7 @@ for experiment in args.experiments:
                     ablated = indices[:int(fraction * len(indices))]
                     copied = copy.deepcopy(cnn)
                     copied.fit(train,
-                               hold_out=val,
+                               hold_out=val.indices,
                                batch_size=args.batch_size,
                                max_epochs=args.epochs,
                                patience=args.patience,
