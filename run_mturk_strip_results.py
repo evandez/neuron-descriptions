@@ -267,7 +267,7 @@ hits.strip_results_csv(
 
         # Some very specific mistakes...
         'theface ': 'the face ',
-        ' asign': 'a sign',
+        ' asign': ' a sign',
         ' dres,': ' dress,',
         ' ona ': ' on a ',
         ' ofa ': ' of a ',
