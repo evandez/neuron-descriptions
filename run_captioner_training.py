@@ -86,6 +86,7 @@ if not args.no_lm:
     if lm_file.exists():
         print(f'loading cached lm from {lm_file}')
         lm = lms.LanguageModel.load(lm_file, map_location=device)
+        lm.eval()
     else:
         lm = lms.lm(dataset)
         lm.fit(dataset, hold_out=val.indices, device=device)
@@ -94,6 +95,7 @@ if not args.no_lm:
         lm.save(lm_file)
 
 encoder = encoders.PyramidConvEncoder(config=args.encoder)
+encoder.eval()
 
 features = None
 if args.precompute_features:
@@ -103,6 +105,7 @@ captioner_file = results_dir / 'captioner.pth'
 if captioner_file.exists():
     print(f'loading cached decoder from {captioner_file}')
     decoder = decoders.Decoder.load(captioner_file, map_location=device)
+    decoder.eval()
 else:
     decoder = decoders.decoder(dataset, encoder, lm=lm)
     decoder.fit(dataset,
