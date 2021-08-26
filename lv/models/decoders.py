@@ -259,8 +259,7 @@ class Decoder(serialize.SerializableModule):
                 strategy: Optional[Strategy] = None,
                 mi: Optional[bool] = None,
                 temperature: Optional[float] = None,
-                beam_size: Optional[int] = None,
-                **_: Any) -> DecoderOutput:
+                beam_size: Optional[int] = None) -> DecoderOutput:
         """Decode captions for the given top images and masks.
 
         Args:
