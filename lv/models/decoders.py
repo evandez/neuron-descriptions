@@ -490,14 +490,16 @@ class Decoder(serialize.SerializableModule):
                 totals_lm = self.lm.predict(candidates,
                                             display_progress_as=None,
                                             device=features.device)
+
+                totals = totals.view(batch_size, beam_size)
                 totals_lm = totals_lm.view(batch_size, beam_size)
                 mis = totals - temperature * totals_lm
 
                 idx_batch = torch.arange(batch_size)
                 idx_beam = mis.argmax(dim=1)
-                tokens = tokens[idx_batch, idx_beam]
-                scores = scores[idx_batch, idx_beam]
-                attentions = attentions[idx_batch, idx_beam]
+                tokens = tokens[idx_batch, idx_beam].clone()
+                scores = scores[idx_batch, idx_beam].clone()
+                attentions = attentions[idx_batch, idx_beam].clone()
 
         return DecoderOutput(
             captions=self.indexer.reconstruct(tokens.tolist()),
