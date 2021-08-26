@@ -1,13 +1,13 @@
 """Train a neuron captioner from scratch."""
 import argparse
 import pathlib
+import shutil
 from typing import Optional
 
 from lv import zoo
 from lv.models import decoders, encoders, lms
 from lv.utils import env, training
 
-import shutil
 import torch
 
 DATASETS = (
