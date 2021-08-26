@@ -120,10 +120,6 @@ predictions = decoder.predict(val,
 bleu = decoder.bleu(val, predictions=predictions)
 print('BLEU:', f'{bleu.score:.1f}')
 
-rouge = decoder.rouge(val, predictions=predictions)
-print('ROUGE-L:',
-      ', '.join(f'{key}={val:.2f}' for key, val in rouge['l'].items()))
-
 bert_score = decoder.bert_score(val, predictions=predictions, device=device)
 print('BERTScore:',
       ', '.join(f'{key}={val:.2f}' for key, val in bert_score.items()))
