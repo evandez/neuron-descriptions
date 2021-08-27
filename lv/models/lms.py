@@ -51,12 +51,20 @@ class LanguageModel(serialize.SerializableModule):
         self.output = nn.Sequential(nn.Linear(hidden_size, len(indexer)),
                                     nn.LogSoftmax(dim=-1))
 
-    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+    def forward(self,
+                inputs: torch.Tensor,
+                reduce: bool = False) -> torch.Tensor:
         """Compute the log probability of the given sequence.
 
         Args:
             inputs (torch.Tensor): The sequence. Should have shape
                 (batch_size, length) and have type `torch.long`.
+            reduce (bool, optional): If set, reduce token-wise logprobs to
+                sequence-wise logprobs. Returned tensor will now have shape
+                (batch_size,) containing the log probability of each sequence
+                according to the model. Note that this technically ignores the
+                first token in `inputs`, which is assumed to be a start token!
+                Defaults to False.
 
         Returns:
             torch.Tensor: Shape (batch_size, length, vocab_size) tensor of
@@ -66,21 +74,22 @@ class LanguageModel(serialize.SerializableModule):
         embeddings = self.embedding(inputs)
         hiddens, _ = self.lstm(embeddings)
         lps = self.output(hiddens)
+        if reduce:
+            batch_size, length = inputs.shape
+            idx_batch = torch.arange(batch_size).repeat_interleave(length - 1)
+            idx_tokens = inputs[1:].view(-1)
+            lps = lps[:, :-1][idx_batch, idx_tokens]\
+                .view(batch_size, length)\
+                .sum(dim=-1)
         return lps
 
-    def predict(
-        self,
-        sequences: StrSequence,
-        batch_size: int = 64,
-        device: Optional[Device] = None,
-        display_progress_as: Optional[str] = 'compute lm probs',
-    ) -> torch.Tensor:
+    def logp(self,
+             sequences: StrSequence,
+             device: Optional[Device] = None) -> torch.Tensor:
         """Compute log probability of each sequence.
 
         Args:
             sequences (StrSequence): Text sequences.
-            batch_size (int, optional): Number of sequences to process at once.
-                Defaults to 64.
             device (Optional[Device], optional): Send this model and all
                 tensors to this device. Defaults to None.
             display_progress_as (Optional[str], optional): Show progress bar
@@ -95,33 +104,15 @@ class LanguageModel(serialize.SerializableModule):
             self.to(device)
         self.eval()
 
-        # Oh you know, just misusing DataLoader. Fight me!
-        loader = data.DataLoader(
-            sequences,  # type: ignore
-            batch_size=batch_size)
-        if display_progress_as is not None:
-            loader = tqdm(loader, desc=display_progress_as)
-
-        logprobs = []
-        for batch in loader:
-            inputs = torch.tensor(self.indexer(batch,
-                                               start=True,
-                                               stop=False,
-                                               pad=True,
-                                               unk=True),
-                                  device=device)
-            with torch.no_grad():
-                outputs = self(inputs)
-
-            targets = self.indexer(batch,
-                                   start=False,
-                                   stop=True,
-                                   pad=False,
-                                   unk=True)
-            for output, target in zip(outputs, targets):
-                logprob = output[torch.arange(len(target)), target].sum()
-                logprobs.append(logprob.item())
-        return torch.tensor(logprobs, device=device)
+        inputs = torch.tensor(self.indexer(sequences,
+                                           start=True,
+                                           stop=True,
+                                           pad=True,
+                                           unk=True),
+                              device=device)
+        with torch.no_grad():
+            logps = self(inputs, reduce=True)
+        return logps
 
     def fit(self,
             dataset: data.Dataset,

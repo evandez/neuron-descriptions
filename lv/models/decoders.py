@@ -480,15 +480,10 @@ class Decoder(serialize.SerializableModule):
                 assert strategy == STRATEGY_RERANK
                 assert self.lm is not None
 
-                # TODO(evandez): I really don't like converting back to string
-                # and then to tokens again--seems error prone. Find a way to
-                # avoid this.
-                candidates = self.indexer.reconstruct(
-                    tokens.view(batch_size * beam_size, length).tolist())
-
-                totals_lm = self.lm.predict(candidates,
-                                            display_progress_as=None,
-                                            device=features.device)
+                starts_lm = tokens.new_empty(batch_size * beam_size, 1)
+                starts_lm.fill_(self.indexer.start_index)
+                inputs_lm = torch.cat([starts_lm, tokens], dim=1)
+                totals_lm = self.lm(inputs_lm, reduce=True)
 
                 totals = totals.view(batch_size, beam_size)
                 totals_lm = totals_lm.view(batch_size, beam_size)
@@ -618,7 +613,7 @@ class Decoder(serialize.SerializableModule):
                            attentions=attentions,
                            state=DecoderState(h=h, c=c, h_lm=h_lm, c_lm=c_lm))
 
-    def force(self,
+    def score(self,
               captions: StrSequence,
               *args: Any,
               device: Optional[Device] = None,
@@ -631,8 +626,8 @@ class Decoder(serialize.SerializableModule):
 
         Args:
             captions (StrSequence): The captions to force decode.
-            device (Optional[Device], optional): [description].
-                Defaults to Device.
+            device (Optional[Device], optional): Send all tensors to this
+                device. Defaults to None.
 
         Returns:
             torch.Tensor: Length (len(captions,) tensor containing log
