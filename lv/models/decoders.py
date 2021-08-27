@@ -658,8 +658,7 @@ class Decoder(serialize.SerializableModule):
             images_or_features = images_or_features.expand(
                 len(captions), *images_or_features.shape[1:])
             if masks is not None:
-                masks = images_or_features.expand(len(captions),
-                                                  *masks.shape[1:])
+                masks = masks.expand(len(captions), *masks.shape[1:])
         elif len(images_or_features) != len(captions):
             raise ValueError('images_or_features must have batch size 1 or '
                              f'{len(captions)}; got {len(images_or_features)}')
