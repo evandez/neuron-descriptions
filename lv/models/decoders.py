@@ -617,7 +617,8 @@ class Decoder(serialize.SerializableModule):
 
     def score(self,
               captions: StrSequence,
-              *args: Any,
+              images_or_features: torch.Tensor,
+              masks: Optional[torch.Tensor] = None,
               device: Optional[Device] = None,
               **kwargs: Any) -> torch.Tensor:
         """Force decode the given captions, returning their total scores.
@@ -628,6 +629,10 @@ class Decoder(serialize.SerializableModule):
 
         Args:
             captions (StrSequence): The captions to force decode.
+            images_or_features (torch.Tensor): Images or image features.
+                See `Decoder.forward`.
+            masks (Optional[torch.Tensor], optional): Image masks, if images
+                are to be encoded. See `Decoder.forward`. Defaults to None.
             device (Optional[Device], optional): Send all tensors to this
                 device. Defaults to None.
 
@@ -643,12 +648,19 @@ class Decoder(serialize.SerializableModule):
 
         if device is not None:
             self.to(device)
+            images_or_features = images_or_features.to(device)
+            if masks is not None:
+                masks = masks.to(device)
 
         targets = torch.tensor(self.indexer(captions), device=device)
         targets = targets[:, 1:]
         _, length = targets.shape
 
-        outputs = self(*args, strategy=targets, length=length, **kwargs)
+        outputs = self(images_or_features,
+                       masks=masks,
+                       strategy=targets,
+                       length=length,
+                       **kwargs)
 
         # Coding wise, it's easier to just reindex the captions without
         # special tokens than it is to work with the special tokens...
