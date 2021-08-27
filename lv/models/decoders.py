@@ -484,7 +484,7 @@ class Decoder(serialize.SerializableModule):
                 starts_lm.fill_(self.indexer.start_index)
                 inputs_lm = torch\
                     .cat([starts_lm, tokens], dim=-1)\
-                    .reshape(batch_size * beam_size, length + 1)
+                    .view(batch_size * beam_size, length + 1)
                 totals_lm = self.lm(inputs_lm, reduce=True)
 
                 totals = totals.view(batch_size, beam_size)
