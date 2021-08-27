@@ -80,7 +80,7 @@ class LanguageModel(serialize.SerializableModule):
             idx_time = torch.arange(length - 1).repeat(batch_size)
             idx_tokens = inputs[:, 1:].view(-1)
             lps = lps[:, :-1][idx_batch, idx_time, idx_tokens]\
-                .view(batch_size, length)\
+                .view(batch_size, length - 1)\
                 .sum(dim=-1)
         return lps
 
