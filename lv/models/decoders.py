@@ -630,7 +630,10 @@ class Decoder(serialize.SerializableModule):
         Args:
             captions (StrSequence): The captions to force decode.
             images_or_features (torch.Tensor): Images or image features.
-                See `Decoder.forward`.
+                See `Decoder.forward`. Must have batch size of 1 (in which
+                case score for each sequence will be computed for these
+                features) or a batch size of `len(captions)` in which case
+                each element corresponds to exactly one sequence.
             masks (Optional[torch.Tensor], optional): Image masks, if images
                 are to be encoded. See `Decoder.forward`. Defaults to None.
             device (Optional[Device], optional): Send all tensors to this
@@ -645,6 +648,21 @@ class Decoder(serialize.SerializableModule):
         for forbidden in ('strategy', 'length'):
             if forbidden in kwargs:
                 raise ValueError(f'option disallowed: {forbidden}')
+
+        if masks is not None and len(masks) != len(images_or_features):
+            raise ValueError('images_or_features and masks must have the '
+                             f'same batch size; got {len(images_or_features)} '
+                             f'and {len(masks)}')
+
+        if len(images_or_features) == 1:
+            images_or_features = images_or_features.expand(
+                len(captions), *images_or_features.shape[1:])
+            if masks is not None:
+                masks = images_or_features.expand(len(captions),
+                                                  *masks.shape[1:])
+        elif len(images_or_features) != len(captions):
+            raise ValueError('images_or_features must have batch size 1 or '
+                             f'{len(captions)}; got {len(images_or_features)}')
 
         if device is not None:
             self.to(device)
