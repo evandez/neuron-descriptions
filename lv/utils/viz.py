@@ -1,10 +1,11 @@
 """Visualization utilities."""
 import collections
+import pathlib
 import random
 from typing import Any, Callable, Optional, Sequence, Sized, Tuple, Union, cast
 
 from lv import datasets
-from lv.utils.typing import StrSequence
+from lv.utils.typing import StrSequence, PathLike
 
 import wandb
 from PIL import Image
@@ -190,3 +191,88 @@ def wandb_dist_plot(values: Sequence[Any],
     table = wandb.Table(data=sorted(dist, key=lambda item: item[0]),
                         columns=list(columns))
     return wandb.plot.bar(table, *columns, title=title)
+
+
+def generate_html(
+    dataset: data.Dataset[AnyTopImages],
+    out_dir: PathLike,
+    captions: Optional[StrSequence] = None,
+    get_header: Optional[Callable[[AnyTopImages], str]] = None,
+    get_image_url: Optional[Callable[[AnyTopImages], str]] = None,
+    include_gt: bool = True,
+) -> None:
+    """Generate an HTML visualization of neuron top images and captions.
+
+    Args:
+        dataset (data.Dataset[AnyTopImages]): Dataset of neurons.
+        out_dir (PathLike): Directory to write top images and final HTML file.
+        captions (Optional[StrSequence], optional): Predicted captions to show
+            for each neuron. Defaults to None.
+        get_header (Optional[Callable[[AnyTopImages], str]], optional): Fn
+            returning the header text for each neuron. By default, header is
+            "{layer}-{unit}".
+        get_image_url (Optional[Callable[[AnyTopImages], str]], optional): Fn
+            returning the URL of top images for a given neuron. By default,
+            images are saved to out_dir and image URLs are local file system
+            paths.
+        include_gt (bool, optional): If set, also write ground truth captions
+            to the HTML when possible. Defaults to True.
+
+    Raises:
+        ValueError: If `captions` is set but has different length
+            than `dataset`.
+
+    """
+    length = len(cast(Sized, dataset))
+    if captions is not None and len(captions) != length:
+        raise ValueError(f'expected {length} captions, '
+                         f'got {len(captions)}')
+
+    out_dir = pathlib.Path(out_dir)
+    out_dir.mkdir(exist_ok=True, parents=True)
+
+    html = [
+        '<!doctype html>',
+        '<html>',
+        '<body>',
+    ]
+    for index in range(length):
+        sample = dataset[index]
+        key = f'{sample.layer}-{sample.unit}'
+
+        if get_header is not None:
+            header = get_header(sample)
+        else:
+            header = key
+
+        if get_image_url is not None:
+            image_url = get_image_url(sample)
+        else:
+            image_url = str(out_dir.absolute() / f'{key}.png')
+            sample.as_pil_image_grid().save(image_url)
+
+        html += [
+            '<div>',
+            f'<h3>{header}</h3>',
+            f'<img src="{image_url}/>',
+        ]
+
+        if include_gt and isinstance(sample, datasets.AnnotatedTopImages):
+            html += ['<h5>human annotations</h5>', '<ul>']
+            for annotation in sample.annotations:
+                html += [f'<li>{annotation}</li>']
+            html += ['</ul>']
+
+        if captions is not None:
+            html += [
+                '<h5>predicted caption</h5>',
+                captions[index],
+            ]
+
+        html += ['</div>']
+
+    html += ['</body>', '</html>']
+
+    html_file = out_dir / 'index.html'
+    with html_file.open('w') as handle:
+        handle.writelines(html)
