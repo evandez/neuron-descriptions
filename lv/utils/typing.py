@@ -1,6 +1,6 @@
 """Some useful type aliases relevant to this project."""
 import pathlib
-from typing import AbstractSet, Callable, List, Optional, Tuple, Union
+from typing import AbstractSet, Callable, List, Mapping, Optional, Tuple, Union
 
 import torch
 
@@ -20,6 +20,7 @@ Device = Union[str, torch.device]
 StrSequence = Union[List[str], Tuple[str, ...]]
 StrSet = AbstractSet[str]
 StrIterable = Union[StrSet, StrSequence]
+StrMapping = Mapping[str, str]
 
 # Some common transforms.
 TransformTensor = Callable[[torch.Tensor], torch.Tensor]

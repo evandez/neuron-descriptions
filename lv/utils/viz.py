@@ -5,7 +5,7 @@ import random
 from typing import Any, Callable, Optional, Sequence, Sized, Tuple, Union, cast
 
 from lv import datasets
-from lv.utils.typing import StrSequence, PathLike
+from lv.utils.typing import StrMapping, StrSequence, PathLike
 
 import wandb
 from PIL import Image
@@ -193,10 +193,13 @@ def wandb_dist_plot(values: Sequence[Any],
     return wandb.plot.bar(table, *columns, title=title)
 
 
+PredictedCaptions = Union[StrSequence, Sequence[StrMapping]]
+
+
 def generate_html(
     dataset: data.Dataset[AnyTopImages],
     out_dir: PathLike,
-    captions: Optional[StrSequence] = None,
+    predictions: Optional[PredictedCaptions] = None,
     get_header: Optional[Callable[[AnyTopImages], str]] = None,
     get_image_url: Optional[Callable[[AnyTopImages], str]] = None,
     include_gt: bool = True,
@@ -206,8 +209,10 @@ def generate_html(
     Args:
         dataset (data.Dataset[AnyTopImages]): Dataset of neurons.
         out_dir (PathLike): Directory to write top images and final HTML file.
-        captions (Optional[StrSequence], optional): Predicted captions to show
-            for each neuron. Defaults to None.
+        predictions (Optional[PredictedCaptions]): Predicted captions to show
+            for each neuron. Elements can be single strings (i.e., one
+            prediction per neuron) or a mapping from labels (prediction kinds)
+            to strings (predictions). Defaults to None.
         get_header (Optional[Callable[[AnyTopImages], str]], optional): Fn
             returning the header text for each neuron. By default, header is
             "{layer}-{unit}".
@@ -224,9 +229,9 @@ def generate_html(
 
     """
     length = len(cast(Sized, dataset))
-    if captions is not None and len(captions) != length:
-        raise ValueError(f'expected {length} captions, '
-                         f'got {len(captions)}')
+    if predictions is not None and len(predictions) != length:
+        raise ValueError(f'expected {length} predictions, '
+                         f'got {len(predictions)}')
 
     out_dir = pathlib.Path(out_dir)
     out_dir.mkdir(exist_ok=True, parents=True)
@@ -263,11 +268,23 @@ def generate_html(
                 html += [f'<li>{annotation}</li>']
             html += ['</ul>']
 
-        if captions is not None:
+        if predictions is not None:
             html += [
                 '<h5>predicted caption</h5>',
-                captions[index],
             ]
+            prediction = predictions[index]
+            if isinstance(prediction, str):
+                html += ['<div>', prediction, '</div>']
+            else:
+                html += ['<table>']
+                for label, caption in prediction.items():
+                    html += [
+                        '<tr>',
+                        f'<td><b>{label}</b></td>',
+                        f'<td>{caption}</td>',
+                        '</tr>',
+                    ]
+                html += ['</table>']
 
         html += ['</div>']
 
