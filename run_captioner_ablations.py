@@ -7,7 +7,7 @@ from typing import Any
 from lv import zoo
 from lv.ext import bert_score
 from lv.models import decoders, encoders, lms
-from lv.utils import env, logging, training
+from lv.utils import env, training, viz
 
 import numpy
 import torch
@@ -220,7 +220,7 @@ for config in args.encoders:
 
     def evaluate(**kwargs: Any) -> None:
         """Evaluate the captioner with the given args."""
-        metadata = logging.kwargs_to_str(**kwargs)
+        metadata = viz.kwargs_to_str(**kwargs)
         predictions = decoder.predict(
             test,
             features=test_features,
@@ -252,7 +252,7 @@ for config in args.encoders:
             for kind, score in bert_scores.items():
                 log[f'bert_score-{kind}'] = score
 
-        log['samples'] = logging.random_neuron_wandb_images(
+        log['samples'] = viz.random_neuron_wandb_images(
             test,
             captions=predictions,
             k=args.wandb_n_samples,

@@ -10,7 +10,7 @@ from lv import datasets
 from lv.deps.netdissect import renormalize
 from lv.dissection import dissect, zoo
 from lv.models import classifiers, decoders, encoders
-from lv.utils import env, logging, training
+from lv.utils import env, training, viz
 
 import numpy
 import torch
@@ -260,7 +260,7 @@ for experiment in args.experiments:
                         f'frac={fraction})',
                         device=device,
                     )
-                    samples = logging.random_neuron_wandb_images(
+                    samples = viz.random_neuron_wandb_images(
                         dissected,
                         captions,
                         indices=ablated,

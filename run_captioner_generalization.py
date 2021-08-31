@@ -7,7 +7,7 @@ from typing import Dict, Mapping, NamedTuple, Optional, Tuple
 from lv import zoo
 from lv.ext import bert_score
 from lv.models import decoders, encoders, lms
-from lv.utils import env, logging, training
+from lv.utils import env, training, viz
 from lv.utils.typing import StrSequence
 
 import wandb
@@ -262,7 +262,7 @@ for experiment in args.experiments or EXPERIMENTS.keys():
                 log[f'{kind}-{key}'] = score
         for kind, score in bert_scores.items():
             log[f'bert_score-{kind}'] = score
-        log['samples'] = logging.random_neuron_wandb_images(
+        log['samples'] = viz.random_neuron_wandb_images(
             test,
             captions=predictions,
             k=args.wandb_n_samples,

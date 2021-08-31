@@ -7,7 +7,7 @@ import lv.dissection.zoo
 import lv.zoo
 from lv import datasets
 from lv.models import classifiers, decoders, encoders
-from lv.utils import env, logging, training
+from lv.utils import env, training, viz
 from lv.utils.typing import StrSequence
 
 import nltk
@@ -371,7 +371,7 @@ for dataset_name in args.datasets:
                             f'order={order}, '
                             f'frac={fraction:.2f})',
                             device=device)
-                        samples = logging.random_neuron_wandb_images(
+                        samples = viz.random_neuron_wandb_images(
                             annotations,
                             captions,
                             indices=ablated,
@@ -381,7 +381,7 @@ for dataset_name in args.datasets:
                             exp=experiment,
                             order=order,
                             frac=fraction)
-                        layer_dist = logging.wandb_dist_plot(
+                        layer_dist = viz.wandb_dist_plot(
                             [str(layer) for layer, _ in units],
                             columns=('layer', 'fraction'),
                             title=f'distribution of layer ablated '

@@ -1,4 +1,4 @@
-"""Logging utilities."""
+"""Visualization utilities."""
 import collections
 import random
 from typing import Any, Callable, Optional, Sequence, Sized, Tuple, Union, cast
