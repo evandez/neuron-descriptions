@@ -623,9 +623,8 @@ class Decoder(serialize.SerializableModule):
               **kwargs: Any) -> torch.Tensor:
         """Force decode the given captions, returning their total scores.
 
-        The *args are the standard arguments to forward(...). Likewise, all
-        **kwargs are also passed to forward(...); note that some options like
-        `strategy=` and `length=` are disallowed, however.
+        All **kwargs are also passed to forward(...); note that some options
+        like `strategy=` and `length=` are disallowed, however.
 
         Args:
             captions (StrSequence): The captions to force decode.
