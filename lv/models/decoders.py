@@ -384,7 +384,7 @@ class Decoder(serialize.SerializableModule):
             totals[:] = topk.values.view(batch_size, beam_size, 1)
             finished[:, :, 0] = topk.indices\
                 .eq(self.indexer.stop_index)\
-                .view(batch_size, beam_size, 1)\
+                .view(batch_size, beam_size)\
                 .int()
 
             # Adjust the features and state to have the right shape.
@@ -494,7 +494,7 @@ class Decoder(serialize.SerializableModule):
                 inputs_lm = torch\
                     .cat([starts_lm, tokens], dim=-1)\
                     .view(batch_size * beam_size, length + 1)
-                totals_lm = self.lm(inputs_lm, reduce=True, mask=finished)
+                totals_lm = self.lm(inputs_lm, reduce=True, masks=finished)
 
                 totals = totals.view(batch_size, beam_size)
                 totals_lm = totals_lm.view(batch_size, beam_size)
