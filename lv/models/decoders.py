@@ -370,7 +370,10 @@ class Decoder(serialize.SerializableModule):
             attentions = features.new_zeros(batch_size, beam_size, length,
                                             features.shape[1])
             totals = features.new_zeros(batch_size, beam_size, 1)
-            finished = currents.new_zeros(batch_size, beam_size, length)
+            finished = currents.new_zeros(batch_size,
+                                          beam_size,
+                                          length,
+                                          dtype=torch.bool)
 
             # Take the first step, setting up the beam.
             step = self.step(features,
@@ -384,8 +387,7 @@ class Decoder(serialize.SerializableModule):
             totals[:] = topk.values.view(batch_size, beam_size, 1)
             finished[:, :, 0] = topk.indices\
                 .eq(self.indexer.stop_index)\
-                .view(batch_size, beam_size)\
-                .int()
+                .view(batch_size, beam_size)
 
             # Adjust the features and state to have the right shape.
             features = features.repeat_interleave(beam_size, dim=0)
