@@ -246,11 +246,6 @@ class Decoder(serialize.SerializableModule):
         """Return the vocab size."""
         return len(self.indexer)
 
-    @property
-    def mi(self) -> bool:
-        """Return True if MI decoding should be used by default."""
-        return self.lm is not None and not self.training
-
     def forward(self,
                 images_or_features: torch.Tensor,
                 masks: Optional[torch.Tensor] = None,
@@ -375,6 +370,7 @@ class Decoder(serialize.SerializableModule):
             attentions = features.new_zeros(batch_size, beam_size, length,
                                             features.shape[1])
             totals = features.new_zeros(batch_size, beam_size, 1)
+            finished = currents.new_zeros(batch_size, beam_size, length)
 
             # Take the first step, setting up the beam.
             step = self.step(features,
@@ -386,6 +382,10 @@ class Decoder(serialize.SerializableModule):
             scores[:, :, 0] = step.scores[:, None]
             attentions[:, :, 0] = step.attentions[:, None]
             totals[:] = topk.values.view(batch_size, beam_size, 1)
+            finished[:, :, 0] = topk.indices\
+                .eq(self.indexer.stop_index)\
+                .view(batch_size, beam_size, 1)\
+                .int()
 
             # Adjust the features and state to have the right shape.
             features = features.repeat_interleave(beam_size, dim=0)
@@ -412,8 +412,11 @@ class Decoder(serialize.SerializableModule):
                 # Determine which sequences (s) in the beam, and which next
                 # tokens (t) for those sequences, will comprise the next beam.
                 topk_t = step.scores.topk(k=beam_size, dim=-1)
+                topk_t_scores = topk_t.values\
+                    .view(batch_size, beam_size, beam_size)\
+                    .mul(~finished[:, :, time - 1, None])
                 topk_s = totals\
-                    .add(topk_t.values.view(batch_size, beam_size, beam_size))\
+                    .add(topk_t_scores)\
                     .view(batch_size, beam_size**2)\
                     .topk(k=beam_size, dim=-1)
                 idx_s = (topk_s.indices // beam_size).view(-1)
@@ -444,6 +447,12 @@ class Decoder(serialize.SerializableModule):
                     .view(batch_size, beam_size, step.attentions.shape[-1])
 
                 totals[:] = topk_s.values.view(batch_size, beam_size, 1)
+
+                # Update which sequences in the beam have predicted "<stop>".
+                finished[:, :, :time] = finished[idx_b, idx_s, :time]\
+                    .view(batch_size, beam_size, time)
+                stopped = tokens[:, :, time].eq(self.indexer.stop_index)
+                finished[:, :, time] = finished[:, :, time - 1] | stopped
 
                 # Don't forget to update RNN state as well!
                 h = step.state.h.view(batch_size, beam_size, -1)[idx_b, idx_s]
@@ -485,7 +494,7 @@ class Decoder(serialize.SerializableModule):
                 inputs_lm = torch\
                     .cat([starts_lm, tokens], dim=-1)\
                     .view(batch_size * beam_size, length + 1)
-                totals_lm = self.lm(inputs_lm, reduce=True)
+                totals_lm = self.lm(inputs_lm, reduce=True, mask=finished)
 
                 totals = totals.view(batch_size, beam_size)
                 totals_lm = totals_lm.view(batch_size, beam_size)

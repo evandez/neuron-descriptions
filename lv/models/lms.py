@@ -53,7 +53,8 @@ class LanguageModel(serialize.SerializableModule):
 
     def forward(self,
                 inputs: torch.Tensor,
-                reduce: bool = False) -> torch.Tensor:
+                reduce: bool = False,
+                masks: Optional[torch.Tensor] = None) -> torch.Tensor:
         """Compute the log probability of the given sequence.
 
         Args:
@@ -65,10 +66,16 @@ class LanguageModel(serialize.SerializableModule):
                 according to the model. Note that this technically ignores the
                 first token in `inputs`, which is assumed to be a start token!
                 Defaults to False.
+            masks (Optional[torch.Tensor], optional): Apply this mask to token
+                probabilities when reducing (e.g., to ignore specific tokens).
+                Must have shape (batch_size, len(inputs) - 1). By default,
+                everything after the first stop token is masked.
 
         Returns:
-            torch.Tensor: Shape (batch_size, length, vocab_size) tensor of
-                log probabilites for each token.
+            torch.Tensor: Shape (batch_size, len(inputs), vocab_size) tensor of
+                log probabilites for each token, or shape (batch_size,) tensor
+                containing log probabilities for each sequence if `reduce` is
+                set.
 
         """
         embeddings = self.embedding(inputs)
@@ -79,8 +86,13 @@ class LanguageModel(serialize.SerializableModule):
             idx_batch = torch.arange(batch_size).repeat_interleave(length - 1)
             idx_time = torch.arange(length - 1).repeat(batch_size)
             idx_tokens = inputs[:, 1:].reshape(-1)
+            if masks is None:
+                masks = inputs.new_ones((batch_size, length - 1))
+                for i, j in inputs.eq(self.indexer.stop_index).nonzero():
+                    masks[i, j + 1:] = 0
             lps = lps[:, :-1][idx_batch, idx_time, idx_tokens]\
                 .view(batch_size, length - 1)\
+                .mul(masks)\
                 .sum(dim=-1)
         return lps
 
