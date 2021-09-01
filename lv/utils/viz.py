@@ -5,7 +5,7 @@ import random
 from typing import Any, Callable, Optional, Sequence, Sized, Tuple, Union, cast
 
 from lv import datasets
-from lv.utils.typing import StrMapping, StrSequence, PathLike
+from lv.utils.typing import PathLike, StrMapping, StrSequence
 
 import wandb
 from PIL import Image
