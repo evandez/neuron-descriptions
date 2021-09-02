@@ -277,7 +277,7 @@ def generate_html(
             '<div style="display: inline-block">',
         ]
         for image_url in image_urls:
-            html += [f'<img src="{image_url}/>']
+            html += [f'<img src="{image_url} alt="{key}"/>']
         html += ['</div>']
 
         if include_gt and isinstance(sample, datasets.AnnotatedTopImages):
