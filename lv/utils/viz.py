@@ -202,7 +202,7 @@ def generate_html(
     out_dir: PathLike,
     predictions: Optional[PredictedCaptions] = None,
     get_header: Optional[Callable[[AnyTopImages], str]] = None,
-    get_image_url: Optional[Callable[[AnyTopImages], str]] = None,
+    get_image_urls: Optional[Callable[[AnyTopImages], StrSequence]] = None,
     include_gt: Optional[bool] = None,
     save_images: Optional[bool] = None,
 ) -> None:
@@ -218,10 +218,10 @@ def generate_html(
         get_header (Optional[Callable[[AnyTopImages], str]], optional): Fn
             returning the header text for each neuron. By default, header is
             "{layer}-{unit}".
-        get_image_url (Optional[Callable[[AnyTopImages], str]], optional): Fn
-            returning the URL of top images for a given neuron. By default,
-            images are saved to out_dir and image URLs are local file system
-            paths.
+        get_image_urls (Optional[Callable[[AnyTopImages], StrSequence]],
+            optional): Fn returning the URL(s) of top images for a given
+            neuron. By default, images are saved to out_dir and image URLs
+            are local file system paths.
         include_gt (Optional[bool], optional): If set, also write ground truth
             captions to the HTML when possible. Defaults to True.
         save_images (Optional[bool], optional): If set, save top images in dir.
@@ -237,7 +237,7 @@ def generate_html(
         include_gt = bool(length) and isinstance(dataset[0],
                                                  datasets.AnnotatedTopImages)
     if save_images is None:
-        save_images = get_image_url is None
+        save_images = get_image_urls is None
 
     if predictions is not None and len(predictions) != length:
         raise ValueError(f'expected {length} predictions, '
@@ -263,10 +263,10 @@ def generate_html(
         else:
             header = key
 
-        if get_image_url is not None:
-            image_url = get_image_url(sample)
+        if get_image_urls is not None:
+            image_urls = get_image_urls(sample)
         elif save_images:
-            image_url = image_file_name_pattern % index
+            image_urls = [image_file_name_pattern % index]
 
         if save_images:
             images.append(sample.as_pil_image_grid())
@@ -274,8 +274,11 @@ def generate_html(
         html += [
             '<div>',
             f'<h3>{header}</h3>',
-            f'<img src="{image_url}/>',
+            '<div style="display: inline-block">',
         ]
+        for image_url in image_urls:
+            html += [f'<img src="{image_url}/>']
+        html += ['</div>']
 
         if include_gt and isinstance(sample, datasets.AnnotatedTopImages):
             html += ['<h5>human annotations</h5>', '<ul>']
