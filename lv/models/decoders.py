@@ -466,11 +466,17 @@ class Decoder(serialize.SerializableModule):
             else:
                 assert strategy == STRATEGY_RERANK
                 assert self.lm is not None
-                scores_lm = self.lm(
-                    tokens.view(batch_size * beam_size, -1),
-                    reduce=True,
-                ).view(batch_size, beam_size)
+
+                starts_lm = currents.new_full((batch_size, beam_size, 1),
+                                              self.lm.indexer.start_index)
+                inputs_lm = torch.cat([starts_lm, tokens], dim=-1)
+                inputs_lm = inputs_lm.view(batch_size * beam_size, -1)
+
+                scores_lm = self.lm(inputs_lm, reduce=True)
+                scores_lm = scores_lm.view(batch_size, beam_size)
+
                 scores = scores - temperature * scores_lm
+
                 bests = scores.argmax(dim=-1)
                 tokens = tokens[:, bests].view(batch_size, -1)
                 scores = scores[:, bests].view(batch_size)
