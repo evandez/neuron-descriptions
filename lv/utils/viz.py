@@ -5,6 +5,7 @@ import random
 from typing import Any, Callable, Optional, Sequence, Sized, Tuple, Union, cast
 
 from lv import datasets
+from lv.deps.netdissect import imgsave
 from lv.utils.typing import PathLike, StrMapping, StrSequence
 
 import wandb
@@ -202,7 +203,8 @@ def generate_html(
     predictions: Optional[PredictedCaptions] = None,
     get_header: Optional[Callable[[AnyTopImages], str]] = None,
     get_image_url: Optional[Callable[[AnyTopImages], str]] = None,
-    include_gt: bool = True,
+    include_gt: Optional[bool] = None,
+    save_images: Optional[bool] = None,
 ) -> None:
     """Generate an HTML visualization of neuron top images and captions.
 
@@ -220,8 +222,10 @@ def generate_html(
             returning the URL of top images for a given neuron. By default,
             images are saved to out_dir and image URLs are local file system
             paths.
-        include_gt (bool, optional): If set, also write ground truth captions
-            to the HTML when possible. Defaults to True.
+        include_gt (Optional[bool], optional): If set, also write ground truth
+            captions to the HTML when possible. Defaults to True.
+        save_images (Optional[bool], optional): If set, save top images in dir.
+            By default, images are saved whenever get_image_url is not set.
 
     Raises:
         ValueError: If `captions` is set but has different length
@@ -229,12 +233,21 @@ def generate_html(
 
     """
     length = len(cast(Sized, dataset))
+    if include_gt is None:
+        include_gt = bool(length) and isinstance(dataset[0],
+                                                 datasets.AnnotatedTopImages)
+    if save_images is None:
+        save_images = get_image_url is None
+
     if predictions is not None and len(predictions) != length:
         raise ValueError(f'expected {length} predictions, '
                          f'got {len(predictions)}')
 
     out_dir = pathlib.Path(out_dir)
     out_dir.mkdir(exist_ok=True, parents=True)
+
+    images = []
+    image_file_name_pattern = str(out_dir / 'top_images_%d.pth')
 
     html = [
         '<!doctype html>',
@@ -252,9 +265,11 @@ def generate_html(
 
         if get_image_url is not None:
             image_url = get_image_url(sample)
-        else:
-            image_url = str(out_dir.absolute() / f'{key}.png')
-            sample.as_pil_image_grid().save(image_url)
+        elif save_images:
+            image_url = image_file_name_pattern % index
+
+        if save_images:
+            images.append(sample.as_pil_image_grid())
 
         html += [
             '<div>',
@@ -285,10 +300,11 @@ def generate_html(
                         '</tr>',
                     ]
                 html += ['</table>']
-
         html += ['</div>']
-
     html += ['</body>', '</html>']
+
+    if save_images:
+        imgsave.save_image_set(images, image_file_name_pattern)
 
     html_file = out_dir / 'index.html'
     with html_file.open('w') as handle:
