@@ -409,7 +409,7 @@ class Decoder(serialize.SerializableModule):
 
                 # Record step results.
                 predictions[:, time] = outputs.predictions
-                scores[:, time] += outputs.predictions[:, time, currents]
+                scores[:] += outputs.predictions[:, time, currents]
                 attentions[:, time] = outputs.attentions
                 tokens[:, time] = currents
                 state = outputs.state
