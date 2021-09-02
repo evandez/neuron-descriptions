@@ -472,8 +472,8 @@ class Decoder(serialize.SerializableModule):
                 ).view(batch_size, beam_size)
                 scores = scores - temperature * scores_lm
                 bests = scores.argmax(dim=-1)
-                tokens = tokens[:, bests]
-                scores = scores[:, bests]
+                tokens = tokens[:, bests].view(batch_size, -1)
+                scores = scores[:, bests].view(batch_size)
 
         return DecoderOutput(
             captions=self.indexer.reconstruct(tokens.tolist()),
