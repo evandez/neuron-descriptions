@@ -11,6 +11,7 @@ from lv.utils.typing import Device, OptionalTensors, StrSequence
 import rouge
 import sacrebleu
 import torch
+from allennlp.nn import beam_search
 from torch import nn, optim
 from torch.distributions import categorical
 from torch.utils import data
@@ -94,16 +95,16 @@ class DecoderStep(NamedTuple):
     """Wraps the outputs of one decoding step.
 
     Fields:
-        scores (torch.Tensor): Shape (batch_size, vocab_size) tensor containing
-            log probabilities (if using likelihood decoding) or mutual info (if
-            using MI decoding) for each word.
+        predictions (torch.Tensor): Shape (batch_size, vocab_size) tensor
+            containing log probabilities (if using likelihood decoding) or
+            mutual info (if using MI decoding) for each word.
         attentions (torch.Tensor): Shape (batch_size, n_features) tensor
             containing attention weights for each visual feature.
         state (DecoderState): Hidden states used by the decoder.
 
     """
 
-    scores: torch.Tensor
+    predictions: torch.Tensor
     attentions: torch.Tensor
     state: DecoderState
 
@@ -113,20 +114,65 @@ class DecoderOutput(NamedTuple):
 
     Fields:
         captions (StrSequence): Fully decoded captions for each sample.
-        scores (torch.Tensor): Shape (batch_size, length, vocab_size) tensor
-            containing log probabilities (if using likelihood decoding) or
-            mutual info (if using MI decoding) for each word.
         tokens (torch.Tensor): Shape (batch_size, length) integer tensor
             containing IDs of decoded tokens.
-        attentions (torch.Tensor): Shape (batch_size, length, n_features)
-            containing attention weights for each time step.
+        scores (torch.Tensor): Shape (batch_size,) tensor containing log
+            probabilities (if using likelihood decoding) or mutual info
+            (if using MI decoding) for each predicted caption.
+        predictions (Optional[torch.Tensor]): Shape
+            (batch_size, length, vocab_size) tensor containing scores for each
+            word at each time step. Only set when not using beam search.
+        attentions (Optional[torch.Tensor]): Shape
+            (batch_size, length, n_features) containing attention weights
+            for each time step. Only when not using beam search.
 
     """
 
     captions: StrSequence
     scores: torch.Tensor
     tokens: torch.Tensor
-    attentions: torch.Tensor
+
+    # These values are generally only used during training.
+    predictions: Optional[torch.Tensor]
+    attentions: Optional[torch.Tensor]
+
+
+class AllenNLPDecoderState(dict):
+    """Wraps decoder state for AllenNLP implementation of beam search."""
+
+    def __init__(self, features: torch.Tensor, state: DecoderState,
+                 **kwargs: Any):
+        """Initialize the state.
+
+        Args:
+            features (torch.Tensor): Image features.
+            state (DecoderState): Current decoder state.
+
+        """
+        kvs = {
+            'features': features,
+            'h': state.h,
+            'c': state.c,
+        }
+        if state.h_lm is not None:
+            kvs['h_lm'] = state.h_lm
+        if state.c_lm is not None:
+            kvs['c_lm'] = state.c_lm
+        super().__init__(**kvs, **kwargs)
+
+
+class AllenNLPDecoderStep(NamedTuple):
+    """Wraps the output of a single decoder step for allennlp beam search.
+
+    Fields:
+        scores (torch.Tensor): Same as in DecoderState.
+        state (Dict[str, torch.Tensor]): Same as in DecoderState, except state
+            is a dictionary.
+
+    """
+
+    scores: torch.Tensor
+    state: Dict[str, torch.Tensor]
 
 
 Strategy = Union[torch.Tensor, str]
@@ -301,6 +347,7 @@ class Decoder(serialize.SerializableModule):
             mi &= not isinstance(strategy, str) or strategy != STRATEGY_RERANK
         if beam_size is None:
             beam_size = self.beam_size
+        batch_size = len(images_or_features)
 
         # Validate arguments.
         if mi and strategy == STRATEGY_RERANK:
@@ -319,8 +366,6 @@ class Decoder(serialize.SerializableModule):
                 raise ValueError(f'strategy must have length {length}, '
                                  f'got {strategy.shape[-1]}')
 
-        batch_size = len(images_or_features)
-
         # If necessary, obtain visual features.
         if encode:
             features = self.encode(images_or_features, masks=masks)
@@ -332,186 +377,89 @@ class Decoder(serialize.SerializableModule):
         currents = features.new_empty(batch_size, dtype=torch.long)
         currents.fill_(self.indexer.start_index)
 
-        # Begin decoding. If we're not doing beam search, it's easy!
+        # Declare optional outputs for later.
+        predictions: Optional[torch.Tensor] = None
+        attentions: Optional[torch.Tensor] = None
+
+        # Begin decoding. Handle non-beam search cases first.
         if strategy not in {STRATEGY_BEAM, STRATEGY_RERANK}:
             tokens = currents.new_zeros(batch_size, length)
-            scores = features.new_zeros(batch_size, length, self.vocab_size)
+            scores = features.new_zeros(batch_size)
+            predictions = features.new_zeros(batch_size, length,
+                                             self.vocab_size)
             attentions = features.new_zeros(batch_size, length,
                                             features.shape[1])
             for time in range(length):
-                step = self.step(features,
-                                 currents,
-                                 state,
-                                 temperature=temperature)
+                outputs = self.step(features,
+                                    currents,
+                                    state,
+                                    temperature=temperature)
 
                 # Pick next token by applying the decoding strategy.
                 if isinstance(strategy, torch.Tensor):
                     currents = strategy[:, time]
                 elif strategy == STRATEGY_GREEDY:
-                    currents = step.scores.argmax(dim=1)
+                    currents = outputs.predictions.argmax(dim=1)
                 else:
                     assert strategy == STRATEGY_SAMPLE
-                    for index, logprobs in enumerate(step.scores):
+                    for index, logprobs in enumerate(outputs.predictions):
                         probs = torch.exp(logprobs)
                         distribution = categorical.Categorical(probs=probs)
                         currents[index] = distribution.sample()
 
                 # Record step results.
-                scores[:, time] = step.scores
-                attentions[:, time] = step.attentions
+                predictions[:, time] = outputs.predictions
+                scores[:, time] += outputs.predictions[:, time, currents]
+                attentions[:, time] = outputs.attentions
                 tokens[:, time] = currents
-                state = step.state
+                state = outputs.state
 
-        # Otherwise, if we're doing beam search, life is hard.
+        # Otherwise, if we're doing beam search, defer to allennlp.
         else:
-            tokens = currents.new_zeros(batch_size, beam_size, length)
-            scores = features.new_zeros(batch_size, beam_size, length,
-                                        self.vocab_size)
-            attentions = features.new_zeros(batch_size, beam_size, length,
-                                            features.shape[1])
-            totals = features.new_zeros(batch_size, beam_size, 1)
-            finished = currents.new_zeros(batch_size,
-                                          beam_size,
-                                          length,
-                                          dtype=torch.bool)
+            runner = beam_search.BeamSearch(self.indexer.stop_index,
+                                            max_steps=length,
+                                            beam_size=beam_size)
 
-            # Take the first step, setting up the beam.
-            step = self.step(features,
-                             currents,
-                             state,
-                             temperature=temperature)
-            topk = step.scores.topk(k=beam_size, dim=-1)
-            tokens[:, :, 0] = topk.indices
-            scores[:, :, 0] = step.scores[:, None]
-            attentions[:, :, 0] = step.attentions[:, None]
-            totals[:] = topk.values.view(batch_size, beam_size, 1)
-            finished[:, :, 0] = topk.indices\
-                .eq(self.indexer.stop_index)\
-                .view(batch_size, beam_size)
+            start_predictions = currents
+            start_state = AllenNLPDecoderState(features, state)
 
-            # Adjust the features and state to have the right shape.
-            features = features.repeat_interleave(beam_size, dim=0)
+            def step(tokens: torch.Tensor,
+                     state: Dict[str, torch.Tensor]) -> AllenNLPDecoderStep:
+                """Take a decoding step."""
+                outputs = self.step(state['features'],
+                                    tokens,
+                                    DecoderState(state['h'], state['c'],
+                                                 state.get('h_lm'),
+                                                 state.get('c_lm')),
+                                    temperature=temperature)
+                return AllenNLPDecoderStep(
+                    outputs.predictions,
+                    AllenNLPDecoderState(features, outputs.state))
 
-            h = step.state.h.repeat_interleave(beam_size, dim=0)
-            c = step.state.c.repeat_interleave(beam_size, dim=0)
-            h_lm, c_lm = None, None
-            if mi:
-                assert self.lm is not None
-                assert step.state.h_lm is not None
-                assert step.state.c_lm is not None
-                h_lm = step.state.h_lm.repeat_interleave(beam_size, dim=1)
-                c_lm = step.state.c_lm.repeat_interleave(beam_size, dim=1)
-            state = DecoderState(h, c, h_lm, c_lm)
+            tokens, scores = runner.search(start_predictions, start_state,
+                                           step)
 
-            # Take the remaining steps.
-            for time in range(1, length):
-                currents = tokens[:, :, time - 1].view(-1)
-                step = self.step(features,
-                                 currents,
-                                 state,
-                                 temperature=temperature)
-
-                # Determine which sequences (s) in the beam, and which next
-                # tokens (t) for those sequences, will comprise the next beam.
-                topk_t = step.scores.topk(k=beam_size, dim=-1)
-                topk_t_scores = topk_t.values\
-                    .view(batch_size, beam_size, beam_size)\
-                    .mul(~finished[:, :, time - 1, None])
-                topk_s = totals\
-                    .add(topk_t_scores)\
-                    .view(batch_size, beam_size**2)\
-                    .topk(k=beam_size, dim=-1)
-                idx_s = (topk_s.indices // beam_size).view(-1)
-                idx_t = (topk_s.indices % beam_size).view(-1)
-                idx_b = torch.arange(batch_size).repeat_interleave(beam_size)
-
-                # Update the beam. The fancy indexing here allows us to forgo
-                # for loops, which generally impose a big performance penalty.
-                tokens[:, :, :time] = tokens[idx_b, idx_s, :time]\
-                    .view(batch_size, beam_size, time)
-                tokens[:, :, time] = topk_t.indices\
-                    .view(batch_size, beam_size, beam_size)[
-                        idx_b, idx_s, idx_t]\
-                    .view(batch_size, beam_size)
-
-                scores[:, :, :time] = scores[idx_b, idx_s, :time]\
-                    .view(batch_size, beam_size, time, self.vocab_size)
-                scores[:, :, time] = step.scores\
-                    .view(batch_size, beam_size, self.vocab_size)[
-                        idx_b, idx_s]\
-                    .view(batch_size, beam_size, self.vocab_size)
-
-                attentions[:, :, :time] = attentions[idx_b, idx_s, :time]\
-                    .view(batch_size, beam_size, time, attentions.shape[-1])
-                attentions[:, :, time] = step.attentions\
-                    .view(batch_size, beam_size, step.attentions.shape[-1])[
-                        idx_b, idx_s]\
-                    .view(batch_size, beam_size, step.attentions.shape[-1])
-
-                totals[:] = topk_s.values.view(batch_size, beam_size, 1)
-
-                # Update which sequences in the beam have predicted "<stop>".
-                finished[:, :, :time] = finished[idx_b, idx_s, :time]\
-                    .view(batch_size, beam_size, time)
-                stopped = tokens[:, :, time].eq(self.indexer.stop_index)
-                finished[:, :, time] = finished[:, :, time - 1] | stopped
-
-                # Don't forget to update RNN state as well!
-                h = step.state.h.view(batch_size, beam_size, -1)[idx_b, idx_s]
-                c = step.state.c.view(batch_size, beam_size, -1)[idx_b, idx_s]
-
-                h_lm, c_lm = None, None
-                if mi:
-                    assert self.lm is not None
-                    assert step.state.h_lm is not None
-                    assert step.state.c_lm is not None
-                    h_lm = step.state.h_lm\
-                        .permute(1, 0, 2)\
-                        .contiguous()\
-                        .view(batch_size, beam_size, -1)[idx_b, idx_s]\
-                        .view(batch_size * beam_size, self.lm.layers, -1)\
-                        .permute(1, 0, 2)\
-                        .contiguous()
-                    c_lm = step.state.c_lm\
-                        .permute(1, 0, 2)\
-                        .contiguous()\
-                        .view(batch_size, beam_size, -1)[idx_b, idx_s]\
-                        .view(batch_size * beam_size, self.lm.layers, -1)\
-                        .permute(1, 0, 2)\
-                        .contiguous()
-
-                state = DecoderState(h, c, h_lm, c_lm)
-
-            # Throw away everything but the best.
+            # Prepare output sequences, depending on strategy.
             if strategy == STRATEGY_BEAM:
-                tokens = tokens[:, 0].clone()
-                scores = scores[:, 0].clone()
-                attentions = attentions[:, 0].clone()
+                tokens = tokens[:, 0]
+                scores = scores[:, 0]
             else:
                 assert strategy == STRATEGY_RERANK
                 assert self.lm is not None
-
-                starts_lm = tokens.new_empty(batch_size, beam_size, 1)
-                starts_lm.fill_(self.indexer.start_index)
-                inputs_lm = torch\
-                    .cat([starts_lm, tokens], dim=-1)\
-                    .view(batch_size * beam_size, length + 1)
-                totals_lm = self.lm(inputs_lm, reduce=True, masks=finished)
-
-                totals = totals.view(batch_size, beam_size)
-                totals_lm = totals_lm.view(batch_size, beam_size)
-                mis = totals - temperature * totals_lm
-
-                idx_batch = torch.arange(batch_size)
-                idx_beam = mis.argmax(dim=1)
-                tokens = tokens[idx_batch, idx_beam].clone()
-                scores = scores[idx_batch, idx_beam].clone()
-                attentions = attentions[idx_batch, idx_beam].clone()
+                scores_lm = self.lm(
+                    tokens.view(batch_size * beam_size, length),
+                    reduce=True,
+                ).view(batch_size, beam_size)
+                scores = scores - temperature * scores_lm
+                bests = scores.argmax(dim=-1)
+                tokens = tokens[:, bests]
+                scores = scores[:, bests]
 
         return DecoderOutput(
             captions=self.indexer.reconstruct(tokens.tolist()),
-            scores=scores,
             tokens=tokens,
+            scores=scores,
+            predictions=predictions,
             attentions=attentions,
         )
 
@@ -611,7 +559,7 @@ class Decoder(serialize.SerializableModule):
         embeddings = self.embedding(tokens)
         inputs = torch.cat((embeddings, gated), dim=-1)
         h, c = self.lstm(inputs, (h, c))
-        scores = log_p_w = self.output(h)
+        predictions = log_p_w = self.output(h)
 
         # If MI decoding, convert likelihood into mutual information.
         if self.lm is not None and h_lm is not None and c_lm is not None:
@@ -620,9 +568,9 @@ class Decoder(serialize.SerializableModule):
                 _, (h_lm, c_lm) = self.lm.lstm(inputs_lm, (h_lm, c_lm))
                 assert h_lm is not None and c_lm is not None
                 log_p_w_lm = self.lm.output(h_lm[-1])
-            scores = log_p_w - temperature * log_p_w_lm
+            predictions = log_p_w - temperature * log_p_w_lm
 
-        return DecoderStep(scores=scores,
+        return DecoderStep(predictions=predictions,
                            attentions=attentions,
                            state=DecoderState(h=h, c=c, h_lm=h_lm, c_lm=c_lm))
 
@@ -698,7 +646,7 @@ class Decoder(serialize.SerializableModule):
                                pad=False,
                                unk=True)
         totals = []
-        for scores, indices in zip(outputs.scores, indexed):
+        for scores, indices in zip(outputs.predictions, indexed):
             total = scores[torch.arange(len(indices)), indices].sum()
             totals.append(total.item())
         return torch.tensor(totals, device=device)
@@ -1057,10 +1005,12 @@ class Decoder(serialize.SerializableModule):
                                           length=length,
                                           strategy=targets,
                                           mi=False)
-
-            loss = criterion(outputs.scores.permute(0, 2, 1), targets)
+            predictions = outputs.predictions
+            assert predictions is not None
+            loss = criterion(predictions.permute(0, 2, 1), targets)
             if regularize:
                 attentions = outputs.attentions
+                assert attentions is not None
                 regularizer = ((1 - attentions.sum(dim=1))**2).mean()
                 loss += regularization_weight * regularizer
             return loss
