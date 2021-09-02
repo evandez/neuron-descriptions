@@ -157,9 +157,9 @@ class AllenNLPDecoderState(dict):
         # Only add LM states if they are present. Also force the batch
         # dimension to go first.
         if state.h_lm is not None:
-            kvs['h_lm'] = state.h_lm.permute(1, 0, 2)
+            kvs['h_lm'] = state.h_lm.permute(1, 0, 2).contiguous()
         if state.c_lm is not None:
-            kvs['c_lm'] = state.c_lm.permute(1, 0, 2)
+            kvs['c_lm'] = state.c_lm.permute(1, 0, 2).contiguous()
         super().__init__(**kvs, **kwargs)
 
     @property
@@ -179,8 +179,8 @@ class AllenNLPDecoderState(dict):
         h_lm, c_lm = self.get('h_lm'), self.get('c_lm')
         assert (h_lm is None) == (c_lm is None), 'c_lm/h_lm set, but not both?'
         if h_lm is not None and c_lm is not None:
-            h_lm = h_lm.permute(1, 0, 2)
-            c_lm = c_lm.permute(1, 0, 2)
+            h_lm = h_lm.permute(1, 0, 2).contiguous()
+            c_lm = c_lm.permute(1, 0, 2).contiguous()
 
         return DecoderState(h, c, h_lm, c_lm)
 
