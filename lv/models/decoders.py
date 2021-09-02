@@ -154,11 +154,35 @@ class AllenNLPDecoderState(dict):
             'h': state.h,
             'c': state.c,
         }
+        # Only add LM states if they are present. Also force the batch
+        # dimension to go first.
         if state.h_lm is not None:
-            kvs['h_lm'] = state.h_lm
+            kvs['h_lm'] = state.h_lm.permute(1, 0, 2)
         if state.c_lm is not None:
-            kvs['c_lm'] = state.c_lm
+            kvs['c_lm'] = state.c_lm.permute(1, 0, 2)
         super().__init__(**kvs, **kwargs)
+
+    @property
+    def features(self) -> torch.Tensor:
+        """Return the visual features, asserting they are present."""
+        features = self.get('features')
+        assert features is not None, 'features missing from state?'
+        return features
+
+    @property
+    def state(self) -> DecoderState:
+        """Return the DecoderState, asserting all parts are present."""
+        h, c = self.get('h'), self.get('c')
+        assert h is not None, 'missing decoder h?'
+        assert c is not None, 'missing decoder c?'
+
+        h_lm, c_lm = self.get('h_lm'), self.get('c_lm')
+        assert (h_lm is None) == (c_lm is None), 'c_lm/h_lm set, but not both?'
+        if h_lm is not None and c_lm is not None:
+            h_lm = h_lm.permute(1, 0, 2)
+            c_lm = c_lm.permute(1, 0, 2)
+
+        return DecoderState(h, c, h_lm, c_lm)
 
 
 class AllenNLPDecoderStep(NamedTuple):
@@ -420,24 +444,20 @@ class Decoder(serialize.SerializableModule):
                                             max_steps=length,
                                             beam_size=beam_size)
 
-            start_predictions = currents
-            start_state = AllenNLPDecoderState(features, state)
-
             def step(tokens: torch.Tensor,
                      state: Dict[str, torch.Tensor]) -> AllenNLPDecoderStep:
                 """Take a decoding step."""
-                outputs = self.step(state['features'],
+                assert isinstance(state, AllenNLPDecoderState)
+                outputs = self.step(state.features,
                                     tokens,
-                                    DecoderState(state['h'], state['c'],
-                                                 state.get('h_lm'),
-                                                 state.get('c_lm')),
+                                    state.state,
                                     temperature=temperature)
                 return AllenNLPDecoderStep(
                     outputs.predictions,
                     AllenNLPDecoderState(features, outputs.state))
 
-            tokens, scores = runner.search(start_predictions, start_state,
-                                           step)
+            tokens, scores = runner.search(
+                currents, AllenNLPDecoderState(features, state), step)
 
             # Prepare output sequences, depending on strategy.
             if strategy == STRATEGY_BEAM:
