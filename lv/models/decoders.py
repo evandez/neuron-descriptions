@@ -454,7 +454,7 @@ class Decoder(serialize.SerializableModule):
                                     temperature=temperature)
                 return AllenNLPDecoderStep(
                     outputs.predictions,
-                    AllenNLPDecoderState(features, outputs.state))
+                    AllenNLPDecoderState(state.features, outputs.state))
 
             tokens, scores = runner.search(
                 currents, AllenNLPDecoderState(features, state), step)
