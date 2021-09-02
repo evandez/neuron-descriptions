@@ -467,7 +467,7 @@ class Decoder(serialize.SerializableModule):
                 assert strategy == STRATEGY_RERANK
                 assert self.lm is not None
                 scores_lm = self.lm(
-                    tokens.view(batch_size * beam_size, -1).tolist(),
+                    tokens.view(batch_size * beam_size, -1),
                     reduce=True,
                 ).view(batch_size, beam_size)
                 scores = scores - temperature * scores_lm
