@@ -208,6 +208,8 @@ def generate_html(
     get_image_urls: Optional[GetImageUrlsFn] = None,
     include_gt: Optional[bool] = None,
     save_images: Optional[bool] = None,
+    image_height: int = 600,
+    image_width: int = 1000,
 ) -> None:
     """Generate an HTML visualization of neuron top images and captions.
 
@@ -229,6 +231,12 @@ def generate_html(
             captions to the HTML when possible. Defaults to True.
         save_images (Optional[bool], optional): If set, save top images in dir.
             By default, images are saved whenever get_image_url is not set.
+        image_height (int, optional): Height (in px) for each saved image.
+            By default, 600 to be compatible with default
+            `top_images.as_pil_image_grid()` behavior.
+        image_width (int, optional): Width (in px) for each saved image.
+            By default, 1000 to be compatible with default
+            `top_images.as_pil_image_grid()` behavior.
 
     Raises:
         ValueError: If `captions` is set but has different length
@@ -285,7 +293,11 @@ def generate_html(
             '<div style="display: inline-block">',
         ]
         for image_url in image_urls:
-            html += [f'<img src="{image_url}" alt="{key}"/>']
+            html += [
+                f'<img src="{image_url}" alt="{key}" '
+                f'style="height: {image_height}px; width: {image_width}px"'
+                '/>'
+            ]
         html += ['</div>']
 
         if include_gt and isinstance(sample, datasets.AnnotatedTopImages):
@@ -295,9 +307,10 @@ def generate_html(
             html += ['</ul>']
 
         if predictions is not None:
-            html += [
-                '<h3>predicted caption</h3>',
-            ]
+            if include_gt:
+                html += [
+                    '<h3>predicted caption</h3>',
+                ]
             prediction = predictions[index]
             if isinstance(prediction, str):
                 html += ['<div>', prediction, '</div>']
