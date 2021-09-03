@@ -195,14 +195,16 @@ def wandb_dist_plot(values: Sequence[Any],
 
 
 PredictedCaptions = Union[StrSequence, Sequence[StrMapping]]
+GetHeaderFn = Callable[[AnyTopImages, int], str]
+GetImageUrlsFn = Callable[[AnyTopImages, int], StrSequence]
 
 
 def generate_html(
     dataset: data.Dataset[AnyTopImages],
     out_dir: PathLike,
     predictions: Optional[PredictedCaptions] = None,
-    get_header: Optional[Callable[[AnyTopImages], str]] = None,
-    get_image_urls: Optional[Callable[[AnyTopImages], StrSequence]] = None,
+    get_header: Optional[GetHeaderFn] = None,
+    get_image_urls: Optional[GetImageUrlsFn] = None,
     include_gt: Optional[bool] = None,
     save_images: Optional[bool] = None,
 ) -> None:
@@ -215,13 +217,13 @@ def generate_html(
             for each neuron. Elements can be single strings (i.e., one
             prediction per neuron) or a mapping from labels (prediction kinds)
             to strings (predictions). Defaults to None.
-        get_header (Optional[Callable[[AnyTopImages], str]], optional): Fn
-            returning the header text for each neuron. By default, header is
-            "{layer}-{unit}".
-        get_image_urls (Optional[Callable[[AnyTopImages], StrSequence]],
-            optional): Fn returning the URL(s) of top images for a given
-            neuron. By default, images are saved to out_dir and image URLs
-            are local file system paths.
+        get_header (Optional[GetHeaderFn], optional): Fn returning the header
+            text for each neuron. Arguments are top images and thier index in
+            `dataset`. By default, header is "{layer}-{unit}".
+        get_image_urls (Optional[GetImageUrlsFn], optional): Fn returning the
+            URL(s) of top images for a given neuron. Arguments are top images
+            and their index in `dataset`. By default, images are saved to
+            out_dir and image URLs are local file system paths.
         include_gt (Optional[bool], optional): If set, also write ground truth
             captions to the HTML when possible. Defaults to True.
         save_images (Optional[bool], optional): If set, save top images in dir.
@@ -259,12 +261,12 @@ def generate_html(
         key = f'{sample.layer}-{sample.unit}'
 
         if get_header is not None:
-            header = get_header(sample)
+            header = get_header(sample, index)
         else:
             header = key
 
         if get_image_urls is not None:
-            image_urls = get_image_urls(sample)
+            image_urls = get_image_urls(sample, index)
         elif save_images:
             image_urls = [image_file_name_pattern % index]
 
