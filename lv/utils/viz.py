@@ -249,7 +249,7 @@ def generate_html(
     out_dir.mkdir(exist_ok=True, parents=True)
 
     images = []
-    image_file_name_pattern = str(out_dir / 'top_images_%d.pth')
+    image_file_name_pattern = str(out_dir / 'top_images_%d.png')
 
     html = [
         '<!doctype html>',
