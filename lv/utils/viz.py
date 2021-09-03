@@ -255,6 +255,11 @@ def generate_html(
     html = [
         '<!doctype html>',
         '<html>',
+        '<head>',
+        '<style>',
+        'td { padding-right: 10px; }',
+        '</style>',
+        '</head>',
         '<body>',
     ]
     for index in tqdm(range(length), desc='compiling top images'):
@@ -276,22 +281,22 @@ def generate_html(
 
         html += [
             '<div>',
-            f'<h3>{header}</h3>',
+            f'<h2>{header}</h2>',
             '<div style="display: inline-block">',
         ]
         for image_url in image_urls:
-            html += [f'<img src="{image_url} alt="{key}"/>']
+            html += [f'<img src="{image_url}" alt="{key}"/>']
         html += ['</div>']
 
         if include_gt and isinstance(sample, datasets.AnnotatedTopImages):
-            html += ['<h5>human annotations</h5>', '<ul>']
+            html += ['<h3>human annotations</h3>', '<ul>']
             for annotation in sample.annotations:
                 html += [f'<li>{annotation}</li>']
             html += ['</ul>']
 
         if predictions is not None:
             html += [
-                '<h5>predicted caption</h5>',
+                '<h3>predicted caption</h3>',
             ]
             prediction = predictions[index]
             if isinstance(prediction, str):
