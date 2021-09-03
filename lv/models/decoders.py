@@ -433,10 +433,13 @@ class Decoder(serialize.SerializableModule):
 
                 # Record step results.
                 predictions[:, time] = outputs.predictions
-                scores[:] += outputs.predictions[:, currents].view(batch_size)
                 attentions[:, time] = outputs.attentions
                 tokens[:, time] = currents
                 state = outputs.state
+
+                idx_b = torch.arange(batch_size)
+                idx_s = currents
+                scores[:] += outputs.predictions[idx_b, idx_s].view(batch_size)
 
         # Otherwise, if we're doing beam search, defer to allennlp.
         else:
@@ -477,9 +480,10 @@ class Decoder(serialize.SerializableModule):
 
                 scores = scores - temperature * scores_lm
 
-                bests = scores.argmax(dim=-1)
-                tokens = tokens[:, bests].view(batch_size, -1)
-                scores = scores[:, bests].view(batch_size)
+                idx_b = torch.arange(batch_size)
+                idx_s = scores.argmax(dim=-1)
+                tokens = tokens[idx_b, idx_s].view(batch_size, -1)
+                scores = scores[idx_b, idx_s].view(batch_size)
 
         return DecoderOutput(
             captions=self.indexer.reconstruct(tokens.tolist()),
