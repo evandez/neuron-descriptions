@@ -11,6 +11,7 @@ from lv.utils.typing import PathLike, StrMapping, StrSequence
 import wandb
 from PIL import Image
 from torch.utils import data
+from tqdm.auto import tqdm
 
 
 def kwargs_to_str(**kwargs: Any) -> str:
@@ -256,7 +257,7 @@ def generate_html(
         '<html>',
         '<body>',
     ]
-    for index in range(length):
+    for index in tqdm(range(length), desc='compiling top images'):
         sample = dataset[index]
         key = f'{sample.layer}-{sample.unit}'
 
