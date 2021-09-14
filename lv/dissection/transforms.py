@@ -1,4 +1,5 @@
 """Common transforms for input, hidden, and output data during dissection."""
+import math
 from typing import Any, Callable, Optional, Sequence, Tuple, TypeVar
 
 from lv.utils.typing import Device
@@ -48,3 +49,32 @@ def identity(inputs: T) -> T:
 def identities(*inputs: T) -> Tuple[T, ...]:
     """Return all inputs as a tuple."""
     return inputs
+
+
+def spatialize_vit_mlp(hiddens: torch.Tensor) -> torch.Tensor:
+    """Make ViT MLP activations look like convolutional activations.
+
+    Each activation corresponds to an image patch, so we can arrange them
+    spatially. This allows us to use all the same dissection tools we
+    used for CNNs.
+
+    Args:
+        hiddens (torch.Tensor): The hidden activations. Should have shape
+            (batch_size, n_patches, n_units).
+
+    Returns:
+        torch.Tensor: Spatially arranged activations, with shape
+            (batch_size, n_units, sqrt(n_patches - 1), sqrt(n_patches - 1)).
+    """
+    batch_size, n_patches, n_units = hiddens.shape
+
+    # Exclude CLS token.
+    hiddens = hiddens[:, :-1]
+    n_patches -= 1
+
+    # Compute spatial size.
+    size = math.isqrt(n_patches)
+    assert size**2 == n_patches
+
+    # Finally, reshape.
+    return hiddens.permute(0, 2, 1).reshape(batch_size, n_units, size, size)

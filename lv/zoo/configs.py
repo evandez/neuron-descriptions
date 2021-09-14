@@ -13,6 +13,7 @@ HOST = 'https://unitname.csail.mit.edu'
 KEY_ALEXNET = 'alexnet'
 KEY_RESNET152 = 'resnet152'
 KEY_BIGGAN = 'biggan'
+KEY_DINO_VITS8 = 'dino_vits8'
 
 KEY_IMAGENET = 'imagenet'
 KEY_PLACES365 = 'places365'

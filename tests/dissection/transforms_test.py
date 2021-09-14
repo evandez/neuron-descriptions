@@ -39,3 +39,17 @@ def test_identities():
     args = ('foo', 'bar')
     actual = transforms.identities(*args)
     assert actual == args
+
+
+VIT_BATCH_SIZE = 32
+VIT_SPATIAL_SIZE = 28
+VIT_N_PATCHES = VIT_SPATIAL_SIZE**2 + 1
+VIT_N_UNITS = 3072
+
+
+def test_spatialize_vit_mlp():
+    """Test spatialize_vit_mlp correctly reshapes vit features."""
+    hiddens = torch.randn(VIT_BATCH_SIZE, VIT_N_PATCHES, VIT_N_UNITS)
+    actual = transforms.spatialize_vit_mlp(hiddens)
+    assert actual.shape == (VIT_BATCH_SIZE, VIT_N_UNITS, VIT_SPATIAL_SIZE,
+                            VIT_SPATIAL_SIZE)

@@ -10,9 +10,10 @@ from lv.dissection import transforms as lv_transforms
 from lv.ext.pretorched.gans import biggan
 from lv.ext.torchvision import models
 from lv.utils.typing import Layer
-from lv.zoo import (KEY_ALEXNET, KEY_BIGGAN, KEY_IMAGENET, KEY_PLACES365,
-                    KEY_RESNET152)
+from lv.zoo import (KEY_ALEXNET, KEY_BIGGAN, KEY_DINO_VITS8, KEY_IMAGENET,
+                    KEY_PLACES365, KEY_RESNET152)
 
+import torch
 from torch import nn
 from torch.utils import data
 from torchvision import datasets, transforms
@@ -37,6 +38,7 @@ LAYERS_VGG16 = ('conv1_1', 'conv1_2', 'conv2_1', 'conv2_2', 'conv3_1',
                 'conv3_2', 'conv3_3', 'conv4_1', 'conv4_2', 'conv4_3',
                 'conv5_1', 'conv5_2', 'conv5_3')
 LAYERS_BIGGAN = ('layer0', 'layer1', 'layer2', 'layer3', 'layer4', 'layer5')
+LAYERS_DINO_VITS8 = tuple(f'blocks.{layer}.mlp.fc1' for layer in range(12))
 
 
 @dataclasses.dataclass(frozen=True)
@@ -197,7 +199,20 @@ def dissection_models() -> ModelConfigs:
                         dataset=KEY_BIGGAN_ZS_PLACES365,
                     ),
                 ),
-        }
+        },
+        KEY_DINO_VITS8: {
+            KEY_IMAGENET:
+                ModelConfig(
+                    torch.hub.load,
+                    repo_or_dir='facebookresearch/dino:main',
+                    model=KEY_DINO_VITS8,
+                    layers=LAYERS_DINO_VITS8,
+                    dissection=DiscriminativeModelDissectionConfig(
+                        transform_hiddens=lv_transforms.spatialize_vit_mlp,
+                        batch_size=32),
+                    load_weights=False,
+                ),
+        },
     }
 
 
