@@ -9,6 +9,7 @@ from lv.models import decoders, encoders, lms
 from lv.utils import env, training
 
 import torch
+from torch import cuda
 
 DATASETS = (
     zoo.KEY_ALEXNET_IMAGENET,
@@ -52,12 +53,10 @@ parser.add_argument(
     default=.05,
     help='hold out and validate on this fraction of training data '
     '(default: .05)')
-parser.add_argument('--cuda',
-                    action='store_true',
-                    help='use cuda device (default: cpu)')
+parser.add_argument('--device', help='manually set device (default: guessed)')
 args = parser.parse_args()
 
-device = 'cuda' if args.cuda else 'cpu'
+device = args.device or 'cuda' if cuda.is_available() else 'cpu'
 
 results_dir: Optional[pathlib.Path] = args.results_dir
 if not results_dir:

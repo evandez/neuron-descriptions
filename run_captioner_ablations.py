@@ -12,6 +12,7 @@ from lv.utils import env, training, viz
 import numpy
 import torch
 import wandb
+from torch import cuda
 from torch.utils import data
 
 ABLATION_BASE = 'base'
@@ -131,7 +132,7 @@ parser.add_argument(
     type=int,
     default=10,
     help='number of samples to upload for each model (default: 10)')
-parser.add_argument('--cuda', action='store_true', help='use cuda device')
+parser.add_argument('--device', help='manually set device (default: guessed)')
 args = parser.parse_args()
 
 wandb.init(project=args.wandb_project,
@@ -142,7 +143,7 @@ wandb.init(project=args.wandb_project,
 run = wandb.run
 assert run is not None, 'failed to initialize wandb?'
 
-device = 'cuda' if args.cuda else 'cpu'
+device = args.device or 'cuda' if cuda.is_available() else 'cpu'
 
 # Prepare necessary directories.
 data_dir = args.data_dir or env.data_dir()

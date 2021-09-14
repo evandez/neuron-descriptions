@@ -14,6 +14,7 @@ from lv.deps.netdissect import (nethook, pbar, renormalize, segmenter, tally,
 from lv.dissection import dissect, transforms, zoo
 
 import torch
+from torch import cuda
 
 parser = argparse.ArgumentParser(description='run compexp baseline')
 parser.add_argument('model', help='model to dissect')
@@ -40,10 +41,10 @@ parser.add_argument('--batch-size',
                     type=int,
                     default=128,
                     help='image batch size (default: 128)')
-parser.add_argument('--cuda', action='store_true', help='use cuda device')
+parser.add_argument('--device', help='manually set device (default: guessed)')
 args = parser.parse_args()
 
-device = 'cuda' if args.cuda else 'cpu'
+device = args.device or 'cuda' if cuda.is_available() else 'cpu'
 
 # Load the model to dissect and the dataset to dissect on.
 model, layers, config = zoo.model(args.model,

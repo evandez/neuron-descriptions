@@ -4,7 +4,7 @@ import pathlib
 
 from lv.dissection import dissect, zoo
 
-import torch
+from torch import cuda
 
 parser = argparse.ArgumentParser(description='dissect a vision model')
 parser.add_argument('model', help='model architecture')
@@ -24,10 +24,10 @@ parser.add_argument('--model-file',
 parser.add_argument('--dataset-path',
                     type=pathlib.Path,
                     help='path to dataset')
-parser.add_argument('--cuda', action='store_true', help='use cuda')
+parser.add_argument('--device', help='manually set device (default: guessed)')
 args = parser.parse_args()
 
-device = torch.device('cuda' if args.cuda else 'cpu')
+device = args.device or 'cuda' if cuda.is_available() else 'cpu'
 
 model, layers, config = zoo.model(args.model,
                                   args.dataset,

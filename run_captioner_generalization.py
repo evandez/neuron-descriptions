@@ -11,6 +11,7 @@ from lv.utils import env, training, viz
 from lv.utils.typing import StrSequence
 
 import wandb
+from torch import cuda
 from torch.utils import data
 
 
@@ -121,24 +122,20 @@ parser.add_argument('--wandb-name',
 parser.add_argument('--wandb-group',
                     default='captioner',
                     help='wandb group name (default: captioner)')
-parser.add_argument('--wandb-entity', help='wandb user or team')
-parser.add_argument('--wandb-dir', metavar='PATH', help='wandb directory')
 parser.add_argument('--wandb-n-samples',
                     type=int,
                     default=25,
                     help='number of samples to upload for each model')
-parser.add_argument('--cuda', action='store_true', help='use cuda device')
+parser.add_argument('--device', help='manually set device (default: guessed)')
 args = parser.parse_args()
 
 wandb.init(project=args.wandb_project,
            name=args.wandb_name,
-           entity=args.wandb_entity,
-           group=args.wandb_group,
-           dir=args.wandb_dir)
+           group=args.wandb_group)
 run = wandb.run
 assert run is not None, 'failed to initialize wandb?'
 
-device = 'cuda' if args.cuda else 'cpu'
+device = args.device or 'cuda' if cuda.is_available() else 'cpu'
 
 # Prepare necessary directories.
 data_dir = args.data_dir or env.data_dir()

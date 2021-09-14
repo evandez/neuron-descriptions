@@ -15,6 +15,7 @@ from lv.utils import env, training, viz
 import numpy
 import torch
 import wandb
+from torch import cuda
 
 EXPERIMENTS = (
     zoo.KEY_SPURIOUS_IMAGENET,
@@ -121,7 +122,7 @@ parser.add_argument(
     type=float,
     default=.1,
     help='fraction of additional neurons to ablate at each step (default: .1)')
-parser.add_argument('--cuda', action='store_true', help='use cuda device')
+parser.add_argument('--device', help='manually set device (default: guessed)')
 parser.add_argument('--wandb-project',
                     default='lv',
                     help='wandb project name (default: lv)')
@@ -131,8 +132,6 @@ parser.add_argument('--wandb-name',
 parser.add_argument('--wandb-group',
                     default='applications',
                     help='wandb group name (default: applications)')
-parser.add_argument('--wandb-entity', help='wandb user or team')
-parser.add_argument('--wandb-dir', metavar='PATH', help='wandb directory')
 parser.add_argument('--wandb-n-samples',
                     type=int,
                     default=25,
@@ -141,15 +140,13 @@ args = parser.parse_args()
 
 wandb.init(project=args.wandb_project,
            name=args.wandb_name,
-           entity=args.wandb_entity,
            group=args.wandb_group,
            config={
                'captioner': args.captioner,
                'n_random_trials': args.n_random_trials,
-           },
-           dir=args.wandb_dir)
+           })
 
-device = 'cuda' if args.cuda else 'cpu'
+device = args.device or 'cuda' if cuda.is_available() else 'cpu'
 
 # Prepare necessary directories.
 data_dir = args.data_dir or env.data_dir()
