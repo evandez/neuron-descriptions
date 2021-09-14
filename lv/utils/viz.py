@@ -101,7 +101,6 @@ def random_wandb_images(
             dataset index and sample to caption. Defaults to None.
         indices (Optional[Sequence[int]], optional): Indices to sample from.
             By default, uses all indices.
-
         k (int, optional): Number of samples. Defaults to 25.
 
     Returns:
