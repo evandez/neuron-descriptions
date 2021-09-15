@@ -18,7 +18,7 @@ parser.add_argument('--results-root',
 parser.add_argument('--viz-root',
                     type=pathlib.Path,
                     help='dissection visualization root '
-                    '(default: <results root> / viz)')
+                    '(default: <results dir> / <layer> / viz)')
 parser.add_argument('--model-file',
                     type=pathlib.Path,
                     help='path to model weights')
@@ -50,10 +50,9 @@ if results_root is None:
     results_root = env.results_dir() / 'dissection'
 results_dir = results_root / args.model / args.dataset
 
-viz_root = args.viz_root
-if viz_root is None:
-    viz_root = results_root / 'viz'
-viz_dir = viz_root / args.model / args.dataset
+viz_root = viz_dir = args.viz_root
+if viz_root is not None:
+    viz_dir = viz_root / args.model / args.dataset
 
 for layer in layers:
     if generative:
