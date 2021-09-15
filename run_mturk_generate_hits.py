@@ -35,9 +35,7 @@ dataset = zoo.dataset(args.dataset,
 if not isinstance(dataset, datasets.TopImagesDataset):
     raise ValueError(f'bad dataset type: {type(dataset).__name__}')
 
-# TODO(evandez): Ugly! Find a better way to namespace this.
-# Also, no need to host images.npy etc. at this URL.
-base_url = f'{args.host_url.strip("/")}/{args.dataset.replace("-", "/")}'
+base_url = f'{args.host_url.strip("/")}/{args.dataset}'
 
 
 def generate_urls(layer: Layer, unit: int, k: int) -> Sequence[str]:
