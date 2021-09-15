@@ -122,11 +122,6 @@ parser.add_argument('--wandb-name',
 parser.add_argument('--wandb-group',
                     default='captioner',
                     help='wandb group name (default: captioner)')
-parser.add_argument('--wandb-entity',
-                    help='wandb user or team (default: wandb default)')
-parser.add_argument('--wandb-dir',
-                    metavar='PATH',
-                    help='wandb directory (default: wandb default)')
 parser.add_argument(
     '--wandb-n-samples',
     type=int,
@@ -137,9 +132,7 @@ args = parser.parse_args()
 
 wandb.init(project=args.wandb_project,
            name=args.wandb_name,
-           entity=args.wandb_entity,
-           group=args.wandb_group,
-           dir=args.wandb_dir)
+           group=args.wandb_group)
 run = wandb.run
 assert run is not None, 'failed to initialize wandb?'
 
