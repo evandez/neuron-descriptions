@@ -26,18 +26,28 @@ def test_run_bad_inputs(dataset, kwargs, error_pattern):
         dissect.run(lambda *_: None, lambda *_: None, dataset, **kwargs)
 
 
-def assert_results_dir_populated(results_dir, layer=None):
+def assert_results_dir_populated(results_dir, layer=None, units=None):
     """Assert the results_dir contains dissection results."""
     if layer is not None:
         results_dir = results_dir / layer
     assert results_dir.is_dir()
 
+    # Check units.
+    if units is not None:
+        n_units = len(units)
+        units_file = results_dir / 'units.npy'
+        assert units_file.is_file()
+        actual_units = numpy.load(units_file)
+        assert actual_units.shape == (n_units,)
+        assert tuple(actual_units) == tuple(sorted(units))
+    else:
+        n_units = conftest.N_UNITS_PER_LAYER
+
     # Check top images.
     images_file = results_dir / 'images.npy'
     assert images_file.is_file()
     images = numpy.load(images_file)
-    assert images.shape == (conftest.N_UNITS_PER_LAYER,
-                            conftest.N_TOP_IMAGES_PER_UNIT,
+    assert images.shape == (n_units, conftest.N_TOP_IMAGES_PER_UNIT,
                             *conftest.IMAGE_SHAPE)
     assert images.dtype == numpy.uint8
     assert images.min() >= 0
@@ -47,8 +57,7 @@ def assert_results_dir_populated(results_dir, layer=None):
     masks_file = results_dir / 'masks.npy'
     assert masks_file.is_file()
     masks = numpy.load(masks_file)
-    assert masks.shape == (conftest.N_UNITS_PER_LAYER,
-                           conftest.N_TOP_IMAGES_PER_UNIT,
+    assert masks.shape == (n_units, conftest.N_TOP_IMAGES_PER_UNIT,
                            *conftest.MASK_SHAPE)
     assert masks.dtype == numpy.uint8
     assert masks.min() >= 0
@@ -59,7 +68,7 @@ def assert_results_dir_populated(results_dir, layer=None):
     assert ids_file.is_file()
     with ids_file.open('r') as handle:
         ids = tuple(csv.reader(handle))
-    assert len(ids) == conftest.N_UNITS_PER_LAYER
+    assert len(ids) == n_units
     for unit_image_ids in ids:
         assert len(unit_image_ids) == conftest.N_TOP_IMAGES_PER_UNIT
         for unit_image_id in unit_image_ids:
@@ -73,7 +82,7 @@ def assert_results_dir_populated(results_dir, layer=None):
     assert activations_file.is_file()
     with activations_file.open('r') as handle:
         activations = tuple(csv.reader(handle))
-    assert len(activations) == conftest.N_UNITS_PER_LAYER
+    assert len(activations) == n_units
     for unit_activations in activations:
         assert len(unit_activations) == conftest.N_TOP_IMAGES_PER_UNIT
         for unit_activation in unit_activations:
@@ -81,18 +90,19 @@ def assert_results_dir_populated(results_dir, layer=None):
             assert not math.isnan(float(unit_activation))
 
 
-def assert_viz_dir_populated(viz_dir, layer=None):
+def assert_viz_dir_populated(viz_dir, layer=None, units=None):
     """Assert viz_dir contains individual png images and lightbox."""
     if layer is not None:
         viz_dir = viz_dir / layer
     assert viz_dir.is_dir()
 
     assert viz_dir.is_dir()
-    units = tuple(f'unit_{unit}' for unit in range(conftest.N_UNITS_PER_LAYER))
+    units = range(conftest.N_UNITS_PER_LAYER) if units is None else units
+    unit_keys = tuple(f'unit_{unit}' for unit in sorted(units))
     actual = tuple(path.name for path in viz_dir.iterdir())
-    assert sorted(actual) == sorted(units)
-    for unit in units:
-        viz_unit_dir = viz_dir / unit
+    assert sorted(actual) == sorted(unit_keys)
+    for unit_key in unit_keys:
+        viz_unit_dir = viz_dir / unit_key
         assert viz_unit_dir.is_dir()
         for index in range(conftest.N_TOP_IMAGES_PER_UNIT):
             viz_unit_top_image_file = viz_unit_dir / f'image_{index}.png'
@@ -226,6 +236,32 @@ def test_discriminative_layer(model, dataset, results_dir, viz_dir,
         assert_viz_dir_populated(viz_dir, layer='conv_2')
 
 
+UNITS = (0, 1)
+
+
+def test_discriminative_units(model, dataset, results_dir, viz_dir,
+                              tally_cache_file, masks_cache_file):
+    """Test discriminative runs when subset of units specified."""
+    dissect.discriminative(model,
+                           dataset,
+                           layer='conv_2',
+                           device='cpu',
+                           results_dir=results_dir,
+                           viz_dir=viz_dir,
+                           display_progress=False,
+                           num_workers=1,
+                           k=conftest.N_TOP_IMAGES_PER_UNIT,
+                           units=UNITS,
+                           image_size=conftest.IMAGE_SIZE,
+                           output_size=conftest.IMAGE_SIZE,
+                           tally_cache_file=tally_cache_file,
+                           masks_cache_file=masks_cache_file,
+                           clear_cache_files=True,
+                           clear_results_dir=True)
+    assert_results_dir_populated(results_dir, layer='conv_2', units=UNITS)
+    assert_viz_dir_populated(viz_dir, layer='conv_2', units=UNITS)
+
+
 class FeaturesToImage(nn.Module):
     """A dummy module that converts conv features to fake images."""
 
@@ -272,3 +308,29 @@ def test_generative(model, dataset, results_dir, viz_dir, tally_cache_file,
         assert_results_dir_populated(results_dir, layer='conv_2')
     if save_viz:
         assert_viz_dir_populated(viz_dir, layer='conv_2')
+
+
+def test_generative_units(model, dataset, results_dir, viz_dir,
+                          tally_cache_file, masks_cache_file):
+    """Test generative runs when subset of units specified."""
+    layers = list(model.named_children())
+    layers.append(('output', FeaturesToImage()))
+    model = nn.Sequential(collections.OrderedDict(layers))
+    dissect.generative(model,
+                       dataset,
+                       'conv_2',
+                       device='cpu',
+                       results_dir=results_dir,
+                       viz_dir=viz_dir,
+                       display_progress=False,
+                       num_workers=1,
+                       k=conftest.N_TOP_IMAGES_PER_UNIT,
+                       units=UNITS,
+                       image_size=conftest.IMAGE_SIZE,
+                       output_size=conftest.IMAGE_SIZE,
+                       tally_cache_file=tally_cache_file,
+                       masks_cache_file=masks_cache_file,
+                       clear_cache_files=True,
+                       clear_results_dir=True)
+    assert_results_dir_populated(results_dir, layer='conv_2', units=UNITS)
+    assert_viz_dir_populated(viz_dir, layer='conv_2', units=UNITS)

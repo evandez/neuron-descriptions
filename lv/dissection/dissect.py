@@ -1,7 +1,7 @@
 """Functions for dissecting convolutional units in vision models."""
 import pathlib
 import shutil
-from typing import Any, Callable, Optional, Tuple
+from typing import Any, Callable, Optional, Sequence, Tuple
 
 from lv.deps.ext.netdissect import imgviz
 from lv.deps.netdissect import (imgsave, nethook, pbar, renormalize,
@@ -21,6 +21,7 @@ DissectionResults = Tuple[runningstats.RunningTopK,
 def run(compute_topk_and_quantile: Callable[..., TensorPair],
         compute_activations: imgviz.ComputeActivationsFn,
         dataset: data.Dataset,
+        units: Optional[Sequence[int]] = None,
         k: int = 15,
         quantile: float = 0.99,
         output_size: int = 224,
@@ -55,6 +56,8 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
             (batch_size, channels, *) and optionally the associated images
             of shape (batch_size, channels, height, width).
         dataset (data.Dataset): Dataset to compute activations on.
+        units (Optional[Sequence[int]], optional): Only dissect these units.
+            By default, all units dissected.
         k (int, optional): Number of top-activating images to save.
             Defaults to 15.
         quantile (float, optional): Activation quantile to use when visualizing
@@ -106,6 +109,8 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
         DissectionResults: The top-k and quantile statistics for every unit.
 
     """
+    if units is not None and not units:
+        raise ValueError('when setting `units`, must provide >= 1 unit')
     if k < 1:
         raise ValueError(f'must have k >= 1, got k={k}')
     if quantile <= 0 or quantile >= 1:
@@ -145,10 +150,30 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
             shutil.rmtree(results_dir)
         directory.mkdir(exist_ok=True, parents=True)
 
+    # Handle case where specific units to be dissected.
+    if units is not None:
+        units = sorted(units)
+        numpy.save(f'{results_dir}/units.npy', numpy.array(units))
+
+        def _compute_topk_and_quantile(*args: Any) -> TensorPair:
+            pooled, activations = compute_topk_and_quantile(*args)
+            return pooled[:, units], activations[:, units]
+
+        def _compute_activations(*args: Any) -> imgviz.Activations:
+            outputs = compute_activations(*args)
+            if not isinstance(outputs, torch.Tensor):
+                activations, images = outputs
+                return activations[:, units], images
+            else:
+                return outputs[:, units]
+    else:
+        _compute_topk_and_quantile = compute_topk_and_quantile
+        _compute_activations = compute_activations
+
     # We always compute activation statistics across dataset.
     if display_progress:
         pbar.descnext('tally activations')
-    topk, rq = tally.tally_topk_and_quantile(compute_topk_and_quantile,
+    topk, rq = tally.tally_topk_and_quantile(_compute_topk_and_quantile,
                                              dataset,
                                              k=k,
                                              batch_size=batch_size,
@@ -168,7 +193,7 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
                                      source=dataset,
                                      level=levels)
         masked, images, masks = viz.individual_masked_images_for_topk(
-            compute_activations,
+            _compute_activations,
             dataset,
             topk,
             k=k,

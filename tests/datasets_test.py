@@ -61,6 +61,34 @@ def test_top_images_dataset_init(top_images_root, device):
         assert sample.masks.max() <= 1
 
 
+def test_top_images_dataset_init_with_units_file(top_images_root):
+    """Test TopImagesDataset.__init__ properly reads units file."""
+    layer = conftest.layer(0)
+    units = range(conftest.N_UNITS_PER_LAYER - 1)
+    layer_dir = top_images_root / layer
+    units_file = layer_dir / 'units.npy'
+    numpy.save(str(units_file), numpy.array(units))
+
+    dataset = datasets.TopImagesDataset(top_images_root,
+                                        display_progress=False)
+    assert dataset.root == top_images_root
+    assert str(top_images_root).endswith(dataset.name)
+    assert dataset.layers == tuple(
+        f'layer-{i}' for i in range(conftest.N_LAYERS))
+    assert len(dataset.samples) == conftest.N_SAMPLES - 1
+    for sample in dataset.samples:
+        if sample.layer == layer:
+            assert sample.unit != conftest.N_UNITS_PER_LAYER - 1
+
+        assert sample.images.dtype is torch.float
+        assert sample.images.min() >= 0
+        assert sample.images.max() <= 1
+
+        assert sample.masks.dtype is torch.float
+        assert sample.masks.min() >= 0
+        assert sample.masks.max() <= 1
+
+
 @pytest.mark.parametrize('subpath,error_pattern', (
     ('', '.*root directory not found.*'),
     (f'{conftest.layer(0)}/images.npy', '.*missing images.*'),
@@ -125,6 +153,18 @@ def test_top_images_dataset_init_bad_images_or_masks(top_images_root,
     for name, tensor in (('images', images), ('masks', masks)):
         numpy.save(top_images_root / conftest.layer(0) / f'{name}.npy', tensor)
 
+    with pytest.raises(ValueError, match=error_pattern):
+        datasets.TopImagesDataset(top_images_root)
+
+
+@pytest.mark.parametrize('units,error_pattern', (
+    (torch.randint(conftest.N_UNITS_PER_LAYER, size=()), '.*0D.*'),
+    (torch.randint(conftest.N_UNITS_PER_LAYER, size=(1, 2)), '.*2D.*'),
+))
+def test_top_images_dataset_init_bad_units(top_images_root, units,
+                                           error_pattern):
+    """Test TopImagesDataset.__init__ dies when images/masks misshapen."""
+    numpy.save(top_images_root / conftest.layer(0) / 'units.npy', units)
     with pytest.raises(ValueError, match=error_pattern):
         datasets.TopImagesDataset(top_images_root)
 

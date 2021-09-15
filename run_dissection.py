@@ -11,6 +11,9 @@ parser = argparse.ArgumentParser(description='dissect a vision model')
 parser.add_argument('model', help='model architecture')
 parser.add_argument('dataset', help='dataset model is trained on')
 parser.add_argument('--layers', nargs='+', help='layers to dissect')
+parser.add_argument('--units',
+                    type=int,
+                    help='only dissect the first n units (default: all)')
 parser.add_argument('--results-root',
                     type=pathlib.Path,
                     help='dissection results root '
@@ -45,6 +48,10 @@ dataset = zoo.dataset(dataset, path=args.dataset_path)
 layers = args.layers or layers
 assert layers is not None, 'should always be >= 1 layer'
 
+units = None
+if args.units:
+    units = range(args.units)
+
 results_root = args.results_root
 if results_root is None:
     results_root = env.results_dir() / 'dissection'
@@ -59,6 +66,7 @@ for layer in layers:
         dissect.generative(model,
                            dataset,
                            layer=layer,
+                           units=units,
                            results_dir=results_dir,
                            viz_dir=viz_dir,
                            device=device,
@@ -67,6 +75,7 @@ for layer in layers:
         dissect.discriminative(model,
                                dataset,
                                layer=layer,
+                               units=units,
                                results_dir=results_dir,
                                viz_dir=viz_dir,
                                device=device,

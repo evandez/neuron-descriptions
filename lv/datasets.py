@@ -114,6 +114,7 @@ class TopImagesDataset(data.Dataset):
 
         self.images_by_layer = {}
         self.masks_by_layer = {}
+        self.units_by_layer = {}
         renormalizer = renormalize.renormalizer(source='byte', target='pt')
         for layer in progress:
             images_file = root / str(layer) / 'images.npy'
@@ -126,9 +127,9 @@ class TopImagesDataset(data.Dataset):
             masks = torch.from_numpy(numpy.load(masks_file))
 
             for name, tensor in (('images', images), ('masks', masks)):
-                if tensor.ndimension() != 5:
+                if tensor.dim() != 5:
                     raise ValueError(f'expected 5D {name}, '
-                                     f'got {tensor.ndimension()}D '
+                                     f'got {tensor.dim()}D '
                                      f'in layer {layer}')
             if images.shape[:2] != masks.shape[:2]:
                 raise ValueError(f'layer {layer} masks/images have '
@@ -138,6 +139,15 @@ class TopImagesDataset(data.Dataset):
                 raise ValueError(f'layer {layer} masks/images have '
                                  'different height/width '
                                  f'{images.shape[3:]} vs. {masks.shape[3:]}')
+
+            # Handle units separately, since they're optional.
+            units_file = root / str(layer) / 'units.npy'
+            if units_file.exists():
+                units = torch.from_numpy(numpy.load(units_file))
+                if units.dim() != 1:
+                    raise ValueError(f'expected 1D units, got {units.dim()}D')
+            else:
+                units = torch.arange(len(images))
 
             images = images.float()
             masks = masks.float()
@@ -153,18 +163,19 @@ class TopImagesDataset(data.Dataset):
 
             self.images_by_layer[layer] = images
             self.masks_by_layer[layer] = masks
+            self.units_by_layer[layer] = units
 
         self.samples = []
         for layer in layers:
-            units = zip(self.images_by_layer[layer],
-                        self.masks_by_layer[layer])
-            for unit, (images, masks) in enumerate(units):
+            for unit, images, masks in zip(self.units_by_layer[layer],
+                                           self.images_by_layer[layer],
+                                           self.masks_by_layer[layer]):
                 if transform_images is not None:
                     images = transform_images(images)
                 if transform_masks is not None:
                     masks = transform_masks(masks)
                 sample = TopImages(layer=str(layer),
-                                   unit=unit,
+                                   unit=unit.item(),
                                    images=images,
                                    masks=masks)
                 self.samples.append(sample)

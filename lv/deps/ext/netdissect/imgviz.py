@@ -14,7 +14,8 @@ def __getattr__(name: str) -> Any:
     return getattr(imgviz, name)
 
 
-ComputeActivationsFn = Callable[..., Union[torch.Tensor, TensorPair]]
+Activations = Union[torch.Tensor, TensorPair]
+ComputeActivationsFn = Callable[..., Activations]
 UnitRank = Tuple[int, int]
 UnitRanks = Sequence[Sequence[UnitRank]]
 IndividualMaskedImages = Sequence[Sequence[Image.Image]]
