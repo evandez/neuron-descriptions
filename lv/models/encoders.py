@@ -243,7 +243,7 @@ class PyramidConvEncoder(Encoder, serialize.SerializableModule):
     downsampled mask, pooled, and stacked to create a feature vector.
     """
 
-    def __init__(self, config: str = 'resnet18', **kwargs: Any):
+    def __init__(self, config: str = 'resnet101', **kwargs: Any):
         """Initialize the encoder.
 
         Keyword arguments are forwarded to the constructor of the underlying
@@ -252,7 +252,7 @@ class PyramidConvEncoder(Encoder, serialize.SerializableModule):
         Args:
             config (str, optional): The encoder config to use.
                 See `PyramidConvEncoder.configs` for options.
-                Defaults to 'resnet18'.
+                Defaults to 'resnet101'.
 
         """
         super().__init__()
@@ -357,3 +357,30 @@ def parse(key: str) -> Type[Encoder]:
 def key(encoder: Encoder) -> str:
     """Return the key for the given encoder."""
     return type(encoder).__name__
+
+
+KIND_SPATIAL = 'spatial'
+KIND_PYRAMID = 'pyramid'
+
+
+def encoder(kind: str, **kwargs: Any) -> Encoder:
+    """Create an encoder.
+
+    Keyword arguments passed to constructor.
+
+    Args:
+        kind (str): The kind of encoder to load. Can be 'pyramid', 'spatial',
+            or the exact type name.
+
+    Returns:
+        The instantiated encoder.
+
+    """
+    encoder_t: Type[Encoder]
+    if kind == KIND_SPATIAL:
+        encoder_t = SpatialConvEncoder
+    elif kind == KIND_PYRAMID:
+        encoder_t = PyramidConvEncoder
+    else:
+        encoder_t = parse(kind)
+    return encoder_t(**kwargs)
