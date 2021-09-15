@@ -153,7 +153,6 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
                                              k=k,
                                              batch_size=batch_size,
                                              num_workers=num_workers,
-                                             pin_memory=True,
                                              cachefile=tally_cache_file)
 
     # Now compute top images and masks for the highest-activating pixels if
@@ -175,7 +174,6 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
             k=k,
             batch_size=batch_size,
             num_workers=num_workers,
-            pin_memory=True,
             cachefile=masks_cache_file)
 
     if save_results:
