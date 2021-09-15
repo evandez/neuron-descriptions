@@ -3,10 +3,10 @@ import pathlib
 import shutil
 from typing import Any, Callable, Optional, Tuple
 
+from lv.deps.ext.netdissect import imgviz
 from lv.deps.netdissect import (imgsave, nethook, pbar, renormalize,
                                 runningstats, tally)
 from lv.dissection import transforms
-from lv.ext.netdissect import imgviz
 from lv.utils.typing import Device, Layer, PathLike, TensorPair
 
 import numpy

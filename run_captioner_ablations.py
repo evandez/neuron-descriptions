@@ -5,7 +5,7 @@ import shutil
 from typing import Any
 
 from lv import zoo
-from lv.ext import bert_score
+from lv.deps.ext import bert_score
 from lv.models import decoders, encoders, lms
 from lv.utils import env, training, viz
 

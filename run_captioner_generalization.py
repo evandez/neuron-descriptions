@@ -5,7 +5,7 @@ import shutil
 from typing import Dict, Mapping, NamedTuple, Optional, Tuple
 
 from lv import zoo
-from lv.ext import bert_score
+from lv.deps.ext import bert_score
 from lv.models import decoders, encoders, lms
 from lv.utils import env, training, viz
 from lv.utils.typing import StrSequence
