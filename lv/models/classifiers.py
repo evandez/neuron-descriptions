@@ -206,3 +206,17 @@ class ImageClassifier(nn.Module):
                 correct += predictions.argmax(dim=-1).eq(targets).sum().item()
 
         return correct / len(cast(Sized, dataset))
+
+
+def classifier(model: nn.Module) -> ImageClassifier:
+    """Create an ImageClassifier wrapper.
+
+    Args:
+        model (nn.Module): The underlying classification model
+            (e.g., a `torchvision.models.resnet18`).
+
+    Returns:
+        ImageClassifier: Wrapper for the classifier.
+
+    """
+    return ImageClassifier(model)
