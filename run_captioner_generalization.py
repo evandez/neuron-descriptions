@@ -4,9 +4,8 @@ import pathlib
 import shutil
 from typing import Dict, Mapping, NamedTuple, Optional, Tuple
 
-from lv import zoo
+from lv import models, zoo
 from lv.deps.ext import bert_score
-from lv.models import decoders, encoders, lms
 from lv.utils import env, training, viz
 from lv.utils.typing import StrSequence
 
@@ -96,8 +95,8 @@ parser.add_argument('--hold-out',
                     default=.1,
                     help='hold out this fraction of data for testing')
 parser.add_argument('--strategy',
-                    default=decoders.STRATEGY_BEAM,
-                    help='decoding strategy (default: beam)')
+                    default='rerank',
+                    help='decoding strategy (default: rerank)')
 parser.add_argument(
     '--no-mi',
     action='store_true',
@@ -153,7 +152,7 @@ bert_scorer = bert_score.BERTScorer(lang='en',
                                     device=device)
 
 # Load encoder.
-encoder = encoders.PyramidConvEncoder(config='resnet50').to(device)
+encoder = models.encoder(config='resnet50').to(device)
 
 # Start experiments.
 for experiment in args.experiments or EXPERIMENTS.keys():
@@ -214,7 +213,7 @@ for experiment in args.experiments or EXPERIMENTS.keys():
         assert isinstance(test, data.Dataset)
 
         # Train the LM.
-        lm = lms.lm(train)
+        lm = models.lm(train)
         lm.fit(train, device=device)
         lm.save(results_dir / f'{experiment}-split{index}-lm.pth')
 
@@ -225,12 +224,12 @@ for experiment in args.experiments or EXPERIMENTS.keys():
             test_features = encoder.map(test, device=device)
 
         # Train the decoder.
-        decoder = decoders.decoder(train,
-                                   encoder,
-                                   lm=lm,
-                                   strategy=args.strategy,
-                                   beam_size=args.beam_size,
-                                   temperature=args.temperature)
+        decoder = models.decoder(train,
+                                 encoder,
+                                 lm=lm,
+                                 strategy=args.strategy,
+                                 beam_size=args.beam_size,
+                                 temperature=args.temperature)
         decoder.fit(train, features=train_features, device=device)
         decoder.save(results_dir / f'{experiment}-split{index}-captioner.pth')
 

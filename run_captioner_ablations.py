@@ -4,9 +4,8 @@ import pathlib
 import shutil
 from typing import Any
 
-from lv import zoo
+from lv import models, zoo
 from lv.deps.ext import bert_score
-from lv.models import decoders, encoders, lms
 from lv.utils import env, training, viz
 
 import numpy
@@ -172,9 +171,9 @@ for config in args.encoders:
     lm_file = results_dir / f'{config}-lm.pth'
     if lm_file.exists():
         print(f'loading cached lm from {lm_file}')
-        lm = lms.LanguageModel.load(lm_file, map_location=device)
+        lm = models.LanguageModel.load(lm_file, map_location=device)
     elif ABLATION_MI in args.ablations or ABLATION_BEAM_MI in args.ablations:
-        lm = lms.lm(train).to(device)
+        lm = models.lm(train).to(device)
         lm.fit(train,
                device=device,
                display_progress_as=f'(encoder={config}) train lm')
@@ -184,11 +183,11 @@ for config in args.encoders:
     captioner_file = results_dir / f'{config}-captioner.pth'
     if captioner_file.is_file() and splits_file.is_file():
         print(f'loading cached captioner from {captioner_file}')
-        decoder = decoders.Decoder.load(captioner_file, map_location=device)
+        decoder = models.Decoder.load(captioner_file, map_location=device)
         encoder = decoder.encoder
     else:
-        encoder = encoders.PyramidConvEncoder(config=config).to(device)
-        decoder = decoders.decoder(train, encoder, lm=lm).to(device)
+        encoder = models.encoder(config=config).to(device)
+        decoder = models.decoder(train, encoder, lm=lm).to(device)
 
         train_features = None
         if args.precompute_features:

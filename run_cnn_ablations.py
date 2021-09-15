@@ -5,8 +5,7 @@ import random
 
 import lv.dissection.zoo
 import lv.zoo
-from lv import datasets
-from lv.models import classifiers, decoders, encoders
+from lv import datasets, models
 from lv.utils import env, training, viz
 from lv.utils.typing import StrSequence
 
@@ -234,7 +233,7 @@ for dataset_name in args.datasets:
                                         factory=training.PreloadedImageFolder)
     for cnn_name in args.cnns:
         cnn, *_ = lv.dissection.zoo.model(cnn_name, dataset_name)
-        cnn = classifiers.ImageClassifier(cnn).to(device).eval()
+        cnn = models.classifier(cnn).to(device).eval()
 
         annotations = lv.zoo.datasets(f'{cnn_name}/{dataset_name}',
                                       path=data_dir)
@@ -250,8 +249,8 @@ for dataset_name in args.datasets:
         else:
             assert args.captions == CAPTIONS_LEARNED
             train = lv.zoo.datasets(*TRAIN[cnn_name], path=data_dir)
-            encoder = encoders.PyramidConvEncoder().to(device)
-            decoder = decoders.decoder(train, encoder).to(device)
+            encoder = models.encoder(config='resnet50').to(device)
+            decoder = models.decoder(train, encoder).to(device)
             decoder.fit(train, device=device)
             decoder.eval()
             captions = decoder.predict(annotations, device=device)

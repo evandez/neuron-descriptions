@@ -6,10 +6,9 @@ import random
 import shutil
 
 import lv.zoo
-from lv import datasets
+from lv import datasets, models
 from lv.deps.netdissect import renormalize
 from lv.dissection import dissect, zoo
-from lv.models import classifiers, decoders, encoders
 from lv.utils import env, training, viz
 
 import numpy
@@ -158,8 +157,8 @@ results_dir.mkdir(exist_ok=True, parents=True)
 # Before diving into experiments, train a captioner on all the data.
 # TODO(evandez): Use a pretrained captioner.
 annotations = lv.zoo.datasets(*args.annotations, path=data_dir)
-encoder = encoders.PyramidConvEncoder().to(device)
-decoder = decoders.decoder(annotations, encoder).to(device)
+encoder = models.encoder(config='resnet50').to(device)
+decoder = models.decoder(annotations, encoder).to(device)
 decoder.fit(annotations,
             display_progress_as=f'train {args.captioner}',
             device=device)
@@ -181,7 +180,7 @@ for experiment in args.experiments:
         cnn, layers, _ = zoo.model(args.cnn,
                                    zoo.KEY_IMAGENET,
                                    pretrained=False)
-        cnn = classifiers.ImageClassifier(cnn).to(device)
+        cnn = models.classifier(cnn).to(device)
         cnn.fit(train,
                 hold_out=val.indices,
                 batch_size=args.batch_size,
