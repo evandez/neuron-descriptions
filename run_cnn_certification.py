@@ -31,7 +31,8 @@ CONDITION_TEXT = 'ablate-text'
 CONDITION_RANDOM = 'ablate-random'
 CONDITIONS = (CONDITION_TEXT, CONDITION_RANDOM)
 
-parser = argparse.ArgumentParser(description='fix a cnn trained on bad data')
+parser = argparse.ArgumentParser(
+    description='certify a cnn trained on bad data')
 parser.add_argument('--experiments',
                     choices=EXPERIMENTS,
                     default=EXPERIMENTS,
@@ -47,10 +48,11 @@ parser.add_argument('--conditions',
                     default=CONDITIONS,
                     nargs='+',
                     help='condition(s) to test under (default: all)')
-parser.add_argument('--cnn',
-                    choices=(lv.zoo.KEY_ALEXNET, zoo.KEY_RESNET18),
-                    default=zoo.KEY_RESNET18,
-                    help='cnn architecture to repair')
+parser.add_argument(
+    '--cnn',
+    choices=(lv.zoo.KEY_ALEXNET, zoo.KEY_RESNET18),
+    default=zoo.KEY_RESNET18,
+    help='cnn architecture to train and certify (default: resnet18)')
 parser.add_argument('--captioner',
                     nargs=2,
                     default=(lv.zoo.KEY_CAPTIONER_RESNET101, lv.zoo.KEY_ALL),
@@ -131,7 +133,8 @@ wandb.init(project=args.wandb_project,
            name=args.wandb_name,
            group=args.wandb_group,
            config={
-               'captioner': args.captioner,
+               'captioner': '/'.join(args.captioner),
+               'cnn': args.cnn,
                'n_random_trials': args.n_random_trials,
            })
 
