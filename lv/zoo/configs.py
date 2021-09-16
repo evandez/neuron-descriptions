@@ -26,21 +26,78 @@ KEY_RESNET152_PLACES365 = f'{KEY_RESNET152}/{KEY_PLACES365}'
 KEY_BIGGAN_IMAGENET = f'{KEY_BIGGAN}/{KEY_IMAGENET}'
 KEY_BIGGAN_PLACES365 = f'{KEY_BIGGAN}/{KEY_PLACES365}'
 
+KEY_GENERATORS = 'gen'
+KEY_CLASSIFIERS = 'cls'
 KEY_ALL = 'all'
 
-KEY_CAPTIONER_RESNET101_LM = 'captioner-resnet101-lm'
+# We can group the datasets of neuron annotations in a bunch of interesting
+# ways. Here are the most common, used throughout the project. To load a
+# grouping, simply do e.g.:
+# >>> import lv.zoo
+# >>> group = lv.zoo.DATASET_GROUPS['gen']
+# >>> dataset = lv.zoo.datasets(*group)
+DATASET_GROUPINGS = {
+    KEY_ALL: (
+        KEY_ALEXNET_IMAGENET,
+        KEY_ALEXNET_PLACES365,
+        KEY_RESNET152_IMAGENET,
+        KEY_RESNET152_PLACES365,
+        KEY_BIGGAN_IMAGENET,
+        KEY_BIGGAN_PLACES365,
+    ),
+    KEY_CLASSIFIERS: (
+        KEY_ALEXNET_IMAGENET,
+        KEY_ALEXNET_PLACES365,
+        KEY_RESNET152_IMAGENET,
+        KEY_RESNET152_PLACES365,
+    ),
+    KEY_GENERATORS: (
+        KEY_BIGGAN_IMAGENET,
+        KEY_BIGGAN_PLACES365,
+    ),
+    KEY_IMAGENET: (
+        KEY_ALEXNET_IMAGENET,
+        KEY_RESNET152_IMAGENET,
+        KEY_BIGGAN_IMAGENET,
+    ),
+    KEY_PLACES365: (
+        KEY_ALEXNET_PLACES365,
+        KEY_RESNET152_PLACES365,
+        KEY_BIGGAN_PLACES365,
+    ),
+    KEY_ALEXNET: (
+        KEY_ALEXNET_IMAGENET,
+        KEY_ALEXNET_PLACES365,
+    ),
+    KEY_RESNET152: (
+        KEY_RESNET152_IMAGENET,
+        KEY_RESNET152_PLACES365,
+    ),
+    KEY_BIGGAN: (
+        KEY_BIGGAN_IMAGENET,
+        KEY_BIGGAN_PLACES365,
+    ),
+    KEY_ALEXNET_IMAGENET: (KEY_ALEXNET_IMAGENET,),
+    KEY_ALEXNET_PLACES365: (KEY_ALEXNET_PLACES365,),
+    KEY_RESNET152_IMAGENET: (KEY_RESNET152_IMAGENET,),
+    KEY_RESNET152_PLACES365: (KEY_RESNET152_PLACES365,),
+    KEY_BIGGAN_IMAGENET: (KEY_BIGGAN_IMAGENET,),
+    KEY_BIGGAN_PLACES365: (KEY_BIGGAN_PLACES365,),
+}
+
+KEY_CAPTIONER_RESNET101 = 'captioner-resnet101'
 
 
 def models() -> core.ModelConfigs:
     """Return all model configs."""
     return {
-        KEY_CAPTIONER_RESNET101_LM: {
-            KEY_ALL:
-                core.ModelConfig(
-                    lv.models.Decoder.load,
-                    url=f'{HOST}/models/captioner-resnet101-lm.pth',
-                    requires_path=True,
-                    load_weights=False),
+        KEY_CAPTIONER_RESNET101: {
+            dataset: core.ModelConfig(
+                lv.models.Decoder.load,
+                url=f'{HOST}/models/captioner-resnet101-{dataset}.pth',
+                requires_path=True,
+                load_weights=False,
+            ) for dataset in DATASET_GROUPINGS.keys()
         },
     }
 

@@ -10,15 +10,6 @@ from lv.utils import env, training
 import torch
 from torch import cuda
 
-DATASETS = (
-    zoo.KEY_ALEXNET_IMAGENET,
-    zoo.KEY_ALEXNET_PLACES365,
-    zoo.KEY_RESNET152_IMAGENET,
-    zoo.KEY_RESNET152_PLACES365,
-    zoo.KEY_BIGGAN_IMAGENET,
-    zoo.KEY_BIGGAN_PLACES365,
-)
-
 ENCODER_RESNET18 = 'resnet18'
 ENCODER_RESNET50 = 'resnet50'
 ENCODER_RESNET101 = 'resnet101'
@@ -32,9 +23,9 @@ parser.add_argument(
 parser.add_argument('--clear-results-dir',
                     action='store_true',
                     help='clear results dir (default: do not)')
-parser.add_argument('--datasets',
-                    nargs='+',
-                    default=DATASETS,
+parser.add_argument('--dataset',
+                    choices=zoo.DATASET_GROUPINGS.keys(),
+                    default=zoo.KEY_ALL,
                     help='datasets to train on (default: all)')
 parser.add_argument('--encoder',
                     choices=ENCODERS,
@@ -59,14 +50,16 @@ device = args.device or 'cuda' if cuda.is_available() else 'cpu'
 
 results_dir: Optional[pathlib.Path] = args.results_dir
 if not results_dir:
-    subdir = f'captioner-{args.encoder}{"" if args.no_lm else "-lm"}'
+    subdir = f'captioner-{args.encoder}-{args.dataset.replace("/", "_")}'
+    if args.no_lm:
+        subdir += '-no_lm'
     results_dir = env.results_dir() / subdir
 
 if args.clear_results_dir:
     shutil.rmtree(results_dir)
 results_dir.mkdir(exist_ok=True, parents=True)
 
-dataset = zoo.datasets(*args.datasets)
+dataset = zoo.datasets(*zoo.DATASET_GROUPINGS[args.dataset])
 
 splits_file = results_dir / 'splits.pth'
 if splits_file.exists():
