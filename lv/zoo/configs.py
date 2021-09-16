@@ -6,6 +6,7 @@ part of this project--you are at the wrong zoo. You want to look at the configs
 in lv/dissection/zoo.py instead.
 """
 import lv.datasets
+import lv.models
 from lv.zoo import core
 
 HOST = 'https://unitname.csail.mit.edu'
@@ -25,10 +26,23 @@ KEY_RESNET152_PLACES365 = f'{KEY_RESNET152}/{KEY_PLACES365}'
 KEY_BIGGAN_IMAGENET = f'{KEY_BIGGAN}/{KEY_IMAGENET}'
 KEY_BIGGAN_PLACES365 = f'{KEY_BIGGAN}/{KEY_PLACES365}'
 
+KEY_ALL = 'all'
+
+KEY_CAPTIONER_RESNET101_LM = 'captioner-resnet101-lm'
+
 
 def models() -> core.ModelConfigs:
     """Return all model configs."""
-    return {}
+    return {
+        KEY_CAPTIONER_RESNET101_LM: {
+            KEY_ALL:
+                core.ModelConfig(
+                    lv.models.Decoder.load,
+                    url=f'{HOST}/models/captioner-resnet101-lm.pth',
+                    requires_path=True,
+                    load_weights=False),
+        },
+    }
 
 
 def datasets() -> core.DatasetConfigs:

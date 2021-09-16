@@ -13,7 +13,7 @@ from torch import hub, nn
 from torch.utils import data
 
 TransformWeights = Callable[[Any], OrderedDict[str, torch.Tensor]]
-ModelFactory = Callable[..., nn.Sequential]
+ModelFactory = Callable[..., nn.Module]
 
 
 @dataclasses.dataclass
@@ -30,6 +30,7 @@ class ModelConfig:
                  factory: ModelFactory,
                  layers: Optional[Iterable[Layer]] = None,
                  url: Optional[str] = None,
+                 requires_path: bool = False,
                  load_weights: bool = True,
                  transform_weights: Optional[TransformWeights] = None,
                  **defaults: Any):
@@ -46,6 +47,9 @@ class ModelConfig:
             url (Optional[str], optional): URL hosting pretrained weights.
                 If set and path provided to `load` does not exist, weights
                 will be downloaded. Defaults to None.
+            requires_path (bool, optional): If True, path argument is required
+                and will be forwarded to the factory as the first argument.
+                Defaults to False.
             load_weights (bool, optional): If True, attempt to load
                 pretrained weights. Otherwise, model will be immediately
                 returned after instantiation from the factory. Set this to
@@ -61,6 +65,7 @@ class ModelConfig:
 
         self.url = url
         self.layers = layers
+        self.requires_path = requires_path
         self.load_weights = load_weights
         self.transform_weights = transform_weights
 
@@ -69,7 +74,7 @@ class ModelConfig:
              factory: Optional[ModelFactory] = None,
              load_weights: Optional[bool] = None,
              map_location: Optional[Device] = None,
-             **kwargs: Any) -> Tuple[nn.Sequential, Iterable[Layer]]:
+             **kwargs: Any) -> Tuple[nn.Module, Iterable[Layer]]:
         """Load the model from the given path.
 
         Args:
@@ -86,20 +91,24 @@ class ModelConfig:
                 time. Defaults to None.
 
         Returns:
-            Tuple[nn.Sequential, Iterable[Layer]]: The loaded model.
+            Tuple[nn.Module, Iterable[Layer]]: The loaded model.
 
         """
+        if path is None and self.requires_path:
+            raise ValueError('model requires path, but none given')
+
+        # Set defaults.
         if factory is None:
             factory = self.factory
         if load_weights is None:
             load_weights = self.load_weights
 
+        # Set factory fn defaults.
         for key, default in self.defaults.items():
             kwargs.setdefault(key, default)
 
-        model = factory(**kwargs)
-
-        if path is not None and load_weights:
+        # If necessary, try to download model weights from the URL.
+        if path is not None and (load_weights or self.requires_path):
             path = pathlib.Path(path)
             if not path.exists() and self.url is not None:
                 path.parent.mkdir(exist_ok=True, parents=True)
@@ -107,12 +116,21 @@ class ModelConfig:
             if not path.exists():
                 raise FileNotFoundError(f'model path not found: {path}')
 
+        # Create the model, forwarding path if needed.
+        if self.requires_path:
+            model = factory(path, **kwargs)
+        else:
+            model = factory(**kwargs)
+
+        # Explicitly load the weights if needed.
+        if path is not None and load_weights:
             state_dict = torch.load(path, map_location=map_location)
             if self.transform_weights is not None:
                 state_dict = self.transform_weights(state_dict)
 
             model.load_state_dict(state_dict)
 
+        # Determine what layers the model has.
         layers = self.layers
         if layers is None:
             layers = [key for key, _ in model.named_children()]
