@@ -1,8 +1,10 @@
 absl-py==0.12.0
+aiohttp==3.7.4.post0
 allennlp==2.7.0
 appnope==0.1.2
 argon2-cffi==20.1.0
 async-generator==1.10
+async-timeout==3.0.1
 attrs==20.3.0
 backcall==0.2.0
 backports.csv==1.0.7
@@ -27,6 +29,7 @@ cryptography==3.4.8
 cycler==0.10.0
 cymem==2.0.5
 datasets==1.11.0
+debugpy==1.4.3
 decorator==5.0.7
 defusedxml==0.7.1
 dill==0.3.4
@@ -85,9 +88,11 @@ lxml==4.6.3
 Markdown==3.3.4
 MarkupSafe==1.1.1
 matplotlib==3.4.1
+matplotlib-inline==0.1.3
 mccabe==0.6.1
 mistune==0.8.4
 more-itertools==8.8.0
+multidict==5.1.0
 multiprocess==0.70.12.2
 munch==2.5.0
 murmurhash==1.0.5
@@ -207,4 +212,5 @@ Werkzeug==1.0.1
 widgetsnbextension==3.5.1
 xxhash==2.0.2
 yapf==0.31.0
+yarl==1.6.3
 zc.lockfile==2.0
