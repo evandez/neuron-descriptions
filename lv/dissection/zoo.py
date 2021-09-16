@@ -24,7 +24,6 @@ LV_HOST = 'https://unitname.csail.mit.edu/dissect/models'
 DISSECT_HOST = 'https://dissect.csail.mit.edu/models'
 
 KEY_RESNET18 = 'resnet18'
-KEY_VGG_16 = 'vgg16'
 
 KEY_SPURIOUS_IMAGENET_TEXT = 'spurious-imagenet-text'
 
