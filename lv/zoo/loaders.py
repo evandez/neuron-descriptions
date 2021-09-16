@@ -1,6 +1,6 @@
 """Functions for loading models/datasets by name."""
 import pathlib
-from typing import Any, Iterable, Mapping, Optional, Tuple
+from typing import Any, Mapping, Optional, Sequence, Tuple
 
 from lv.utils import env
 from lv.utils.typing import Layer, PathLike
@@ -9,7 +9,7 @@ from lv.zoo import configs, core
 from torch import nn
 from torch.utils import data
 
-Model = Tuple[nn.Module, Iterable[Layer], core.ModelConfig]
+Model = Tuple[nn.Module, Sequence[Layer], core.ModelConfig]
 
 
 def model(name: str,

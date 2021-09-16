@@ -1,6 +1,6 @@
 """Defines dissection configurations."""
 import dataclasses
-from typing import Any, Iterable, Mapping, Optional, Tuple
+from typing import Any, Mapping, Optional, Sequence, Tuple
 
 from lv import zoo
 from lv.deps import alexnet, resnet152
@@ -114,7 +114,7 @@ class ModelConfig(zoo.ModelConfig):
         self.dissection = dissection or ModelDissectionConfig()
 
 
-Model = Tuple[nn.Module, Iterable[Layer], ModelConfig]
+Model = Tuple[nn.Module, Sequence[Layer], ModelConfig]
 ModelConfigs = Mapping[str, Mapping[str, ModelConfig]]
 
 

@@ -3,7 +3,7 @@ import dataclasses
 import pathlib
 import tempfile
 import zipfile
-from typing import (Any, Callable, Iterable, Mapping, Optional, OrderedDict,
+from typing import (Any, Callable, Mapping, Optional, OrderedDict, Sequence,
                     Tuple)
 
 from lv.utils.typing import Device, Layer, PathLike
@@ -28,7 +28,7 @@ class ModelConfig:
 
     def __init__(self,
                  factory: ModelFactory,
-                 layers: Optional[Iterable[Layer]] = None,
+                 layers: Optional[Sequence[Layer]] = None,
                  url: Optional[str] = None,
                  requires_path: bool = False,
                  load_weights: bool = True,
@@ -41,7 +41,7 @@ class ModelConfig:
         Args:
             factory (ModelFactory): Factory function that
                 creates a model from arbitrary keyword arguments.
-            layers (Optional[Iterable[Layer]], optional): Layers to return
+            layers (Optional[Sequence[Layer]], optional): Layers to return
                 when model is instantiated. By default, set to the keys
                 returned by `model.named_children()`.
             url (Optional[str], optional): URL hosting pretrained weights.
@@ -74,7 +74,7 @@ class ModelConfig:
              factory: Optional[ModelFactory] = None,
              load_weights: Optional[bool] = None,
              map_location: Optional[Device] = None,
-             **kwargs: Any) -> Tuple[nn.Module, Iterable[Layer]]:
+             **kwargs: Any) -> Tuple[nn.Module, Sequence[Layer]]:
         """Load the model from the given path.
 
         Args:
@@ -91,7 +91,7 @@ class ModelConfig:
                 time. Defaults to None.
 
         Returns:
-            Tuple[nn.Module, Iterable[Layer]]: The loaded model.
+            Tuple[nn.Module, Sequence[Layer]]: The loaded model.
 
         """
         if path is None and self.requires_path:

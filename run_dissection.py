@@ -10,7 +10,13 @@ from torch import cuda
 parser = argparse.ArgumentParser(description='dissect a vision model')
 parser.add_argument('model', help='model architecture')
 parser.add_argument('dataset', help='dataset model is trained on')
-parser.add_argument('--layers', nargs='+', help='layers to dissect')
+parser_ex = parser.add_mutually_exclusive_group()
+parser.add_argument('--layer-names', nargs='+', help='layer names to dissect')
+parser.add_argument(
+    '--layer-indices',
+    type=int,
+    nargs='+',
+    help='layer indices to dissect; cannot be used with --layers')
 parser.add_argument('--units',
                     type=int,
                     help='only dissect the first n units (default: all)')
@@ -45,7 +51,10 @@ if isinstance(config.dissection, zoo.GenerativeModelDissectionConfig):
 
 dataset = zoo.dataset(dataset, path=args.dataset_path)
 
-layers = args.layers or layers
+if args.layer_names:
+    layers = args.layer_names
+elif args.layer_indices:
+    layers = [layers[index] for index in args.layer_indices]
 assert layers is not None, 'should always be >= 1 layer'
 
 units = None
