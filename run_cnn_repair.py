@@ -16,44 +16,32 @@ import torch
 import wandb
 from torch import cuda
 
-EXPERIMENTS = (
-    zoo.KEY_SPURIOUS_IMAGENET,
-    # TODO(evandez): Figure out what to do with this one.
-    # zoo.KEY_SPURIOUS_PLACES365,
-)
+EXPERIMENTS = (zoo.KEY_SPURIOUS_IMAGENET_TEXT,)
+
 VERSIONS = (
     # 'original',
-    'spurious-5',
-    'spurious-10',
-    'spurious-25',
-    # 'spurious-50',
-    # 'spurious-100',
+    '5%',
+    '10%',
+    '25%',
+    # '50%',
+    # '100%',
 )
 
 CONDITION_TEXT = 'ablate-text'
 CONDITION_RANDOM = 'ablate-random'
 CONDITIONS = (CONDITION_TEXT, CONDITION_RANDOM)
 
-ANNOTATIONS = (
-    lv.zoo.KEY_ALEXNET_IMAGENET,
-    lv.zoo.KEY_ALEXNET_PLACES365,
-    lv.zoo.KEY_RESNET152_IMAGENET,
-    lv.zoo.KEY_RESNET152_PLACES365,
-    lv.zoo.KEY_BIGGAN_IMAGENET,
-    lv.zoo.KEY_BIGGAN_PLACES365,
-)
-
-parser = argparse.ArgumentParser(description='train a cnn on spurious data')
+parser = argparse.ArgumentParser(description='fix a cnn trained on bad data')
 parser.add_argument('--experiments',
                     choices=EXPERIMENTS,
                     default=EXPERIMENTS,
                     nargs='+',
-                    help='train one model for each of these datasets')
+                    help='dataset to experiment with (default: all)')
 parser.add_argument('--versions',
                     choices=VERSIONS,
                     default=VERSIONS,
                     nargs='+',
-                    help='version(s) of each dataset to use')
+                    help='versions of dataset to try (default: all)')
 parser.add_argument('--conditions',
                     choices=CONDITIONS,
                     default=CONDITIONS,
@@ -63,17 +51,19 @@ parser.add_argument('--cnn',
                     choices=(lv.zoo.KEY_ALEXNET, zoo.KEY_RESNET18),
                     default=zoo.KEY_RESNET18,
                     help='cnn architecture to repair')
+parser.add_argument('--captioner',
+                    nargs=2,
+                    default=(lv.zoo.KEY_CAPTIONER_RESNET101, lv.zoo.KEY_ALL),
+                    help='captioner model (default: captioner-resnet101 all)')
 parser.add_argument(
     '--n-random-trials',
     type=int,
     default=5,
     help='for each experiment, delete an equal number of random '
     'neurons and retest this many times (default: 5)')
-parser.add_argument('--annotations',
-                    choices=ANNOTATIONS,
-                    default=ANNOTATIONS,
-                    nargs='+',
-                    help='annotations to train captioner on (default: all)')
+parser.add_argument('--captioner-file',
+                    type=pathlib.Path,
+                    help='captioner weights file (default: loaded from zoo)')
 parser.add_argument('--data-dir',
                     type=pathlib.Path,
                     help='root dir for datasets (default: project data dir)')
@@ -154,14 +144,15 @@ if args.clear_results_dir and results_dir.exists():
     shutil.rmtree(results_dir)
 results_dir.mkdir(exist_ok=True, parents=True)
 
-# Before diving into experiments, train a captioner on all the data.
-# TODO(evandez): Use a pretrained captioner.
-annotations = lv.zoo.datasets(*args.annotations, path=data_dir)
-encoder = models.encoder().to(device)
-decoder = models.decoder(annotations, encoder).to(device)
-decoder.fit(annotations,
-            display_progress_as=f'train {args.captioner}',
-            device=device)
+# Load the captioner.
+captioner_model, captioner_dataset = args.captioner
+decoder, _ = lv.zoo.model(captioner_model,
+                          captioner_dataset,
+                          path=args.captioner_file)
+decoder.to(device)
+encoder = decoder.encoder
+assert isinstance(decoder, models.Decoder)
+assert isinstance(encoder, models.Encoder)
 
 # Now that we have the captioner, we can start the experiments.
 for experiment in args.experiments:

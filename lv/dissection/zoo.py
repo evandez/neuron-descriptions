@@ -26,8 +26,7 @@ DISSECT_HOST = 'https://dissect.csail.mit.edu/models'
 KEY_RESNET18 = 'resnet18'
 KEY_VGG_16 = 'vgg16'
 
-KEY_SPURIOUS_IMAGENET = 'spurious-imagenet'
-KEY_SPURIOUS_PLACES365 = 'spurious-places365'
+KEY_SPURIOUS_IMAGENET_TEXT = 'spurious-imagenet-text'
 
 KEY_RESNET18_IMAGENET = f'{KEY_RESNET18}/{KEY_IMAGENET}'
 KEY_RESNET18_PLACES365 = f'{KEY_RESNET18}/{KEY_PLACES365}'
@@ -220,14 +219,7 @@ def dissection_datasets() -> zoo.DatasetConfigs:
                                   transforms.ToTensor(),
                                   renormalize.NORMALIZER['imagenet'],
                               ])),
-        KEY_SPURIOUS_IMAGENET:
-            zoo.DatasetConfig(datasets.ImageFolder,
-                              transform=transforms.Compose([
-                                  transforms.Resize((224, 224)),
-                                  transforms.ToTensor(),
-                                  renormalize.NORMALIZER['imagenet']
-                              ])),
-        KEY_SPURIOUS_PLACES365:
+        KEY_SPURIOUS_IMAGENET_TEXT:
             zoo.DatasetConfig(datasets.ImageFolder,
                               transform=transforms.Compose([
                                   transforms.Resize((224, 224)),

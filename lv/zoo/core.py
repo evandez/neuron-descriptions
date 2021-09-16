@@ -124,7 +124,7 @@ class ModelConfig:
 
             model.load_state_dict(state_dict)
 
-        return model
+        return model.eval()
 
 
 ModelConfigs = Mapping[str, Mapping[str, ModelConfig]]
