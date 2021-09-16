@@ -63,6 +63,9 @@ parser.add_argument(
     default=5,
     help='for each experiment, delete an equal number of random '
     'neurons and retest this many times (default: 5)')
+parser.add_argument('--fine-tune',
+                    action='store_true',
+                    help='fine tune last fully-connected cnn layers')
 parser.add_argument('--captioner-file',
                     type=pathlib.Path,
                     help='captioner weights file (default: loaded from zoo)')
@@ -136,6 +139,7 @@ wandb.init(project=args.wandb_project,
                'captioner': '/'.join(args.captioner),
                'cnn': args.cnn,
                'n_random_trials': args.n_random_trials,
+               'fine_tune': bool(args.fine_tune),
            })
 
 device = args.device or 'cuda' if cuda.is_available() else 'cpu'
@@ -228,17 +232,19 @@ for experiment in args.experiments:
                 for fraction in fractions:
                     ablated = indices[:int(fraction * len(indices))]
                     copied = copy.deepcopy(cnn)
-                    copied.fit(train,
-                               hold_out=val.indices,
-                               batch_size=args.batch_size,
-                               max_epochs=args.epochs,
-                               patience=args.patience,
-                               optimizer_kwargs={'lr': args.lr},
-                               ablate=dissected.units(ablated),
-                               layers=['fc'] if args.cnn == zoo.KEY_RESNET18
-                               else ['fc6', 'fc7', 'linear8'],
-                               device=device,
-                               display_progress_as=f'fine tune {args.cnn}')
+                    if args.fine_tune:
+                        copied.fit(
+                            train,
+                            hold_out=val.indices,
+                            batch_size=args.batch_size,
+                            max_epochs=args.epochs,
+                            patience=args.patience,
+                            optimizer_kwargs={'lr': args.lr},
+                            ablate=dissected.units(ablated),
+                            layers=['fc'] if args.cnn == zoo.KEY_RESNET18 else
+                            ['fc6', 'fc7', 'linear8'],
+                            device=device,
+                            display_progress_as=f'fine tune {args.cnn}')
                     accuracy = copied.accuracy(
                         test,
                         ablate=dissected.units(ablated),
