@@ -9,8 +9,6 @@ from torch import nn
 from torch.utils import data
 import pytest
 
-LAYER = 'my-layer'
-
 
 class FakeModelConfig:
     """A fake model config object."""
@@ -25,7 +23,7 @@ class FakeModelConfig:
         """Fake load that just assert args and kwargs are correct."""
         assert args == self.args
         assert kwargs == self.kwargs
-        return self.model, [LAYER]
+        return self.model
 
 
 class DangerConfig:
@@ -73,11 +71,10 @@ def test_model(model, model_path):
                             source=source,
                             flag=True)
 
-    assert len(actuals) == 3
+    assert len(actuals) == 2
 
-    actual_model, actual_layers, actual_config = actuals
+    actual_model, actual_config = actuals
     assert actual_model is model
-    assert actual_layers == [LAYER]
     assert actual_config is expected
 
 
@@ -98,11 +95,10 @@ def test_model_no_path(model, model_path):
     }
     actuals = loaders.model(MODEL, DATASET, source=source, flag=True)
 
-    assert len(actuals) == 3
+    assert len(actuals) == 2
 
-    actual_model, actual_layers, actual_config = actuals
+    actual_model, actual_config = actuals
     assert actual_model is model
-    assert actual_layers == [LAYER]
     assert actual_config is expected
 
 

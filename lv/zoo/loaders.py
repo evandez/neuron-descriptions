@@ -1,15 +1,15 @@
 """Functions for loading models/datasets by name."""
 import pathlib
-from typing import Any, Mapping, Optional, Sequence, Tuple
+from typing import Any, Mapping, Optional, Tuple
 
 from lv.utils import env
-from lv.utils.typing import Layer, PathLike
+from lv.utils.typing import PathLike
 from lv.zoo import configs, core
 
 from torch import nn
 from torch.utils import data
 
-Model = Tuple[nn.Module, Sequence[Layer], core.ModelConfig]
+Model = Tuple[nn.Module, core.ModelConfig]
 
 
 def model(name: str,
@@ -35,7 +35,7 @@ def model(name: str,
             weights for the given dataset.
 
     Returns:
-        Model: The loaded model along with its layers.
+        Model: The loaded model and its config.
 
     """
     if source is None:
@@ -49,8 +49,8 @@ def model(name: str,
     if path is None:
         path = env.models_dir() / f'{name}-{dataset}.pth'
 
-    model, layers = config.load(path, **kwargs)
-    return model, layers, config
+    model = config.load(path, **kwargs)
+    return model, config
 
 
 def dataset(name: str,

@@ -3,10 +3,9 @@ import dataclasses
 import pathlib
 import tempfile
 import zipfile
-from typing import (Any, Callable, Mapping, Optional, OrderedDict, Sequence,
-                    Tuple)
+from typing import Any, Callable, Mapping, Optional, OrderedDict
 
-from lv.utils.typing import Device, Layer, PathLike
+from lv.utils.typing import Device, PathLike
 
 import torch
 from torch import hub, nn
@@ -28,7 +27,6 @@ class ModelConfig:
 
     def __init__(self,
                  factory: ModelFactory,
-                 layers: Optional[Sequence[Layer]] = None,
                  url: Optional[str] = None,
                  requires_path: bool = False,
                  load_weights: bool = True,
@@ -41,9 +39,6 @@ class ModelConfig:
         Args:
             factory (ModelFactory): Factory function that
                 creates a model from arbitrary keyword arguments.
-            layers (Optional[Sequence[Layer]], optional): Layers to return
-                when model is instantiated. By default, set to the keys
-                returned by `model.named_children()`.
             url (Optional[str], optional): URL hosting pretrained weights.
                 If set and path provided to `load` does not exist, weights
                 will be downloaded. Defaults to None.
@@ -64,7 +59,6 @@ class ModelConfig:
         self.defaults = defaults
 
         self.url = url
-        self.layers = layers
         self.requires_path = requires_path
         self.load_weights = load_weights
         self.transform_weights = transform_weights
@@ -74,7 +68,7 @@ class ModelConfig:
              factory: Optional[ModelFactory] = None,
              load_weights: Optional[bool] = None,
              map_location: Optional[Device] = None,
-             **kwargs: Any) -> Tuple[nn.Module, Sequence[Layer]]:
+             **kwargs: Any) -> nn.Module:
         """Load the model from the given path.
 
         Args:
@@ -91,7 +85,7 @@ class ModelConfig:
                 time. Defaults to None.
 
         Returns:
-            Tuple[nn.Module, Sequence[Layer]]: The loaded model.
+            nn.Module: The loaded model.
 
         """
         if path is None and self.requires_path:
@@ -130,12 +124,7 @@ class ModelConfig:
 
             model.load_state_dict(state_dict)
 
-        # Determine what layers the model has.
-        layers = self.layers
-        if layers is None:
-            layers = [key for key, _ in model.named_children()]
-
-        return model, layers
+        return model
 
 
 ModelConfigs = Mapping[str, Mapping[str, ModelConfig]]

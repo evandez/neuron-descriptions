@@ -10,15 +10,14 @@ import torch
 from torch import nn
 from torch.utils import data
 
-LAYER = 'my-layer'
-
 
 class Model(nn.Sequential):
     """A fake model that does not do very much."""
 
     def __init__(self, *args, flag=False):
         """Initialize the model."""
-        super().__init__(collections.OrderedDict([(LAYER, nn.Linear(10, 10))]))
+        super().__init__(
+            collections.OrderedDict([('layer', nn.Linear(10, 10))]))
         self.args = args
         self.flag = flag
 
@@ -46,11 +45,10 @@ def model_config():
 
 def test_model_config_load(model_config, weights_file, weights):
     """Test ModelConfig.load in the basic case."""
-    model, layers = model_config.load(path=weights_file)
+    model = model_config.load(path=weights_file)
 
     assert not model.args
     assert model.flag
-    assert tuple(layers) == (LAYER,)
 
     state_dict = model.state_dict()
     assert state_dict.keys() == weights.keys()
@@ -64,11 +62,10 @@ def test_model_config_load_requires_path(weights_file, weights):
     model_config = core.ModelConfig(factory=Model,
                                     requires_path=True,
                                     flag=True)
-    model, layers = model_config.load(path=weights_file)
+    model = model_config.load(path=weights_file)
 
     assert model.args == (weights_file,)
     assert model.flag
-    assert tuple(layers) == (LAYER,)
 
     state_dict = model.state_dict()
     assert state_dict.keys() == weights.keys()
@@ -77,18 +74,13 @@ def test_model_config_load_requires_path(weights_file, weights):
         assert state_dict[key].allclose(weights[key], atol=1e-3)
 
 
-OTHER_LAYER = 'other-layer'
-
-
 def test_model_config_load_overwrite_defaults(model_config, weights_file,
                                               weights):
     """Test ModelConfig.load overwrites defaults."""
-    model_config.layers = [OTHER_LAYER]
-    model, layers = model_config.load(path=weights_file, flag=False)
+    model = model_config.load(path=weights_file, flag=False)
 
     assert not model.args
     assert not model.flag
-    assert tuple(layers) == (OTHER_LAYER,)
 
     state_dict = model.state_dict()
     assert state_dict.keys() == weights.keys()
@@ -101,11 +93,10 @@ def test_model_config_load_no_load_weights(model_config, weights_file,
                                            weights):
     """Test ModelConfig.load does not load weights when told not to."""
     model_config.load_weights = False
-    model, layers = model_config.load(path=weights_file)
+    model = model_config.load(path=weights_file)
 
     assert not model.args
     assert model.flag
-    assert tuple(layers) == (LAYER,)
 
     state_dict = model.state_dict()
     assert state_dict.keys() == weights.keys()
@@ -119,11 +110,10 @@ def test_model_config_load_transform_weights(model_config, weights_file,
     """Test ModelConfig.load does not load weights when told not to."""
     model_config.transform_weights = lambda state_dict:\
         {key: torch.zeros_like(tensor) for key, tensor in state_dict.items()}
-    model, layers = model_config.load(path=weights_file,)
+    model = model_config.load(path=weights_file,)
 
     assert not model.args
     assert model.flag
-    assert tuple(layers) == (LAYER,)
 
     state_dict = model.state_dict()
     assert state_dict.keys() == weights.keys()
