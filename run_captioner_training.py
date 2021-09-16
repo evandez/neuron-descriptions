@@ -5,7 +5,6 @@ import shutil
 from typing import Optional
 
 from lv import models, zoo
-from lv.models import decoders
 from lv.utils import env, training
 
 import torch
@@ -35,10 +34,6 @@ parser.add_argument('--encoder',
 parser.add_argument('--no-lm',
                     action='store_true',
                     help='do not train lm (default: train lm)')
-parser.add_argument(
-    '--default-strategy',
-    choices=decoders.STRATEGIES,
-    help='default decoding strategy (default: rerank if lm, otherwise beam)')
 parser.add_argument('--precompute-features',
                     action='store_true',
                     help='precompute image features (default: do not)')
@@ -104,12 +99,7 @@ if captioner_file.exists():
     decoder = models.Decoder.load(captioner_file, map_location=device)
     decoder.eval()
 else:
-    decoder = models.decoder(
-        dataset,
-        encoder,
-        lm=lm,
-        strategy=args.default_strategy or decoders.STRATEGY_BEAM
-        if args.no_lm else decoders.STRATEGY_RERANK)
+    decoder = models.decoder(dataset, encoder, lm=lm)
     decoder.fit(dataset,
                 features=features,
                 hold_out=val.indices,
