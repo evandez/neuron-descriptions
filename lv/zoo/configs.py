@@ -94,7 +94,8 @@ def models() -> core.ModelConfigs:
         KEY_CAPTIONER_RESNET101: {
             dataset: core.ModelConfig(
                 lv.models.Decoder.load,
-                url=f'{HOST}/models/captioner-resnet101-{dataset}.pth',
+                url=f'{HOST}/models/captioner-resnet101-'
+                f'{dataset.replace("/", "_")}.pth',
                 requires_path=True,
                 load_weights=False,
             ) for dataset in DATASET_GROUPINGS.keys()
