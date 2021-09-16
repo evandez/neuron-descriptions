@@ -249,7 +249,7 @@ for dataset_name in args.datasets:
         else:
             assert args.captions == CAPTIONS_LEARNED
             train = lv.zoo.datasets(*TRAIN[cnn_name], path=data_dir)
-            encoder = models.encoder(config='resnet50').to(device)
+            encoder = models.encoder().to(device)
             decoder = models.decoder(train, encoder).to(device)
             decoder.fit(train, device=device)
             decoder.eval()

@@ -157,7 +157,7 @@ results_dir.mkdir(exist_ok=True, parents=True)
 # Before diving into experiments, train a captioner on all the data.
 # TODO(evandez): Use a pretrained captioner.
 annotations = lv.zoo.datasets(*args.annotations, path=data_dir)
-encoder = models.encoder(config='resnet50').to(device)
+encoder = models.encoder().to(device)
 decoder = models.decoder(annotations, encoder).to(device)
 decoder.fit(annotations,
             display_progress_as=f'train {args.captioner}',

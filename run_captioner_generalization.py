@@ -152,7 +152,7 @@ bert_scorer = bert_score.BERTScorer(lang='en',
                                     device=device)
 
 # Load encoder.
-encoder = models.encoder(config='resnet50').to(device)
+encoder = models.encoder().to(device)
 
 # Start experiments.
 for experiment in args.experiments or EXPERIMENTS.keys():
