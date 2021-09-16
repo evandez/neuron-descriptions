@@ -369,6 +369,8 @@ class Decoder(serialize.SerializableModule):
         if mi is None:
             mi = self.lm is not None and not self.training
             mi &= not isinstance(strategy, str) or strategy != STRATEGY_RERANK
+        if temperature is None:
+            temperature = self.temperature
         if beam_size is None:
             beam_size = self.beam_size
         batch_size = len(images_or_features)
