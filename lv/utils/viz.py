@@ -94,11 +94,9 @@ def random_wandb_images(
     Args:
         dataset (data.Dataset): The dataset.
         sample_to_image (Callable[[int, Any], Image.Image]): Function that maps
-            dataset index and sample to a PIL image. By default, tries to
-            call `sample.as_pil_image_grid()` to be compatible with
-            TopImagesDataset and its variants.
+            dataset index and sample to a PIL image.
         sample_to_caption (Callable[[int, Any], str]): Function that maps
-            dataset index and sample to caption. Defaults to None.
+            dataset index and sample to caption.
         indices (Optional[Sequence[int]], optional): Indices to sample from.
             By default, uses all indices.
         k (int, optional): Number of samples. Defaults to 25.
