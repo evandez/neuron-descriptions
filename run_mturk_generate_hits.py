@@ -42,7 +42,7 @@ base_url = f'{args.host_url.strip("/")}/{args.dataset}'
 def generate_urls(layer: Layer, unit: int, k: int) -> Sequence[str]:
     """Generate top image URLs."""
     return [
-        f'{base_url}/{layer}/viz/unit_{unit}/image_{index}.png'
+        f'{base_url}/{layer}/unit_{unit}/image_{index}.png'
         for index in range(k)
     ]
 
