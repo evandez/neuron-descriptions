@@ -114,6 +114,10 @@ parser.add_argument(
     type=float,
     default=.1,
     help='fraction of additional neurons to ablate at each step (default: .1)')
+parser.add_argument('--num-workers',
+                    type=int,
+                    default=32,
+                    help='workers for loading data (default: 32)')
 parser.add_argument('--device', help='manually set device (default: guessed)')
 parser.add_argument('--wandb-project',
                     default='lv',
@@ -175,11 +179,9 @@ for experiment in args.experiments:
 
         # Start by training the classifier on spurious data.
         dataset = zoo.dataset(experiment,
-                              path=data_dir / experiment / version / 'train',
-                              factory=training.PreloadedImageFolder)
+                              path=data_dir / experiment / version / 'train')
         test = zoo.dataset(experiment,
-                           path=data_dir / experiment / version / 'test',
-                           factory=training.PreloadedImageFolder)
+                           path=data_dir / experiment / version / 'test')
         train, val = training.random_split(dataset, hold_out=args.hold_out)
 
         cnn, layers, config = zoo.model(args.cnn,
@@ -199,6 +201,7 @@ for experiment in args.experiments:
                     max_epochs=args.epochs,
                     patience=args.patience,
                     optimizer_kwargs={'lr': args.lr},
+                    num_workers=args.num_workers,
                     device=device,
                     display_progress_as=f'train {args.cnn}')
             print(f'saving trained {args.cnn} to {cnn_file}')
@@ -215,6 +218,7 @@ for experiment in args.experiments:
                 results_dir=dissection_dir,
                 tally_cache_file=dissection_dir / layer / 'tally.npz',
                 masks_cache_file=dissection_dir / layer / 'masks.npz',
+                num_workers=args.num_workers,
                 device=device,
                 **config.dissection.kwargs,
             )
@@ -256,6 +260,7 @@ for experiment in args.experiments:
                             ablate=dissected.units(ablated),
                             layers=['fc'] if args.cnn == zoo.KEY_RESNET18 else
                             ['fc6', 'fc7', 'linear8'],
+                            num_workers=args.num_workers,
                             device=device,
                             display_progress_as=f'fine tune {args.cnn} '
                             f'(cond={condition}, tri={trial} frac={fraction})')
@@ -266,6 +271,7 @@ for experiment in args.experiments:
                         f'(cond={condition}, '
                         f'tri={trial + 1}, '
                         f'frac={fraction})',
+                        num_workers=args.num_workers,
                         device=device,
                     )
                     samples = viz.random_neuron_wandb_images(
