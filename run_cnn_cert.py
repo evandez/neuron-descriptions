@@ -199,13 +199,13 @@ for experiment in args.experiments:
                    experiment_dir / f'{args.cnn}-{version}.pth')
 
         # Now that we have the trained model, dissect it on the validation set.
-        dissection_root = experiment_dir / version / args.cnn
+        dissection_dir = experiment_dir / f'{args.cnn}-{version}'
         for layer in layers:
             dissect.discriminative(
-                cnn,
+                cnn.model,
                 val,
                 layer=layer,
-                results_dir=dissection_root,
+                results_dir=dissection_dir,
                 clear_results_dir=True,
                 device=device,
                 # TODO(evandez): Remove need for these arguments...
@@ -213,7 +213,7 @@ for experiment in args.experiments:
                 renormalizer=renormalize.renormalizer(source='imagenet',
                                                       target='byte'),
             )
-        dissected = datasets.TopImagesDataset(dissection_root)
+        dissected = datasets.TopImagesDataset(dissection_dir)
         captions = decoder.predict(dissected, device=device)
         texts = [
             index for index, caption in enumerate(captions)
