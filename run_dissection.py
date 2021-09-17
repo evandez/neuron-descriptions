@@ -11,8 +11,10 @@ parser = argparse.ArgumentParser(description='dissect a vision model')
 parser.add_argument('model', help='model architecture')
 parser.add_argument('dataset', help='dataset model is trained on')
 parser_ex = parser.add_mutually_exclusive_group()
-parser.add_argument('--layer-names', nargs='+', help='layer names to dissect')
-parser.add_argument(
+parser_ex.add_argument('--layer-names',
+                       nargs='+',
+                       help='layer names to dissect')
+parser_ex.add_argument(
     '--layer-indices',
     type=int,
     nargs='+',
