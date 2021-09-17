@@ -230,7 +230,11 @@ for experiment in args.experiments:
                 captions = handle.read().split('\n')
             assert len(captions) == len(dissected)
         else:
-            captions = decoder.predict(dissected, device=device)
+            captions = decoder.predict(dissected,
+                                       strategy='rerank',
+                                       temperature=.5,
+                                       beam_size=50,
+                                       device=device)
             print(f'saving captions to {captions_file}')
             with captions_file.open('w') as handle:
                 handle.write('\n'.join(captions))
