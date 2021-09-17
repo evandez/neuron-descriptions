@@ -134,17 +134,17 @@ def dissection_models() -> ModelConfigs:
         },
         KEY_RESNET18: {
             KEY_IMAGENET:
-                ModelConfig(models.resnet18_seq,
-                            pretrained=True,
-                            load_weights=False,
-                            layers=LAYERS_RESNET18),
-            KEY_PLACES365:
                 ModelConfig(
                     models.resnet18_seq,
-                    num_classes=365,
-                    url=f'{LV_HOST}/resnet18-places365.pth',
-                    transform_weights=lambda weights: weights['state_dict'],
-                    layers=LAYERS_RESNET18),
+                    pretrained=True,
+                    load_weights=False,
+                    layers=LAYERS_RESNET18,
+                    dissection=DiscriminativeModelDissectionConfig(
+                        image_size=224,
+                        renormalizer=renormalize.renormalizer(
+                            source='imagenet', target='byte'),
+                    ),
+                ),
         },
         KEY_RESNET152: {
             KEY_IMAGENET:

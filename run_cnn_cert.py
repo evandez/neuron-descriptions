@@ -7,7 +7,6 @@ import shutil
 
 import lv.zoo
 from lv import datasets, models
-from lv.deps.netdissect import renormalize
 from lv.dissection import dissect, zoo
 from lv.utils import env, training, viz
 
@@ -183,35 +182,41 @@ for experiment in args.experiments:
                            factory=training.PreloadedImageFolder)
         train, val = training.random_split(dataset, hold_out=args.hold_out)
 
-        cnn, layers, _ = zoo.model(args.cnn,
-                                   zoo.KEY_IMAGENET,
-                                   pretrained=False)
+        cnn, layers, config = zoo.model(args.cnn,
+                                        zoo.KEY_IMAGENET,
+                                        pretrained=False)
         cnn = models.classifier(cnn).to(device)
-        cnn.fit(dataset,
-                hold_out=val.indices,
-                batch_size=args.batch_size,
-                max_epochs=args.epochs,
-                patience=args.patience,
-                optimizer_kwargs={'lr': args.lr},
-                device=device,
-                display_progress_as=f'train {args.cnn}')
-        torch.save(cnn.state_dict(),
-                   experiment_dir / f'{args.cnn}-{version}.pth')
+
+        cnn_file = experiment_dir / f'{args.cnn}-{version}.pth'
+        if cnn_file.exists():
+            print(f'loading trained {args.cnn} from {cnn_file}')
+            state_dict = torch.load(cnn_file, map_location=device)
+            cnn.load_state_dict(state_dict)
+        else:
+            cnn.fit(dataset,
+                    hold_out=val.indices,
+                    batch_size=args.batch_size,
+                    max_epochs=args.epochs,
+                    patience=args.patience,
+                    optimizer_kwargs={'lr': args.lr},
+                    device=device,
+                    display_progress_as=f'train {args.cnn}')
+            print(f'saving trained {args.cnn} to {cnn_file}')
+            torch.save(cnn.state_dict(), cnn_file)
 
         # Now that we have the trained model, dissect it on the validation set.
         dissection_dir = experiment_dir / f'{args.cnn}-{version}'
         for layer in layers:
+            print(f'dissection layer {layer}')
             dissect.discriminative(
                 cnn.model,
                 val,
                 layer=layer,
                 results_dir=dissection_dir,
-                clear_results_dir=True,
+                tally_cache_file=dissection_dir / layer / 'tally.npz',
+                masks_cache_file=dissection_dir / layer / 'masks.npz',
                 device=device,
-                # TODO(evandez): Remove need for these arguments...
-                image_size=224,
-                renormalizer=renormalize.renormalizer(source='imagenet',
-                                                      target='byte'),
+                **config.dissection.kwargs,
             )
         dissected = datasets.TopImagesDataset(dissection_dir)
         captions = decoder.predict(dissected, device=device)
@@ -252,15 +257,14 @@ for experiment in args.experiments:
                             layers=['fc'] if args.cnn == zoo.KEY_RESNET18 else
                             ['fc6', 'fc7', 'linear8'],
                             device=device,
-                            display_progress_as=f'fine tune {args.cnn}')
+                            display_progress_as=f'fine tune {args.cnn} '
+                            f'(cond={condition}, tri={trial} frac={fraction})')
                     accuracy = copied.accuracy(
                         test,
                         ablate=dissected.units(ablated),
                         display_progress_as=f'test ablated {args.cnn} '
-                        f'(exp={experiment}, '
-                        f'ver={version}, '
-                        f'cond={condition}, '
-                        f'trial={trial + 1}, '
+                        f'(cond={condition}, '
+                        f'tri={trial + 1}, '
                         f'frac={fraction})',
                         device=device,
                     )
