@@ -227,13 +227,13 @@ for experiment in args.experiments:
         if captions_file.exists():
             print(f'loading cached captions from {captions_file}')
             with captions_file.open('r') as handle:
-                captions = handle.readlines()
+                captions = handle.read().split('\n')
             assert len(captions) == len(dissected)
         else:
             captions = decoder.predict(dissected, device=device)
             print(f'saving captions to {captions_file}')
             with captions_file.open('w') as handle:
-                handle.writelines(captions)
+                handle.write('\n'.join(captions))
 
         text_neuron_indices = [
             index for index, caption in enumerate(captions)
