@@ -236,7 +236,7 @@ for experiment in args.experiments:
             else:
                 trials = 1
 
-            for trial in range(trials):
+            for trial in range(1, trials + 1):
                 if condition == CONDITION_TEXT:
                     indices = texts
                 else:
@@ -263,15 +263,16 @@ for experiment in args.experiments:
                             num_workers=args.num_workers,
                             device=device,
                             display_progress_as=f'fine tune {args.cnn} '
-                            f'(cond={condition}, tri={trial} frac={fraction})')
+                            f'(cond={condition}, t={trial}, f={fraction:.2f})')
                     accuracy = copied.accuracy(
                         test,
                         ablate=dissected.units(ablated),
                         display_progress_as=f'test ablated {args.cnn} '
                         f'(cond={condition}, '
-                        f'tri={trial + 1}, '
-                        f'frac={fraction})',
-                        num_workers=args.num_workers,
+                        f't={trial}, '
+                        f'f={fraction:.2f})',
+                        # TODO(evandez): This causes a bunch of warnings...
+                        # num_workers=args.num_workers,
                         device=device,
                     )
                     samples = viz.random_neuron_wandb_images(
@@ -293,3 +294,6 @@ for experiment in args.experiments:
                         'accuracy': accuracy,
                         'samples': samples,
                     })
+                    print(f'experiment={experiment}', f'version={version}',
+                          f'condition={condition}', f'trial={trial}',
+                          f'fraction={fraction:.2f}', f'accuracy={accuracy}')
