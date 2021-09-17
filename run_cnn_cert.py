@@ -222,8 +222,20 @@ for experiment in args.experiments:
                 **config.dissection.kwargs,
             )
         dissected = datasets.TopImagesDataset(dissection_dir)
-        captions = decoder.predict(dissected, device=device)
-        texts = [
+
+        captions_file = experiment_dir / f'{args.cnn}-{version}-captions.txt'
+        if captions_file.exists():
+            print(f'loading cached captions from {captions_file}')
+            with captions_file.open('r') as handle:
+                captions = handle.readlines()
+            assert len(captions) == len(dissected)
+        else:
+            captions = decoder.predict(dissected, device=device)
+            print(f'saving captions to {captions_file}')
+            with captions_file.open('w') as handle:
+                handle.writelines(captions)
+
+        text_neuron_indices = [
             index for index, caption in enumerate(captions)
             if 'text' in caption
         ]
@@ -237,16 +249,16 @@ for experiment in args.experiments:
 
             for trial in range(1, trials + 1):
                 if condition == CONDITION_TEXT:
-                    indices = texts
+                    indices = text_neuron_indices
                 else:
                     assert condition == CONDITION_RANDOM
                     indices = random.sample(range(len(dissected)),
-                                            k=len(texts))
+                                            k=len(text_neuron_indices))
 
                 fractions = numpy.arange(args.ablation_min, args.ablation_max,
                                          args.ablation_step_size)
                 for fraction in fractions:
-                    ablated = indices[:int(fraction * len(indices))]
+                    ablated_indices = indices[:int(fraction * len(indices))]
                     copied = copy.deepcopy(cnn)
                     if args.fine_tune:
                         copied.fit(
@@ -256,7 +268,7 @@ for experiment in args.experiments:
                             max_epochs=args.epochs,
                             patience=args.patience,
                             optimizer_kwargs={'lr': args.lr},
-                            ablate=dissected.units(ablated),
+                            ablate=dissected.units(ablated_indices),
                             layers=['fc'] if args.cnn == zoo.KEY_RESNET18 else
                             ['fc6', 'fc7', 'linear8'],
                             num_workers=args.num_workers,
@@ -265,7 +277,7 @@ for experiment in args.experiments:
                             f'(cond={condition}, t={trial}, f={fraction:.2f})')
                     accuracy = copied.accuracy(
                         test,
-                        ablate=dissected.units(ablated),
+                        ablate=dissected.units(ablated_indices),
                         display_progress_as=f'test ablated {args.cnn} '
                         f'(cond={condition}, '
                         f't={trial}, '
@@ -277,7 +289,7 @@ for experiment in args.experiments:
                     samples = viz.random_neuron_wandb_images(
                         dissected,
                         captions,
-                        indices=ablated,
+                        indices=ablated_indices,
                         k=args.wandb_n_samples,
                         exp=experiment,
                         ver=version,
@@ -289,7 +301,7 @@ for experiment in args.experiments:
                         'condition': condition,
                         'trial': trial,
                         'frac_ablated': fraction,
-                        'n_ablated': len(ablated),
+                        'n_ablated': len(ablated_indices),
                         'accuracy': accuracy,
                         'samples': samples,
                     })
