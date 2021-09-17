@@ -38,7 +38,6 @@ if not isinstance(dataset, datasets.TopImagesDataset):
 base_url = f'{args.host_url.strip("/")}/{args.dataset}'
 
 
-# TODO(evandez): Fix how URL is generated; should be no viz subdir.
 def generate_urls(layer: Layer, unit: int, k: int) -> Sequence[str]:
     """Generate top image URLs."""
     return [
