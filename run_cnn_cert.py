@@ -122,9 +122,7 @@ parser.add_argument('--device', help='manually set device (default: guessed)')
 parser.add_argument('--wandb-project',
                     default='lv',
                     help='wandb project name (default: lv)')
-parser.add_argument('--wandb-name',
-                    default='cnn-cert',
-                    help='wandb run name (default: cnn-cert)')
+parser.add_argument('--wandb-name', help='wandb run name (default: generated)')
 parser.add_argument('--wandb-group',
                     default='applications',
                     help='wandb group name (default: applications)')
@@ -134,8 +132,12 @@ parser.add_argument('--wandb-n-samples',
                     help='number of samples to upload for each model')
 args = parser.parse_args()
 
+run_key = f'cnn-cert-r{args.n_random_trials}'
+if args.fine_tune:
+    run_key += '-ft'
+
 wandb.init(project=args.wandb_project,
-           name=args.wandb_name,
+           name=args.wandb_name or run_key,
            group=args.wandb_group,
            config={
                'captioner': '/'.join(args.captioner),
@@ -151,10 +153,7 @@ data_dir = args.data_dir or env.data_dir()
 
 results_dir = args.results_dir
 if results_dir is None:
-    results_subdir = f'cnn-cert-r{args.n_random_trials}'
-    if args.fine_tune:
-        results_subdir += '-ft'
-    results_dir = env.results_dir() / results_subdir
+    results_dir = env.results_dir() / run_key
 
 if args.clear_results_dir and results_dir.exists():
     shutil.rmtree(results_dir)
