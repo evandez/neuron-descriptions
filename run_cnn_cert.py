@@ -210,7 +210,7 @@ for experiment in args.experiments:
         # Now that we have the trained model, dissect it on the validation set.
         dissection_dir = experiment_dir / f'{args.cnn}-{version}'
         for layer in layers:
-            print(f'dissection layer {layer}')
+            print(f'dissecting layer {layer}')
             dissect.discriminative(
                 cnn.model,
                 val,
