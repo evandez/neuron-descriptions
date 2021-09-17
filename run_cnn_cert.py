@@ -185,7 +185,7 @@ for experiment in args.experiments:
                                    zoo.KEY_IMAGENET,
                                    pretrained=False)
         cnn = models.classifier(cnn).to(device)
-        cnn.fit(train,
+        cnn.fit(dataset,
                 hold_out=val.indices,
                 batch_size=args.batch_size,
                 max_epochs=args.epochs,
@@ -240,7 +240,7 @@ for experiment in args.experiments:
                     copied = copy.deepcopy(cnn)
                     if args.fine_tune:
                         copied.fit(
-                            train,
+                            dataset,
                             hold_out=val.indices,
                             batch_size=args.batch_size,
                             max_epochs=args.epochs,
