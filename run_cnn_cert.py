@@ -22,7 +22,7 @@ VERSIONS = (
     '5pct',
     '10pct',
     '25pct',
-    # '50pct',
+    '50pct',
     # '100pct',
 )
 
