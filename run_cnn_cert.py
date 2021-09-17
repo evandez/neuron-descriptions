@@ -161,8 +161,8 @@ results_dir.mkdir(exist_ok=True, parents=True)
 captioner_model, captioner_dataset = args.captioner
 decoder, _ = lv.zoo.model(captioner_model,
                           captioner_dataset,
-                          path=args.captioner_file)
-decoder.to(device)
+                          path=args.captioner_file,
+                          map_location=device)
 encoder = decoder.encoder
 assert isinstance(decoder, models.Decoder)
 assert isinstance(encoder, models.Encoder)
