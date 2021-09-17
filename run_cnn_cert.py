@@ -239,6 +239,7 @@ for experiment in args.experiments:
             index for index, caption in enumerate(captions)
             if 'text' in caption
         ]
+        print(f'found {len(text_neuron_indices)} text neurons')
 
         # Compute its baseline accuracy on the test set.
         for condition in args.conditions:
