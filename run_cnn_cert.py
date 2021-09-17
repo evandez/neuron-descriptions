@@ -169,6 +169,8 @@ assert isinstance(encoder, models.Encoder)
 
 # Now that we have the captioner, we can start the experiments.
 for experiment in args.experiments:
+    experiment_dir = results_dir / experiment
+    experiment_dir.mkdir(exist_ok=True, parents=True)
     for version in args.versions:
         print(f'\n-------- BEGIN EXPERIMENT: {experiment}/{version} --------')
 
@@ -194,10 +196,10 @@ for experiment in args.experiments:
                 device=device,
                 display_progress_as=f'train {args.cnn}')
         torch.save(cnn.state_dict(),
-                   results_dir / experiment / f'{args.cnn}-{version}.pth')
+                   experiment_dir / f'{args.cnn}-{version}.pth')
 
         # Now that we have the trained model, dissect it on the validation set.
-        dissection_root = results_dir / experiment / version / args.cnn
+        dissection_root = experiment_dir / version / args.cnn
         for layer in layers:
             dissect.discriminative(
                 cnn,
