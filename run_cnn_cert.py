@@ -75,9 +75,8 @@ parser.add_argument('--data-dir',
 parser.add_argument(
     '--results-dir',
     type=pathlib.Path,
-    default='cnn-repair',
     help='output directory to write models and dissection data '
-    '(default: "<project results dir>/cnn-repair")')
+    '(default: "<project results dir>/cnn-cert")')
 parser.add_argument('--clear-results-dir',
                     action='store_true',
                     help='if set, clear results dir (default: do not)')
@@ -121,8 +120,8 @@ parser.add_argument('--wandb-project',
                     default='lv',
                     help='wandb project name (default: lv)')
 parser.add_argument('--wandb-name',
-                    default='cnn-repair',
-                    help='wandb run name (default: cnn-repair)')
+                    default='cnn-cert',
+                    help='wandb run name (default: cnn-cert)')
 parser.add_argument('--wandb-group',
                     default='applications',
                     help='wandb group name (default: applications)')
