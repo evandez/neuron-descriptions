@@ -10,10 +10,8 @@ from lv.deps.netdissect import renormalize
 from lv.dissection import datasets as lv_datasets
 from lv.dissection import transforms as lv_transforms
 from lv.utils.typing import Layer
-from lv.zoo import (KEY_ALEXNET_IMAGENET, KEY_ALEXNET_PLACES365,
-                    KEY_BIGGAN_IMAGENET, KEY_BIGGAN_PLACES365, KEY_DINO_VITS8,
-                    KEY_IMAGENET, KEY_PLACES365, KEY_RESNET152_IMAGENET,
-                    KEY_RESNET152_PLACES365)
+from lv.zoo import (KEY_ALEXNET, KEY_BIGGAN, KEY_DINO_VITS8, KEY_IMAGENET,
+                    KEY_PLACES365, KEY_RESNET152)
 
 import torch
 from torch import nn
@@ -115,87 +113,97 @@ class ModelConfig(zoo.ModelConfig):
 
 
 Model = Tuple[nn.Module, Sequence[Layer], ModelConfig]
-ModelConfigs = Mapping[str, ModelConfig]
+ModelConfigs = Mapping[str, Mapping[str, ModelConfig]]
 
 
 def dissection_models() -> ModelConfigs:
     """Return configs for all models used in dissection."""
     return {
-        KEY_ALEXNET_IMAGENET:
-            ModelConfig(models.alexnet_seq,
-                        pretrained=True,
-                        load_weights=False,
-                        layers=LAYERS_ALEXNET),
-        KEY_ALEXNET_PLACES365:
-            ModelConfig(
-                alexnet.AlexNet,
-                url=f'{LV_HOST}/alexnet-places365.pth',
-                transform_weights=lambda weights: weights['state_dict'],
-                layers=LAYERS_ALEXNET),
-        KEY_RESNET18_IMAGENET:
-            ModelConfig(models.resnet18_seq,
-                        pretrained=True,
-                        load_weights=False,
-                        layers=LAYERS_RESNET18),
-        KEY_RESNET18_PLACES365:
-            ModelConfig(
-                models.resnet18_seq,
-                num_classes=365,
-                url=f'{LV_HOST}/resnet18-places365.pth',
-                transform_weights=lambda weights: weights['state_dict'],
-                layers=LAYERS_RESNET18),
-        KEY_RESNET152_IMAGENET:
-            ModelConfig(models.resnet152_seq,
-                        pretrained=True,
-                        load_weights=False,
-                        layers=LAYERS_RESNET152),
-        KEY_RESNET152_PLACES365:
-            ModelConfig(
-                resnet152.OldResNet152,
-                url=f'{DISSECT_HOST}/resnet152_places365-f928166e5c.pth',
-                layers=(0, 4, 5, 6, 7),
-            ),
-        KEY_BIGGAN_IMAGENET:
-            ModelConfig(
-                biggan.SeqBigGAN,
-                pretrained='imagenet',
-                load_weights=False,
-                layers=LAYERS_BIGGAN,
-                dissection=GenerativeModelDissectionConfig(
-                    transform_inputs=lambda *xs: (biggan.GInputs(*xs),),
-                    transform_hiddens=lambda hiddens: hiddens.h,
-                    renormalizer=renormalize.renormalizer(target='byte'),
-                    image_size=256,
-                    batch_size=32,
-                    dataset=KEY_BIGGAN_ZS_IMAGENET,
+        KEY_ALEXNET: {
+            KEY_IMAGENET:
+                ModelConfig(models.alexnet_seq,
+                            pretrained=True,
+                            load_weights=False,
+                            layers=LAYERS_ALEXNET),
+            KEY_PLACES365:
+                ModelConfig(
+                    alexnet.AlexNet,
+                    url=f'{LV_HOST}/alexnet-places365.pth',
+                    transform_weights=lambda weights: weights['state_dict'],
+                    layers=LAYERS_ALEXNET),
+        },
+        KEY_RESNET18: {
+            KEY_IMAGENET:
+                ModelConfig(models.resnet18_seq,
+                            pretrained=True,
+                            load_weights=False,
+                            layers=LAYERS_RESNET18),
+            KEY_PLACES365:
+                ModelConfig(
+                    models.resnet18_seq,
+                    num_classes=365,
+                    url=f'{LV_HOST}/resnet18-places365.pth',
+                    transform_weights=lambda weights: weights['state_dict'],
+                    layers=LAYERS_RESNET18),
+        },
+        KEY_RESNET152: {
+            KEY_IMAGENET:
+                ModelConfig(models.resnet152_seq,
+                            pretrained=True,
+                            load_weights=False,
+                            layers=LAYERS_RESNET152),
+            KEY_PLACES365:
+                ModelConfig(
+                    resnet152.OldResNet152,
+                    url=f'{DISSECT_HOST}/resnet152_places365-f928166e5c.pth',
+                    layers=(0, 4, 5, 6, 7),
                 ),
-            ),
-        KEY_BIGGAN_PLACES365:
-            ModelConfig(
-                biggan.SeqBigGAN,
-                pretrained='places365',
-                load_weights=False,
-                layers=LAYERS_BIGGAN,
-                dissection=GenerativeModelDissectionConfig(
-                    transform_inputs=lambda *xs: (biggan.GInputs(*xs),),
-                    transform_hiddens=lambda hiddens: hiddens.h,
-                    renormalizer=renormalize.renormalizer(target='byte'),
-                    image_size=256,
-                    batch_size=32,
-                    dataset=KEY_BIGGAN_ZS_PLACES365,
+        },
+        KEY_BIGGAN: {
+            KEY_IMAGENET:
+                ModelConfig(
+                    biggan.SeqBigGAN,
+                    pretrained='imagenet',
+                    load_weights=False,
+                    layers=LAYERS_BIGGAN,
+                    dissection=GenerativeModelDissectionConfig(
+                        transform_inputs=lambda *xs: (biggan.GInputs(*xs),),
+                        transform_hiddens=lambda hiddens: hiddens.h,
+                        renormalizer=renormalize.renormalizer(target='byte'),
+                        image_size=256,
+                        batch_size=32,
+                        dataset=KEY_BIGGAN_ZS_IMAGENET,
+                    ),
                 ),
-            ),
-        KEY_DINO_VITS8:
-            ModelConfig(
-                torch.hub.load,
-                repo_or_dir='facebookresearch/dino:main',
-                model=KEY_DINO_VITS8,
-                layers=LAYERS_DINO_VITS8,
-                dissection=DiscriminativeModelDissectionConfig(
-                    transform_hiddens=lv_transforms.spatialize_vit_mlp,
-                    batch_size=32),
-                load_weights=False,
-            ),
+            KEY_PLACES365:
+                ModelConfig(
+                    biggan.SeqBigGAN,
+                    pretrained='imagenet',
+                    load_weights=False,
+                    layers=LAYERS_BIGGAN,
+                    dissection=GenerativeModelDissectionConfig(
+                        transform_inputs=lambda *xs: (biggan.GInputs(*xs),),
+                        transform_hiddens=lambda hiddens: hiddens.h,
+                        renormalizer=renormalize.renormalizer(target='byte'),
+                        image_size=256,
+                        batch_size=32,
+                        dataset=KEY_BIGGAN_ZS_IMAGENET,
+                    ),
+                ),
+        },
+        KEY_DINO_VITS8: {
+            KEY_IMAGENET:
+                ModelConfig(
+                    torch.hub.load,
+                    repo_or_dir='facebookresearch/dino:main',
+                    model=KEY_DINO_VITS8,
+                    layers=LAYERS_DINO_VITS8,
+                    dissection=DiscriminativeModelDissectionConfig(
+                        transform_hiddens=lv_transforms.spatialize_vit_mlp,
+                        batch_size=32),
+                    load_weights=False,
+                ),
+        },
     }
 
 
