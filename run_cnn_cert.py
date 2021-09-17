@@ -146,7 +146,14 @@ device = args.device or 'cuda' if cuda.is_available() else 'cpu'
 
 # Prepare necessary directories.
 data_dir = args.data_dir or env.data_dir()
-results_dir = args.results_dir or (env.results_dir() / 'cnn-repair')
+
+results_dir = args.results_dir
+if results_dir is None:
+    results_subdir = f'cnn-cert-r{args.n_random_trials}'
+    if args.fine_tune:
+        results_subdir += '-ft'
+    results_dir = env.results_dir() / results_subdir
+
 if args.clear_results_dir and results_dir.exists():
     shutil.rmtree(results_dir)
 results_dir.mkdir(exist_ok=True, parents=True)
