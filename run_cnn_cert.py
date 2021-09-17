@@ -20,11 +20,11 @@ EXPERIMENTS = (zoo.KEY_SPURIOUS_IMAGENET_TEXT,)
 
 VERSIONS = (
     # 'original',
-    '5%',
-    '10%',
-    '25%',
-    # '50%',
-    # '100%',
+    '5pct',
+    '10pct',
+    '25pct',
+    # '50pct',
+    # '100pct',
 )
 
 CONDITION_TEXT = 'ablate-text'
