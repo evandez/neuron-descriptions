@@ -25,6 +25,7 @@ KEY_RESNET152_IMAGENET = f'{KEY_RESNET152}/{KEY_IMAGENET}'
 KEY_RESNET152_PLACES365 = f'{KEY_RESNET152}/{KEY_PLACES365}'
 KEY_BIGGAN_IMAGENET = f'{KEY_BIGGAN}/{KEY_IMAGENET}'
 KEY_BIGGAN_PLACES365 = f'{KEY_BIGGAN}/{KEY_PLACES365}'
+KEY_DINO_VITS8_IMAGENET = f'{KEY_DINO_VITS8}/{KEY_IMAGENET}'
 
 KEY_GENERATORS = 'gen'
 KEY_CLASSIFIERS = 'cls'
@@ -130,4 +131,7 @@ def datasets() -> core.DatasetConfigs:
             core.DatasetConfig(lv.datasets.AnnotatedTopImagesDataset,
                                url=f'{HOST}/data/biggan-places365.zip',
                                annotation_count=3),
+        KEY_DINO_VITS8_IMAGENET:
+            core.DatasetConfig(lv.datasets.TopImagesDataset,
+                               url=f'{HOST}/data/dino_vits8-imagenet.zip'),
     }
