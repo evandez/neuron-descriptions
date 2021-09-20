@@ -181,6 +181,7 @@ for experiment in args.experiments:
         test = zoo.dataset(experiment,
                            path=data_dir / experiment / version / 'test')
 
+        # Sample a small validation set for early stopping, etc.
         splits_file = experiment_dir / 'splits.pth'
         if splits_file.exists():
             print(f'reading train/val split from {splits_file}')
