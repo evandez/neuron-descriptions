@@ -180,7 +180,19 @@ for experiment in args.experiments:
                               path=data_dir / experiment / version / 'train')
         test = zoo.dataset(experiment,
                            path=data_dir / experiment / version / 'test')
-        train, val = training.random_split(dataset, hold_out=args.hold_out)
+
+        splits_file = experiment_dir / 'splits.pth'
+        if splits_file.exists():
+            print(f'reading train/val split from {splits_file}')
+            splits = torch.load(splits_file)
+            train, val = training.fixed_split(dataset, splits['val'])
+        else:
+            train, val = training.random_split(dataset, hold_out=args.hold_out)
+            print(f'saving train/val splits to {splits_file}')
+            torch.save({
+                'train': train.indices,
+                'val': val.indices
+            }, splits_file)
 
         cnn, layers, config = zoo.model(args.cnn,
                                         zoo.KEY_IMAGENET,
