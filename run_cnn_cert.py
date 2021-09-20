@@ -15,6 +15,7 @@ import numpy
 import torch
 import wandb
 from torch import cuda
+from tqdm.auto import tqdm
 
 EXPERIMENTS = (zoo.KEY_SPURIOUS_IMAGENET_TEXT, zoo.KEY_SPURIOUS_IMAGENET_COLOR)
 
@@ -26,9 +27,9 @@ VERSIONS = (
     # '100pct',
 )
 
-CONDITION_TEXT = 'ablate-text'
+CONDITION_SPURIOUS = 'ablate-spurious'
 CONDITION_RANDOM = 'ablate-random'
-CONDITIONS = (CONDITION_TEXT, CONDITION_RANDOM)
+CONDITIONS = (CONDITION_SPURIOUS, CONDITION_RANDOM)
 
 parser = argparse.ArgumentParser(
     description='certify a cnn trained on bad data')
@@ -112,12 +113,8 @@ parser.add_argument('--ablation-max',
 parser.add_argument(
     '--ablation-step-size',
     type=float,
-    default=.1,
+    default=.02,
     help='fraction of additional neurons to ablate at each step (default: .1)')
-parser.add_argument('--num-workers',
-                    type=int,
-                    default=32,
-                    help='workers for loading data (default: 32)')
 parser.add_argument('--device', help='manually set device (default: guessed)')
 parser.add_argument('--wandb-project',
                     default='lv',
@@ -187,8 +184,10 @@ for experiment in args.experiments:
 
         # Start by training the classifier on spurious data.
         dataset = zoo.dataset(experiment,
+                              factory=training.PreloadedImageFolder,
                               path=data_dir / experiment / version / 'train')
         test = zoo.dataset(experiment,
+                           factory=training.PreloadedImageFolder,
                            path=data_dir / experiment / version / 'test')
 
         # Sample a small validation set for early stopping, etc.
@@ -222,7 +221,7 @@ for experiment in args.experiments:
                     max_epochs=args.epochs,
                     patience=args.patience,
                     optimizer_kwargs={'lr': args.lr},
-                    num_workers=args.num_workers,
+                    num_workers=0,
                     device=device,
                     display_progress_as=f'train {args.cnn}')
             print(f'saving trained {args.cnn} to {cnn_file}')
@@ -239,7 +238,6 @@ for experiment in args.experiments:
                 results_dir=dissection_dir,
                 tally_cache_file=dissection_dir / layer / 'tally.npz',
                 masks_cache_file=dissection_dir / layer / 'masks.npz',
-                num_workers=args.num_workers,
                 device=device,
                 **config.dissection.kwargs,
             )
@@ -261,11 +259,27 @@ for experiment in args.experiments:
             with captions_file.open('w') as handle:
                 handle.write('\n'.join(captions))
 
-        neuron_indices = [
+        candidate_indices = [
             index for index, caption in enumerate(captions)
             if any(word in caption for word in target_words)
         ]
-        print(f'found {len(neuron_indices)} spurious neurons')
+        print(f'found {len(candidate_indices)} candidate units')
+
+        # Try cutting out each neuron individually, tracking its accuracy
+        # on the validation dataset. This will help us filter out
+        # important perceptual neurons that are mislabeled.
+        if CONDITION_SPURIOUS in args.conditions:
+            candidate_accuracies = []
+            for index in tqdm(candidate_indices, desc='rank candidates'):
+                accuracy = cnn.accuracy(val,
+                                        ablate=[dissected.unit(index)],
+                                        display_progress_as=None,
+                                        num_workers=0,
+                                        device=device)
+                candidate_accuracies.append(accuracy)
+            candidate_indices = sorted(candidate_indices,
+                                       key=candidate_accuracies.__getitem__,
+                                       reverse=True)
 
         # Compute its baseline accuracy on the test set.
         for condition in args.conditions:
@@ -275,12 +289,12 @@ for experiment in args.experiments:
                 trials = 1
 
             for trial in range(1, trials + 1):
-                if condition == CONDITION_TEXT:
-                    indices = neuron_indices
+                if condition == CONDITION_SPURIOUS:
+                    indices = candidate_indices
                 else:
                     assert condition == CONDITION_RANDOM
                     indices = random.sample(range(len(dissected)),
-                                            k=len(neuron_indices))
+                                            k=len(candidate_indices))
 
                 fractions = numpy.arange(args.ablation_min, args.ablation_max,
                                          args.ablation_step_size)
@@ -298,7 +312,7 @@ for experiment in args.experiments:
                             ablate=dissected.units(ablated_indices),
                             layers=['fc'] if args.cnn == zoo.KEY_RESNET18 else
                             ['fc6', 'fc7', 'linear8'],
-                            num_workers=args.num_workers,
+                            num_workers=0,
                             device=device,
                             display_progress_as=f'fine tune {args.cnn} '
                             f'(cond={condition}, t={trial}, f={fraction:.2f})')
@@ -309,8 +323,7 @@ for experiment in args.experiments:
                         f'(cond={condition}, '
                         f't={trial}, '
                         f'f={fraction:.2f})',
-                        # TODO(evandez): This causes a bunch of warnings...
-                        # num_workers=args.num_workers,
+                        num_workers=0,
                         device=device,
                     )
                     samples = viz.random_neuron_wandb_images(
