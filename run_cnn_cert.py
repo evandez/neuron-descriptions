@@ -15,7 +15,7 @@ import torch
 import wandb
 from torch import cuda
 
-EXPERIMENTS = (zoo.KEY_SPURIOUS_IMAGENET_TEXT,)
+EXPERIMENTS = (zoo.KEY_SPURIOUS_IMAGENET_TEXT, zoo.KEY_SPURIOUS_IMAGENET_COLOR)
 
 VERSIONS = (
     # 'original',
