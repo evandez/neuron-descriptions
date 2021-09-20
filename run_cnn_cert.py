@@ -9,6 +9,7 @@ import lv.zoo
 from lv import datasets, models
 from lv.dissection import dissect, zoo
 from lv.utils import env, training, viz
+from lv.utils.typing import StrSequence
 
 import numpy
 import torch
@@ -172,6 +173,15 @@ assert isinstance(encoder, models.Encoder)
 for experiment in args.experiments:
     experiment_dir = results_dir / experiment
     experiment_dir.mkdir(exist_ok=True, parents=True)
+
+    target_words: StrSequence
+    if experiment == zoo.KEY_SPURIOUS_IMAGENET_TEXT:
+        target_words = ('word', 'text', 'letter')
+    else:
+        assert experiment == zoo.KEY_SPURIOUS_IMAGENET_COLOR
+        target_words = ('red', 'yellow', 'green', 'blue', 'cyan', 'purple',
+                        'brown', 'black', 'white', 'gray')
+
     for version in args.versions:
         print(f'\n-------- BEGIN EXPERIMENT: {experiment}/{version} --------')
 
@@ -251,11 +261,11 @@ for experiment in args.experiments:
             with captions_file.open('w') as handle:
                 handle.write('\n'.join(captions))
 
-        text_neuron_indices = [
+        neuron_indices = [
             index for index, caption in enumerate(captions)
-            if 'text' in caption
+            if any(word in caption for word in target_words)
         ]
-        print(f'found {len(text_neuron_indices)} text neurons')
+        print(f'found {len(neuron_indices)} spurious neurons')
 
         # Compute its baseline accuracy on the test set.
         for condition in args.conditions:
@@ -266,11 +276,11 @@ for experiment in args.experiments:
 
             for trial in range(1, trials + 1):
                 if condition == CONDITION_TEXT:
-                    indices = text_neuron_indices
+                    indices = neuron_indices
                 else:
                     assert condition == CONDITION_RANDOM
                     indices = random.sample(range(len(dissected)),
-                                            k=len(text_neuron_indices))
+                                            k=len(neuron_indices))
 
                 fractions = numpy.arange(args.ablation_min, args.ablation_max,
                                          args.ablation_step_size)
