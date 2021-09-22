@@ -112,20 +112,6 @@ parser.add_argument('--lr',
                     type=float,
                     default=1e-4,
                     help='learning rate (default: 1e-4)')
-parser.add_argument('--captioner-strategy',
-                    choices=decoders.STRATEGIES,
-                    default=decoders.STRATEGY_RERANK,
-                    help='captioner decoding strategy (default: rerank)')
-parser.add_argument('--captioner-temperature',
-                    type=float,
-                    default=.5,
-                    help='captioner mutual info temperature (default: .5)')
-parser.add_argument('--captioner-beam-size',
-                    type=int,
-                    default=50,
-                    help='captioner beam size; '
-                    'only used if strategy is "beam"/"rerank" '
-                    '(default: 50)')
 parser.add_argument('--ablation-min',
                     type=float,
                     default=0,
@@ -137,8 +123,8 @@ parser.add_argument('--ablation-max',
 parser.add_argument(
     '--ablation-step-size',
     type=float,
-    default=.02,
-    help='fraction of additional neurons to ablate at each step (default: .1)')
+    default=.01,
+    help='fraction of add\'l neurons to ablate at each step (default: .01)')
 parser.add_argument('--device', help='manually set device (default: guessed)')
 parser.add_argument('--wandb-project',
                     default='lv',
@@ -272,9 +258,9 @@ for experiment in args.experiments:
             assert len(captions) == len(dissected)
         else:
             captions = decoder.predict(dissected,
-                                       strategy=args.captioner_strategy,
-                                       temperature=args.captioner_temperature,
-                                       beam_size=args.captioner_beam_size,
+                                       strategy='rerank',
+                                       temperature=0.075,
+                                       beam_size=50,
                                        device=device)
             print(f'saving captions to {captions_file}')
             with captions_file.open('w') as handle:
@@ -282,7 +268,7 @@ for experiment in args.experiments:
 
         candidate_indices = [
             index for index, caption in enumerate(captions)
-            if any(word in caption for word in target_words)
+            if any(word in caption.lower() for word in target_words)
         ]
         print(f'found {len(candidate_indices)} candidate units')
 
