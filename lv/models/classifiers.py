@@ -1,5 +1,7 @@
 """Wrappers around image classifiers."""
-from typing import Any, Mapping, Optional, Sequence, Sized, Type, Union, cast
+import collections
+from typing import (Any, Dict, Mapping, Optional, Sequence, Sized, Type, Union,
+                    cast)
 
 from lv.utils import ablations, training
 from lv.utils.typing import Device, Layer, Unit
@@ -155,23 +157,23 @@ class ImageClassifier(nn.Module):
                 if stopper.improved:
                     best = self.state_dict()
 
-    def accuracy(
+    def predict(
         self,
         dataset: data.Dataset,
         image_index: int = 0,
-        target_index: int = 1,
         batch_size: int = 128,
         num_workers: int = 0,
         ablate: Optional[Sequence[Unit]] = None,
         device: Optional[Device] = None,
-        display_progress_as: Optional[str] = 'test classifer',
-    ) -> float:
-        """Compute accuracy of this model on the given dataset.
+        display_progress_as: Optional[str] = 'classify images',
+    ) -> torch.Tensor:
+        """Run the model on every element in the dataset.
 
         Args:
             dataset (data.Dataset): The dataset.
-            image_index (int, optional): [description]. Defaults to 0.
-            target_index (int, optional): [description]. Defaults to 1.
+            image_index (int, optional): Index of images in dataset.
+                Defaults to 0 to be compatible with
+                `torchvision.datasets.ImageFolder`.
             batch_size (int, optional): Number of samples to process at once.
                 Defaults to 128.
             num_workers (int, optional): Number of workers for DataLoader
@@ -184,28 +186,119 @@ class ImageClassifier(nn.Module):
                 with this message while testing. Defaults to 'test classifier'.
 
         Returns:
-            float: Accuracy on the dataset.
+            torch.Tensor: Long tensor containing class predictions for every
+                item in the dataset, with shape (len(dataset),).
 
         """
         if device is not None:
             self.to(device)
 
-        with ablations.ablated(self.model, ablate or []) as ablated:
-            loader = data.DataLoader(dataset,
-                                     num_workers=num_workers,
-                                     batch_size=batch_size)
-            if display_progress_as is not None:
-                loader = tqdm(loader, desc=display_progress_as)
+        # Prepare data loader.
+        loader = data.DataLoader(dataset,
+                                 num_workers=num_workers,
+                                 batch_size=batch_size)
+        if display_progress_as is not None:
+            loader = tqdm(loader, desc=display_progress_as)
 
-            correct = 0
+        # Compute predictions.
+        predictions = []
+        with ablations.ablated(self.model, ablate or []) as ablated:
             for batch in loader:
                 images = batch[image_index].to(device)
-                targets = batch[target_index].to(device)
                 with torch.no_grad():
-                    predictions = ablated(images)
-                correct += predictions.argmax(dim=-1).eq(targets).sum().item()
+                    predictions.append(ablated(images).argmax(dim=-1))
 
-        return correct / len(cast(Sized, dataset))
+        return torch.cat(predictions)
+
+    def accuracy(
+        self,
+        dataset: data.Dataset,
+        target_index: int = 1,
+        device: Optional[Device] = None,
+        display_progress_as: Optional[str] = 'test classifer',
+        **kwargs: Any,
+    ) -> float:
+        """Compute accuracy of this model on the given dataset.
+
+        The **kwargs are forwarded to `ImageClassifier.predict`.
+
+        Args:
+            dataset (data.Dataset): The dataset.
+            target_index (int, optional): Index of target labels in dataset.
+                Defaults to 1 to be compatible with
+                `torchvision.datasets.ImageFolder`.
+            device (Optional[Device], optional): Send this model and all
+                tensors to this device. Defaults to None.
+            display_progress_as (Optional[str], optional): Show a progress bar
+                with this message while testing. Defaults to 'test classifier'.
+
+        Returns:
+            float: Accuracy on the dataset.
+
+        """
+        size = len(cast(Sized, dataset))
+        predictions = self.predict(dataset,
+                                   device=device,
+                                   display_progress_as=display_progress_as,
+                                   **kwargs)
+        targets = torch.tensor(
+            [dataset[index][target_index] for index in range(size)],
+            dtype=torch.long,
+            device=device,
+        )
+        correct = predictions.eq(targets).sum().item()
+        return correct / size
+
+    def accuracies(
+        self,
+        dataset: data.Dataset,
+        target_index: int = 1,
+        device: Optional[Device] = None,
+        display_progress_as: Optional[str] = 'test classifer (class-wise)',
+        **kwargs: Any,
+    ) -> Mapping[int, float]:
+        """Compute class-by-class accuracy of this model on the given dataset.
+
+        The **kwargs are forwarded to `ImageClassifier.predict`.
+
+        Args:
+            dataset (data.Dataset): The dataset.
+            target_index (int, optional): Index of target labels in dataset.
+                Defaults to 1 to be compatible with
+                `torchvision.datasets.ImageFolder`.
+            device (Optional[Device], optional): Send this model and all
+                tensors to this device. Defaults to None.
+            display_progress_as (Optional[str], optional): Show a progress bar
+                with this message while testing. Defaults to
+                'test classifier (class-wise)'.
+
+        Returns:
+            Mapping[int, float]: Class-by-class accuracy on this dataset.
+
+        """
+        predictions = self.predict(dataset,
+                                   device=device,
+                                   display_progress_as=display_progress_as,
+                                   **kwargs)
+
+        size = len(cast(Sized, dataset))
+        targets = torch.tensor(
+            [dataset[index][target_index] for index in range(size)],
+            dtype=torch.long,
+            device=device,
+        )
+
+        correct: Dict[int, int] = collections.defaultdict(int)
+        total: Dict[int, int] = collections.defaultdict(int)
+        for prediction, target in zip(predictions.tolist(), targets.tolist()):
+            correct[target] += prediction == target
+            total[target] += 1
+        assert correct.keys() == total.keys()
+
+        return {
+            target: correct[target] / total[target]
+            for target in correct.keys()
+        }
 
 
 def classifier(model: nn.Module) -> ImageClassifier:
