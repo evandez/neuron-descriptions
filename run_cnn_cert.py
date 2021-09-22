@@ -265,18 +265,15 @@ for experiment in args.experiments:
             with captions_file.open('w') as handle:
                 handle.write('\n'.join(captions))
 
+        # Find candidate spurious neurons, and write them to disk.
+        candidate_indices = [
+            index for index, caption in enumerate(captions)
+            if any(word in caption.lower() for word in target_words)
+        ]
         candidates_file = experiment_dir / f'{args.cnn}-{version}-units.txt'
-        if candidates_file.exists():
-            print(f'loading candidate spurious units from {candidates_file}')
-            candidate_indices = torch.load(candidates_file)
-        else:
-            candidate_indices = [
-                index for index, caption in enumerate(captions)
-                if any(word in caption.lower() for word in target_words)
-            ]
-            print(f'found {len(candidate_indices)} candidate units; '
-                  f'saving to {candidates_file}')
-            torch.save(candidate_indices, candidates_file)
+        print(f'found {len(candidate_indices)} candidate units; '
+              f'saving to {candidates_file}')
+        torch.save(candidate_indices, candidates_file)
 
         # Try cutting out each neuron individually, tracking its accuracy
         # on the validation dataset. This will help us filter out
