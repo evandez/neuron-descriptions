@@ -18,30 +18,39 @@ import wandb
 from torch import cuda
 from tqdm.auto import tqdm
 
-EXPERIMENTS = (zoo.KEY_SPURIOUS_IMAGENET_TEXT, zoo.KEY_SPURIOUS_IMAGENET_COLOR)
-
-VERSIONS = (
-    # 'original',
-    '5pct',
-    '10pct',
-    '50pct',
-    # '100pct',
+EXPERIMENTS = (
+    zoo.KEY_SPURIOUS_IMAGENET_TEXT,
+    zoo.KEY_SPURIOUS_IMAGENET_COLOR,
 )
 
-CONDITION_SPURIOUS = 'ablate-spurious'
-CONDITION_RANDOM = 'ablate-random'
-CONDITIONS = (CONDITION_SPURIOUS, CONDITION_RANDOM)
+VERSION_ORIGINAL = 'original'
+VERSION_5PCT = '5pct'
+VERSION_10PCT = '10pct'
+VERSION_50PCT = '50pct'
+VERSION_100PCT = '100pct'
+VERSIONS = (
+    VERSION_ORIGINAL,
+    VERSION_5PCT,
+    VERSION_10PCT,
+    VERSION_50PCT,
+    VERSION_100PCT,
+)
+
+CONDITION_SORT_SPURIOUS = 'sort-spurious'
+CONDITION_SORT_ALL = 'sort-all'
+CONDITION_RANDOM = 'random'
+CONDITIONS = (CONDITION_SORT_SPURIOUS, CONDITION_SORT_ALL, CONDITION_RANDOM)
 
 parser = argparse.ArgumentParser(
     description='certify a cnn trained on bad data')
 parser.add_argument('--experiments',
                     choices=EXPERIMENTS,
-                    default=EXPERIMENTS,
+                    default=(zoo.KEY_SPURIOUS_IMAGENET_TEXT,),
                     nargs='+',
                     help='dataset to experiment with (default: all)')
 parser.add_argument('--versions',
                     choices=VERSIONS,
-                    default=VERSIONS,
+                    default=(VERSION_50PCT,),
                     nargs='+',
                     help='versions of dataset to try (default: all)')
 parser.add_argument('--conditions',
@@ -144,12 +153,8 @@ parser.add_argument('--wandb-n-samples',
                     help='number of samples to upload for each model')
 args = parser.parse_args()
 
-run_key = f'cnn-cert-r{args.n_random_trials}'
-if args.fine_tune:
-    run_key += '-ft'
-
 wandb.init(project=args.wandb_project,
-           name=args.wandb_name or run_key,
+           name=args.wandb_name or 'cnn-cert',
            group=args.wandb_group,
            config={
                'captioner': '/'.join(args.captioner),
@@ -165,7 +170,7 @@ data_dir = args.data_dir or env.data_dir()
 
 results_dir = args.results_dir
 if results_dir is None:
-    results_dir = env.results_dir() / run_key
+    results_dir = env.results_dir() / 'cnn-cert'
 
 if args.clear_results_dir and results_dir.exists():
     shutil.rmtree(results_dir)
@@ -283,18 +288,24 @@ for experiment in args.experiments:
         # Try cutting out each neuron individually, tracking its accuracy
         # on the validation dataset. This will help us filter out
         # important perceptual neurons that are mislabeled.
-        if CONDITION_SPURIOUS in args.conditions:
-            candidate_accuracies = []
-            for index in tqdm(candidate_indices, desc='rank candidates'):
-                accuracy = cnn.accuracy(val,
-                                        ablate=[dissected.unit(index)],
-                                        display_progress_as=None,
-                                        num_workers=0,
-                                        device=device)
-                candidate_accuracies.append(accuracy)
-            candidate_indices = sorted(candidate_indices,
-                                       key=candidate_accuracies.__getitem__,
-                                       reverse=True)
+        sort_spurious = CONDITION_SORT_SPURIOUS in args.conditions
+        sort_all = CONDITION_SORT_ALL in args.conditions
+        if sort_spurious or sort_all:
+            scores_file = experiment_dir / f'{args.cnn}-{version}-scores.pth'
+            if scores_file.exists():
+                print(f'loading unit scores from {scores_file}')
+                scores = torch.load(scores_file)
+            else:
+                accuracies = []
+                for index in tqdm(range(len(dissected)), desc='score units'):
+                    accuracy = cnn.accuracy(val,
+                                            ablate=[dissected.unit(index)],
+                                            display_progress_as=None,
+                                            num_workers=0,
+                                            device=device)
+                    accuracies.append(accuracy)
+                print(f'saving unit scores to {scores_file}')
+                torch.save(scores, scores_file)
 
         # Compute its baseline accuracy on the test set.
         for condition in args.conditions:
@@ -304,8 +315,14 @@ for experiment in args.experiments:
                 trials = 1
 
             for trial in range(1, trials + 1):
-                if condition == CONDITION_SPURIOUS:
-                    indices = candidate_indices
+                if condition == CONDITION_SORT_SPURIOUS:
+                    indices = sorted(candidate_indices,
+                                     key=accuracies.__getitem__,
+                                     reverse=True)
+                elif condition == CONDITION_SORT_ALL:
+                    indices = sorted(range(len(dissected)),
+                                     key=accuracies.__getitem__,
+                                     reverse=True)[:len(candidate_indices)]
                 else:
                     assert condition == CONDITION_RANDOM
                     indices = random.sample(range(len(dissected)),
