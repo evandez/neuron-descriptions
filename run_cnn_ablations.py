@@ -1,13 +1,13 @@
 """Run CNN ablation experiments."""
 import argparse
 import pathlib
-import random
+import shutil
 
 import lv.dissection.zoo
 import lv.zoo
 from lv import datasets, models
+from lv.models import decoders
 from lv.utils import env, training, viz
-from lv.utils.typing import StrSequence
 
 import nltk
 import numpy as np
@@ -89,33 +89,12 @@ ORDER_INCREASING = 'increasing'
 ORDER_DECREASING = 'decreasing'
 ORDERS = (ORDER_DECREASING, ORDER_INCREASING)
 
-CNNS = (
-    lv.zoo.KEY_ALEXNET,
-    lv.zoo.KEY_RESNET152,
-)
+CNNS = (lv.dissection.zoo.KEY_RESNET18,)
 DATASETS = (
     lv.zoo.KEY_IMAGENET,
     # TODO(evandez): Figure out why this crashes.
     # lv.zoo.KEY_PLACES365,
 )
-TRAIN = {
-    lv.zoo.KEY_ALEXNET: (
-        lv.zoo.KEY_RESNET152_IMAGENET,
-        lv.zoo.KEY_RESNET152_PLACES365,
-        lv.zoo.KEY_BIGGAN_IMAGENET,
-        lv.zoo.KEY_BIGGAN_PLACES365,
-    ),
-    lv.zoo.KEY_RESNET152: (
-        lv.zoo.KEY_ALEXNET_IMAGENET,
-        lv.zoo.KEY_ALEXNET_PLACES365,
-        lv.zoo.KEY_BIGGAN_IMAGENET,
-        lv.zoo.KEY_BIGGAN_PLACES365,
-    ),
-}
-
-CAPTIONS_GT = 'gt'
-CAPTIONS_LEARNED = 'learned'
-CAPTION_SOURCES = (CAPTIONS_GT, CAPTIONS_LEARNED)
 
 parser = argparse.ArgumentParser(description='run cnn ablation experiments')
 parser.add_argument('--cnns',
@@ -123,10 +102,10 @@ parser.add_argument('--cnns',
                     choices=CNNS,
                     default=CNNS,
                     help='cnns to ablate (default: alexnet, resnet152)')
-parser.add_argument('--captions',
-                    choices=CAPTION_SOURCES,
-                    default=CAPTIONS_LEARNED,
-                    help='caption source to use (default: learned)')
+parser.add_argument('--captioner',
+                    nargs=2,
+                    default=(lv.zoo.KEY_CAPTIONER_RESNET101, lv.zoo.KEY_ALL),
+                    help='captioner model (default: captioner-resnet101 all)')
 parser.add_argument(
     '--datasets',
     choices=DATASETS,
@@ -150,6 +129,13 @@ parser.add_argument('--orders',
 parser.add_argument('--data-dir',
                     type=pathlib.Path,
                     help='root dir for datasets (default: project data dir)')
+parser.add_argument(
+    '--results-dir',
+    type=pathlib.Path,
+    help='root dir for experiment results (default: project results dir)')
+parser.add_argument('--clear-results-dir',
+                    action='store_true',
+                    help='if set, clear results dir (default: do not)')
 parser.add_argument('--ablation-min',
                     type=float,
                     default=0,
@@ -169,6 +155,20 @@ parser.add_argument(
     default=5,
     help='for each experiment, delete an equal number of random '
     'neurons and retest this many times (default: 5)')
+parser.add_argument('--captioner-strategy',
+                    choices=decoders.STRATEGIES,
+                    default=decoders.STRATEGY_RERANK,
+                    help='captioner decoding strategy (default: rerank)')
+parser.add_argument('--captioner-temperature',
+                    type=float,
+                    default=.5,
+                    help='captioner mutual info temperature (default: .5)')
+parser.add_argument('--captioner-beam-size',
+                    type=int,
+                    default=50,
+                    help='captioner beam size; '
+                    'only used if strategy is "beam"/"rerank" '
+                    '(default: 50)')
 parser.add_argument('--device', help='manually set device (default: guessed)')
 parser.add_argument('--wandb-project',
                     default='lv',
@@ -189,7 +189,7 @@ wandb.init(project=args.wandb_project,
            name=args.wandb_name,
            group=args.wandb_group,
            config={
-               'captions': args.captions,
+               'captioner': '/'.join(args.captioner),
                'ablation_step_size': args.ablation_step_size,
                'n_random_trials': args.n_random_trials,
            })
@@ -199,6 +199,15 @@ device = args.device or 'cuda' if cuda.is_available() else 'cpu'
 # Prepare necessary directories.
 data_dir = args.data_dir or env.data_dir()
 
+results_dir = args.results_dir
+if results_dir is None:
+    results_dir = env.results_dir() / 'cnn-cert'
+
+if args.clear_results_dir and results_dir.exists():
+    shutil.rmtree(results_dir)
+results_dir.mkdir(exist_ok=True, parents=True)
+
+# Determine subset of experiments to run.
 experiments = set(args.experiments)
 if args.groups:
     for group in args.groups:
@@ -235,25 +244,30 @@ for dataset_name in args.datasets:
         cnn, *_ = lv.dissection.zoo.model(cnn_name, dataset_name)
         cnn = models.classifier(cnn).to(device).eval()
 
-        annotations = lv.zoo.datasets(f'{cnn_name}/{dataset_name}',
-                                      path=data_dir)
-        assert isinstance(annotations, datasets.AnnotatedTopImagesDataset)
+        dissected = lv.zoo.datasets(f'{cnn_name}/{dataset_name}',
+                                    path=data_dir)
+        assert isinstance(dissected, datasets.TopImagesDataset)
 
         # Obtain captions for every neuron in the CNN.
-        if args.captions == CAPTIONS_GT:
-            captions: StrSequence = []
-            for index in range(len(annotations)):
-                caption = random.choice(annotations[index].annotations)
-                assert isinstance(captions, list)
-                captions.append(caption)
+        captions_file = results_dir / f'{cnn_name}-{dataset_name}-captions.txt'
+        if captions_file.exists():
+            print(f'loading captions from {captions_file}')
+            with captions_file.open('r') as handle:
+                captions = handle.read().split('\n')
         else:
-            assert args.captions == CAPTIONS_LEARNED
-            train = lv.zoo.datasets(*TRAIN[cnn_name], path=data_dir)
-            encoder = models.encoder().to(device)
-            decoder = models.decoder(train, encoder).to(device)
-            decoder.fit(train, device=device)
-            decoder.eval()
-            captions = decoder.predict(annotations, device=device)
+            decoder, _ = lv.zoo.model(*args.captioner)
+            decoder.to(device)
+            assert isinstance(decoder, models.Decoder)
+            captions = decoder.predict(
+                dataset,
+                device=device,
+                display_progress_as=f'caption {cnn_name}/{dataset_name}',
+                strategy=args.captioner_strategy,
+                temperature=args.captioner_temperature,
+                beam_size=args.captioner_beam_size)
+            print(f'saving captions to {captions_file}')
+            with captions_file.open('w') as handle:
+                handle.write('\n'.join(captions))
 
         # Pretokenize the captions for efficiency.
         tokenized = tuple(nlp.pipe(captions))
@@ -357,18 +371,19 @@ for dataset_name in args.datasets:
                                           args.ablation_step_size)
                     for fraction in fractions:
                         ablated = indices[:int(fraction * len(indices))]
-                        units = annotations.units(ablated)
+                        units = dissected.units(ablated)
                         accuracy = cnn.accuracy(
                             dataset,
                             ablate=units,
-                            display_progress_as='test ablated cnn '
+                            display_progress_as='test ablated '
+                            f'{cnn_name}/{dataset_name} '
                             f'(cond={experiment}, '
                             f'trial={trial + 1}, '
                             f'order={order}, '
                             f'frac={fraction:.2f})',
                             device=device)
                         samples = viz.random_neuron_wandb_images(
-                            annotations,
+                            dissected,
                             captions,
                             indices=ablated,
                             k=args.wandb_n_samples,
