@@ -8,7 +8,6 @@ import shutil
 import lv.zoo
 from lv import datasets, models
 from lv.dissection import dissect, zoo
-from lv.models import decoders
 from lv.utils import env, training, viz
 from lv.utils.typing import StrSequence
 
