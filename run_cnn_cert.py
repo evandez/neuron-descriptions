@@ -8,6 +8,7 @@ import shutil
 import lv.zoo
 from lv import datasets, models
 from lv.dissection import dissect, zoo
+from lv.models import decoders
 from lv.utils import env, training, viz
 from lv.utils.typing import StrSequence
 
@@ -102,6 +103,20 @@ parser.add_argument('--lr',
                     type=float,
                     default=1e-4,
                     help='learning rate (default: 1e-4)')
+parser.add_argument('--captioner-strategy',
+                    choices=decoders.STRATEGIES,
+                    default=decoders.STRATEGY_RERANK,
+                    help='captioner decoding strategy (default: rerank)')
+parser.add_argument('--captioner-temperature',
+                    type=float,
+                    default=.5,
+                    help='captioner mutual info temperature (default: .5)')
+parser.add_argument('--captioner-beam-size',
+                    type=int,
+                    default=50,
+                    help='captioner beam size; '
+                    'only used if strategy is "beam"/"rerank" '
+                    '(default: 50)')
 parser.add_argument('--ablation-min',
                     type=float,
                     default=0,
@@ -251,9 +266,9 @@ for experiment in args.experiments:
             assert len(captions) == len(dissected)
         else:
             captions = decoder.predict(dissected,
-                                       strategy='rerank',
-                                       temperature=.5,
-                                       beam_size=50,
+                                       strategy=args.captioner_strategy,
+                                       temperature=args.captioner_temperature,
+                                       beam_size=args.captioner_beam_size,
                                        device=device)
             print(f'saving captions to {captions_file}')
             with captions_file.open('w') as handle:
