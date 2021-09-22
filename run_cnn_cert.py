@@ -288,7 +288,8 @@ for experiment in args.experiments:
 
         # Try cutting out each neuron individually, tracking its accuracy
         # on the validation dataset. This will help us filter out
-        # important perceptual neurons that are mislabeled.
+        # important perceptual neurons.
+        scores = None
         sort_spurious = CONDITION_SORT_SPURIOUS in args.conditions
         sort_all = CONDITION_SORT_ALL in args.conditions
         if sort_spurious or sort_all:
@@ -297,14 +298,14 @@ for experiment in args.experiments:
                 print(f'loading unit scores from {scores_file}')
                 scores = torch.load(scores_file)
             else:
-                accuracies = []
+                scores = []
                 for index in tqdm(range(len(dissected)), desc='score units'):
-                    accuracy = cnn.accuracy(val,
-                                            ablate=[dissected.unit(index)],
-                                            display_progress_as=None,
-                                            num_workers=0,
-                                            device=device)
-                    accuracies.append(accuracy)
+                    score = cnn.accuracy(val,
+                                         ablate=[dissected.unit(index)],
+                                         display_progress_as=None,
+                                         num_workers=0,
+                                         device=device)
+                    scores.append(score)
                 print(f'saving unit scores to {scores_file}')
                 torch.save(scores, scores_file)
 
@@ -317,12 +318,14 @@ for experiment in args.experiments:
 
             for trial in range(1, trials + 1):
                 if condition == CONDITION_SORT_SPURIOUS:
+                    assert scores is not None
                     indices = sorted(candidate_indices,
-                                     key=accuracies.__getitem__,
+                                     key=scores.__getitem__,
                                      reverse=True)
                 elif condition == CONDITION_SORT_ALL:
+                    assert scores is not None
                     indices = sorted(range(len(dissected)),
-                                     key=accuracies.__getitem__,
+                                     key=scores.__getitem__,
                                      reverse=True)[:len(candidate_indices)]
                 else:
                     assert condition == CONDITION_RANDOM
