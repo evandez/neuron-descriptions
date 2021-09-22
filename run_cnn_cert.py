@@ -246,6 +246,7 @@ for experiment in args.experiments:
                     display_progress_as=f'train {args.cnn}')
             print(f'saving trained {args.cnn} to {cnn_file}')
             torch.save(cnn.state_dict(), cnn_file)
+        cnn.eval()
 
         # Now that we have the trained model, dissect it on the validation set.
         dissection_dir = experiment_dir / f'{args.cnn}-{version}'
