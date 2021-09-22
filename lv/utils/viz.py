@@ -2,7 +2,7 @@
 import collections
 import pathlib
 import random
-from typing import Any, Callable, Optional, Sequence, Sized, Tuple, Union, cast
+from typing import Any, Callable, Optional, Sequence, Sized, Union, cast
 
 from lv import datasets
 from lv.deps.netdissect import imgsave
@@ -155,41 +155,6 @@ def random_neuron_wandb_images(dataset: data.Dataset[datasets.TopImages],
                                indices=indices,
                                k=k,
                                **kwargs)
-
-
-def wandb_dist_plot(values: Sequence[Any],
-                    normalize: bool = True,
-                    columns: Optional[Tuple[str, str]] = None,
-                    title: Optional[str] = None) -> wandb.viz.CustomChart:
-    """Create a dist plot of the given values.
-
-    Args:
-        values (Sequence[Any]): Values to compute distribution over. Values are
-            all converted to strings.
-        counts (bool, optional): Normalize counts into fractions.
-            Defaults to True.
-        columns (Tuple[str, str], optional): Column names.
-            Defaults to ('value', 'fraction') if normalize=True and
-            ('value', 'counts') otherwise.
-        title (Optional[str], optional): Plot title. Defaults to no title.
-
-    Returns:
-        wandb.viz.CustomChart: The wandb plot.
-
-    """
-    if columns is None:
-        columns = ('value', 'fractions' if normalize else 'counts')
-
-    values = [str(value) for value in values]
-    counts = collections.Counter(values).most_common()
-
-    dist = [(val, float(n)) for val, n in counts]
-    if normalize:
-        dist = [(val, n / len(values)) for val, n in dist]
-
-    table = wandb.Table(data=sorted(dist, key=lambda item: item[0]),
-                        columns=list(columns))
-    return wandb.plot.bar(table, *columns, title=title)
 
 
 PredictedCaptions = Union[StrSequence, Sequence[StrMapping]]

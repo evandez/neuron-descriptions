@@ -241,6 +241,8 @@ for dataset_name in args.datasets:
                                         path=data_dir / dataset_name / 'val',
                                         factory=training.PreloadedImageFolder)
     for cnn_name in args.cnns:
+        model_results_dir = results_dir / cnn_name / dataset_name
+
         cnn, *_ = lv.dissection.zoo.model(cnn_name, dataset_name)
         cnn = models.classifier(cnn).to(device).eval()
 
@@ -249,7 +251,7 @@ for dataset_name in args.datasets:
         assert isinstance(dissected, datasets.TopImagesDataset)
 
         # Obtain captions for every neuron in the CNN.
-        captions_file = results_dir / f'{cnn_name}-{dataset_name}-captions.txt'
+        captions_file = model_results_dir / 'captions.txt'
         if captions_file.exists():
             print(f'loading captions from {captions_file}')
             with captions_file.open('r') as handle:
@@ -363,6 +365,11 @@ for dataset_name in args.datasets:
                         score = distances.max().item()
                         scores.append(score)
 
+                # No need to load cached scores, they're easily derived...
+                # just always save them for auditing purposes.
+                scores_file = model_results_dir / f'{experiment}-scores.pth'
+                torch.save(scores, scores_file)
+
                 for order in args.orders:
                     indices = sorted(range(len(captions)),
                                      key=lambda i: scores[i],
@@ -392,11 +399,6 @@ for dataset_name in args.datasets:
                             exp=experiment,
                             order=order,
                             frac=fraction)
-                        layer_dist = viz.wandb_dist_plot(
-                            [str(layer) for layer, _ in units],
-                            columns=('layer', 'fraction'),
-                            title=f'distribution of layer ablated '
-                            f'({cnn_name}/{dataset_name}/{experiment})')
                         wandb.log({
                             'cnn': cnn_name,
                             'dataset': dataset_name,
@@ -408,5 +410,4 @@ for dataset_name in args.datasets:
                             'n_ablated': len(ablated),
                             'accuracy': accuracy,
                             'samples': samples,
-                            'layer_dist': layer_dist,
                         })
