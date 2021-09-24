@@ -6,21 +6,27 @@ import shutil
 import lv.dissection.zoo
 import lv.zoo
 from lv import datasets, models
-from lv.models import decoders
 from lv.utils import env, training, viz
 
-import nltk
 import numpy as np
 import spacy
 import torch
 import wandb
-from nltk.corpus import wordnet
-from spacy import language
-from spacy_wordnet import wordnet_annotator
 from torch import cuda
 from tqdm import tqdm
 
 EXPERIMENT_RANDOM = 'random'
+
+EXPERIMENT_SEM_AIRLINER = 'airliner'
+EXPERIMENT_SEM_CAR = 'car'
+EXPERIMENT_SEM_CHIHUAHUA = 'chihuahua'
+EXPERIMENT_SEM_FINCH = 'finch'
+EXPERIMENT_SEM_FROG = 'frog'
+EXPERIMENT_SEM_GAZELLE = 'gazelle'
+EXPERIMENT_SEM_HORSE = 'horse'
+EXPERIMENT_SEM_SHIP = 'ship'
+EXPERIMENT_SEM_TABBY = 'tabby'
+EXPERIMENT_SEM_TRUCK = 'truck'
 
 EXPERIMENT_N_OBJECT_WORDS = 'n-object-words'
 EXPERIMENT_N_ABSTRACT_WORDS = 'n-abstract-words'
@@ -39,12 +45,12 @@ EXPERIMENT_CAPTION_LENGTH = 'caption-length'
 EXPERIMENT_MAX_WORD_DIFFERENCE = 'max-word-difference'
 EXPERIMENT_PARSE_DEPTH = 'parse-depth'
 
-EXPERIMENTS = (EXPERIMENT_RANDOM, EXPERIMENT_N_OBJECT_WORDS,
-               EXPERIMENT_N_ABSTRACT_WORDS, EXPERIMENT_N_CAUSAL_AGENTS,
-               EXPERIMENT_N_MATTERS, EXPERIMENT_N_PROCESSES,
-               EXPERIMENT_N_SUBSTANCES, EXPERIMENT_N_THINGS,
-               EXPERIMENT_N_NOUNS, EXPERIMENT_N_VERBS, EXPERIMENT_N_ADPS,
-               EXPERIMENT_N_ADJS, EXPERIMENT_CAPTION_LENGTH,
+EXPERIMENTS = (EXPERIMENT_RANDOM, EXPERIMENT_SEM_AIRLINER, EXPERIMENT_SEM_CAR,
+               EXPERIMENT_SEM_CHIHUAHUA, EXPERIMENT_SEM_FINCH,
+               EXPERIMENT_SEM_FROG, EXPERIMENT_SEM_GAZELLE,
+               EXPERIMENT_SEM_HORSE, EXPERIMENT_SEM_SHIP, EXPERIMENT_SEM_TABBY,
+               EXPERIMENT_SEM_TRUCK, EXPERIMENT_N_NOUNS, EXPERIMENT_N_VERBS,
+               EXPERIMENT_N_ADPS, EXPERIMENT_N_ADJS, EXPERIMENT_CAPTION_LENGTH,
                EXPERIMENT_MAX_WORD_DIFFERENCE, EXPERIMENT_PARSE_DEPTH)
 
 GROUP_RANDOM = 'random'
@@ -57,13 +63,16 @@ EXPERIMENTS_BY_GROUP = {
         frozenset({EXPERIMENT_RANDOM}),
     GROUP_SEMANTIC:
         frozenset({
-            EXPERIMENT_N_ABSTRACT_WORDS,
-            EXPERIMENT_N_OBJECT_WORDS,
-            EXPERIMENT_N_CAUSAL_AGENTS,
-            EXPERIMENT_N_MATTERS,
-            EXPERIMENT_N_PROCESSES,
-            EXPERIMENT_N_SUBSTANCES,
-            EXPERIMENT_N_THINGS,
+            EXPERIMENT_SEM_AIRLINER,
+            EXPERIMENT_SEM_CAR,
+            EXPERIMENT_SEM_CHIHUAHUA,
+            EXPERIMENT_SEM_FINCH,
+            EXPERIMENT_SEM_FROG,
+            EXPERIMENT_SEM_GAZELLE,
+            EXPERIMENT_SEM_HORSE,
+            EXPERIMENT_SEM_SHIP,
+            EXPERIMENT_SEM_TABBY,
+            EXPERIMENT_SEM_TRUCK,
         }),
     GROUP_SYNTACTIC:
         frozenset({
@@ -155,20 +164,6 @@ parser.add_argument(
     default=5,
     help='for each experiment, delete an equal number of random '
     'neurons and retest this many times (default: 5)')
-parser.add_argument('--captioner-strategy',
-                    choices=decoders.STRATEGIES,
-                    default=decoders.STRATEGY_RERANK,
-                    help='captioner decoding strategy (default: rerank)')
-parser.add_argument('--captioner-temperature',
-                    type=float,
-                    default=.5,
-                    help='captioner mutual info temperature (default: .5)')
-parser.add_argument('--captioner-beam-size',
-                    type=int,
-                    default=50,
-                    help='captioner beam size; '
-                    'only used if strategy is "beam"/"rerank" '
-                    '(default: 50)')
 parser.add_argument('--device', help='manually set device (default: guessed)')
 parser.add_argument('--wandb-project',
                     default='lv',
@@ -214,32 +209,11 @@ if args.groups:
         experiments |= EXPERIMENTS_BY_GROUP[group]
 
 nlp = spacy.load('en_core_web_lg')
-target_synsets = None
-if set(experiments) & set(EXPERIMENTS_BY_GROUP[GROUP_SEMANTIC]):
-    nltk.download('wordnet', quiet=True)
-    nltk.download('omw', quiet=True)
-
-    # Redefine spacy factory.
-    # TODO(evandez): Figure out a way to not do this.
-    @language.Language.factory('spacy_wordnet', default_config={'lang': 'en'})
-    def _(nlp, name, lang):
-        return wordnet_annotator.WordnetAnnotator(lang=lang)
-
-    nlp.add_pipe('spacy_wordnet', after='tagger')
-    target_synsets = {
-        EXPERIMENT_N_OBJECT_WORDS: wordnet.synset('object.n.01'),
-        EXPERIMENT_N_ABSTRACT_WORDS: wordnet.synset('abstraction.n.01'),
-        EXPERIMENT_N_CAUSAL_AGENTS: wordnet.synset('causal_agent.n.01'),
-        EXPERIMENT_N_MATTERS: wordnet.synset('matter.n.03'),
-        EXPERIMENT_N_PROCESSES: wordnet.synset('process.n.06'),
-        EXPERIMENT_N_SUBSTANCES: wordnet.synset('substance.n.04'),
-        EXPERIMENT_N_THINGS: wordnet.synset('thing.n.12'),
-    }
-
 for dataset_name in args.datasets:
     dataset = lv.dissection.zoo.dataset(dataset_name,
                                         path=data_dir / dataset_name / 'val',
                                         factory=training.PreloadedImageFolder)
+    assert isinstance(dataset, training.PreloadedImageFolder)
     for cnn_name in args.cnns:
         model_results_dir = results_dir / cnn_name / dataset_name
 
@@ -257,16 +231,16 @@ for dataset_name in args.datasets:
             with captions_file.open('r') as handle:
                 captions = handle.read().split('\n')
         else:
-            decoder, _ = lv.zoo.model(*args.captioner)
+            decoder, *_ = lv.zoo.model(*args.captioner)
             decoder.to(device)
             assert isinstance(decoder, models.Decoder)
             captions = decoder.predict(
                 dataset,
                 device=device,
                 display_progress_as=f'caption {cnn_name}/{dataset_name}',
-                strategy=args.captioner_strategy,
-                temperature=args.captioner_temperature,
-                beam_size=args.captioner_beam_size)
+                strategy='rerank',
+                temperature=.5,
+                beam_size=50)
             print(f'saving captions to {captions_file}')
             with captions_file.open('w') as handle:
                 handle.write('\n'.join(captions))
@@ -298,15 +272,8 @@ for dataset_name in args.datasets:
                 # and score according to how many words in the caption belong
                 # to a synset descended from that one.
                 elif group == GROUP_SEMANTIC:
-                    assert target_synsets is not None
-                    target_synset = target_synsets[experiment]
-                    scores = [
-                        sum(target_synset in synset.lowest_common_hypernyms(
-                            target_synset)
-                            for token in tokens
-                            for synset in token._.wordnet.synsets())
-                        for tokens in tokenized
-                    ]
+                    target = nlp(experiment)
+                    scores = [toks.similarity(target) for toks in tokenized]
 
                 # Group 3: Syntactic ablations. Count the number of times a POS
                 # apears in the caption.
@@ -379,7 +346,7 @@ for dataset_name in args.datasets:
                     for fraction in fractions:
                         ablated = indices[:int(fraction * len(indices))]
                         units = dissected.units(ablated)
-                        accuracy = cnn.accuracy(
+                        predictions = cnn.predict(
                             dataset,
                             ablate=units,
                             display_progress_as='test ablated '
@@ -389,6 +356,19 @@ for dataset_name in args.datasets:
                             f'order={order}, '
                             f'frac={fraction:.2f})',
                             device=device)
+                        accuracy = cnn.accuracy(dataset,
+                                                predictions=predictions,
+                                                device=device)
+
+                        # Compute class-by-class breakdown of accuracy.
+                        accuracies = {
+                            f'accuracy-{dataset.dataset.classes[cat]}': acc for
+                            cat, acc in cnn.accuracies(dataset,
+                                                       predictions=predictions,
+                                                       device=device).items()
+                        }
+
+                        # Report to wandb.
                         samples = viz.random_neuron_wandb_images(
                             dissected,
                             captions,
@@ -410,4 +390,5 @@ for dataset_name in args.datasets:
                             'n_ablated': len(ablated),
                             'accuracy': accuracy,
                             'samples': samples,
+                            **accuracies,
                         })

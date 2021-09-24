@@ -213,6 +213,7 @@ class ImageClassifier(nn.Module):
     def accuracy(
         self,
         dataset: data.Dataset,
+        predictions: Optional[torch.Tensor] = None,
         target_index: int = 1,
         device: Optional[Device] = None,
         display_progress_as: Optional[str] = 'test classifer',
@@ -224,6 +225,8 @@ class ImageClassifier(nn.Module):
 
         Args:
             dataset (data.Dataset): The dataset.
+            predictions (torch.Tensor): Precomputed predictions.
+                By default, computed from dataset.
             target_index (int, optional): Index of target labels in dataset.
                 Defaults to 1 to be compatible with
                 `torchvision.datasets.ImageFolder`.
@@ -236,11 +239,12 @@ class ImageClassifier(nn.Module):
             float: Accuracy on the dataset.
 
         """
+        if predictions is None:
+            predictions = self.predict(dataset,
+                                       device=device,
+                                       display_progress_as=display_progress_as,
+                                       **kwargs)
         size = len(cast(Sized, dataset))
-        predictions = self.predict(dataset,
-                                   device=device,
-                                   display_progress_as=display_progress_as,
-                                   **kwargs)
         targets = torch.tensor(
             [dataset[index][target_index] for index in range(size)],
             dtype=torch.long,
@@ -252,6 +256,7 @@ class ImageClassifier(nn.Module):
     def accuracies(
         self,
         dataset: data.Dataset,
+        predictions: Optional[torch.Tensor] = None,
         target_index: int = 1,
         device: Optional[Device] = None,
         display_progress_as: Optional[str] = 'test classifer (class-wise)',
@@ -263,6 +268,8 @@ class ImageClassifier(nn.Module):
 
         Args:
             dataset (data.Dataset): The dataset.
+            predictions (torch.Tensor): Precomputed predictions.
+                By default, computed from dataset.
             target_index (int, optional): Index of target labels in dataset.
                 Defaults to 1 to be compatible with
                 `torchvision.datasets.ImageFolder`.
@@ -276,10 +283,11 @@ class ImageClassifier(nn.Module):
             Mapping[int, float]: Class-by-class accuracy on this dataset.
 
         """
-        predictions = self.predict(dataset,
-                                   device=device,
-                                   display_progress_as=display_progress_as,
-                                   **kwargs)
+        if predictions is None:
+            predictions = self.predict(dataset,
+                                       device=device,
+                                       display_progress_as=display_progress_as,
+                                       **kwargs)
 
         size = len(cast(Sized, dataset))
         targets = torch.tensor(
