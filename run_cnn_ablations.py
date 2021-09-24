@@ -211,7 +211,6 @@ if args.groups:
 nlp = spacy.load('en_core_web_lg')
 for dataset_name in args.datasets:
     dataset = lv.dissection.zoo.dataset(dataset_name,
-                                        path=data_dir / dataset_name / 'val',
                                         factory=training.PreloadedImageFolder)
     assert isinstance(dataset, training.PreloadedImageFolder)
     for cnn_name in args.cnns:
