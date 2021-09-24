@@ -13,17 +13,17 @@ import torch
 import wandb
 from torch import cuda
 
-ABLATION_GREEDY = 'greedy'
-ABLATION_BEAM = 'beam'
-ABLATION_GREEDY_MI = 'greedy-mi'
-ABLATION_BEAM_MI = 'beam-mi'
-ABLATION_RERANK = 'rerank'
-ABLATIONS = (
-    ABLATION_GREEDY,
-    ABLATION_BEAM,
-    ABLATION_GREEDY_MI,
-    ABLATION_BEAM_MI,
-    ABLATION_RERANK,
+SWEEP_GREEDY = 'greedy'
+SWEEP_BEAM = 'beam'
+SWEEP_GREEDY_MI = 'greedy-mi'
+SWEEP_BEAM_MI = 'beam-mi'
+SWEEP_RERANK = 'rerank'
+SWEEPS = (
+    SWEEP_GREEDY,
+    SWEEP_BEAM,
+    SWEEP_GREEDY_MI,
+    SWEEP_BEAM_MI,
+    SWEEP_RERANK,
 )
 
 DATASETS = (
@@ -49,11 +49,12 @@ SCORES = (
     SCORE_BERT_SCORE,
 )
 
-parser = argparse.ArgumentParser(description='ablate and evaluate captioner')
-parser.add_argument('--ablations',
-                    default=ABLATIONS,
+parser = argparse.ArgumentParser(
+    description='sweep over captioner hyperparams')
+parser.add_argument('--sweeps',
+                    default=SWEEPS,
                     nargs='+',
-                    help='ablations to run (default: all)')
+                    help='sweeps to run (default: all)')
 parser.add_argument('--datasets',
                     default=DATASETS,
                     nargs='+',
@@ -78,43 +79,40 @@ parser.add_argument(
 parser.add_argument('--precompute-features',
                     action='store_true',
                     help='precompute visual features (default: do not)')
-parser.add_argument(
-    '--beam-size-min',
-    type=int,
-    default=5,
-    help='min temperature to try in mi ablations (default: .05)')
-parser.add_argument(
-    '--beam-size-max',
-    type=int,
-    default=50,
-    help='max temperature to try in mi ablations (default: .3)')
+parser.add_argument('--beam-size-min',
+                    type=int,
+                    default=5,
+                    help='min temperature to try in mi sweeps (default: .05)')
+parser.add_argument('--beam-size-max',
+                    type=int,
+                    default=50,
+                    help='max temperature to try in mi sweeps (default: .3)')
 parser.add_argument(
     '--beam-size-step',
     type=int,
     default=5,
-    help='step size for temperatures to try in mi ablations (default: .05)')
-parser.add_argument(
-    '--mi-temperature-min',
-    type=float,
-    default=.05,
-    help='min temperature to try in mi ablations (default: .05)')
-parser.add_argument(
-    '--mi-temperature-max',
-    type=float,
-    default=.75,
-    help='max temperature to try in mi ablations (default: .3)')
+    help='step size for temperatures to try in mi sweeps (default: .05)')
+parser.add_argument('--mi-temperature-min',
+                    type=float,
+                    default=.05,
+                    help='min temperature to try in mi sweeps (default: .05)')
+parser.add_argument('--mi-temperature-max',
+                    type=float,
+                    default=.75,
+                    help='max temperature to try in mi sweeps (default: .3)')
 parser.add_argument(
     '--mi-temperature-step',
     type=float,
     default=.05,
-    help='step size for temperatures to try in mi ablations (default: .05)')
+    help='step size for temperatures to try in mi sweeps (default: .05)')
 parser.add_argument('--data-dir',
                     type=pathlib.Path,
                     help='root dir for datasets (default: project data dir)')
-parser.add_argument('--results-dir',
-                    type=pathlib.Path,
-                    help='directory to write intermediate and final results '
-                    '(default: <project results dir>/captioner-ablations)')
+parser.add_argument(
+    '--results-dir',
+    type=pathlib.Path,
+    help='directory to write intermediate and final results '
+    '(default: <project results dir>/captioner-<encoder>-sweep)')
 parser.add_argument('--clear-results-dir',
                     action='store_true',
                     help='if set, clear results dir (default: do not)')
@@ -122,8 +120,7 @@ parser.add_argument('--wandb-project',
                     default='lv',
                     help='wandb project name (default: lv)')
 parser.add_argument('--wandb-name',
-                    default='captioner-sweep',
-                    help='wandb run name (default: captioner-sweep)')
+                    help='wandb run name (default: captioner-<encoder>-sweep)')
 parser.add_argument('--wandb-group',
                     default='captioner',
                     help='wandb group name (default: captioner)')
@@ -135,8 +132,10 @@ parser.add_argument(
 parser.add_argument('--device', help='manually set device (default: guessed)')
 args = parser.parse_args()
 
+config = args.encoder
+key = f'captioner-{config}-sweep'
 wandb.init(project=args.wandb_project,
-           name=args.wandb_name,
+           name=args.wandb_name or key,
            group=args.wandb_group)
 run = wandb.run
 assert run is not None, 'failed to initialize wandb?'
@@ -144,10 +143,8 @@ assert run is not None, 'failed to initialize wandb?'
 device = args.device or 'cuda' if cuda.is_available() else 'cpu'
 
 # Prepare necessary directories.
-config = args.encoder
 data_dir = args.data_dir or env.data_dir()
-results_dir = args.results_dir or (env.results_dir() /
-                                   f'captioner-{config}-sweep')
+results_dir = args.results_dir or (env.results_dir() / key)
 if args.clear_results_dir and results_dir.exists():
     shutil.rmtree(results_dir)
 results_dir.mkdir(exist_ok=True, parents=True)
@@ -183,7 +180,7 @@ lm_file = results_dir / 'lm.pth'
 if lm_file.exists():
     print(f'loading cached lm from {lm_file}')
     lm = models.LanguageModel.load(lm_file, map_location=device)
-elif {ABLATION_GREEDY_MI, ABLATION_BEAM_MI} & set(args.ablations):
+elif {SWEEP_GREEDY_MI, SWEEP_BEAM_MI} & set(args.ablations):
     lm = models.lm(train).to(device)
     lm.fit(train, device=device, display_progress_as='train lm')
     print(f'saving lm to {lm_file}')
@@ -262,18 +259,18 @@ def evaluate(**kwargs: Any) -> None:
 
 
 for ablation in args.ablations:
-    if ablation == ABLATION_GREEDY:
+    if ablation == SWEEP_GREEDY:
         evaluate(strategy='greedy', mi=False)
-    elif ablation == ABLATION_BEAM:
+    elif ablation == SWEEP_BEAM:
         for beam_size in numpy.arange(args.beam_size_min, args.beam_size_max,
                                       args.beam_size_step):
             evaluate(strategy='beam', mi=False, beam_size=beam_size)
-    elif ablation == ABLATION_GREEDY_MI:
+    elif ablation == SWEEP_GREEDY_MI:
         for temperature in numpy.arange(args.mi_temperature_min,
                                         args.mi_temperature_max,
                                         args.mi_temperature_step):
             evaluate(strategy='greedy', mi=True, temperature=temperature)
-    elif ablation == ABLATION_BEAM_MI:
+    elif ablation == SWEEP_BEAM_MI:
         for beam_size in numpy.arange(args.beam_size_min, args.beam_size_max,
                                       args.beam_size_step):
             for temperature in numpy.arange(args.mi_temperature_min,
@@ -284,7 +281,7 @@ for ablation in args.ablations:
                          mi=True,
                          temperature=temperature)
     else:
-        assert ablation == ABLATION_RERANK
+        assert ablation == SWEEP_RERANK
         for beam_size in numpy.arange(args.beam_size_min, args.beam_size_max,
                                       args.beam_size_step):
             for temperature in numpy.arange(args.mi_temperature_min,
