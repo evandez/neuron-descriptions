@@ -234,7 +234,7 @@ for dataset_name in args.datasets:
             decoder.to(device)
             assert isinstance(decoder, models.Decoder)
             captions = decoder.predict(
-                dataset,
+                dissected,
                 device=device,
                 display_progress_as=f'caption {cnn_name}/{dataset_name}',
                 strategy='rerank',
