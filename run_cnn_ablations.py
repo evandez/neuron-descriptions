@@ -110,7 +110,7 @@ parser.add_argument('--cnns',
                     nargs='+',
                     choices=CNNS,
                     default=CNNS,
-                    help='cnns to ablate (default: alexnet, resnet152)')
+                    help='cnns to ablate (default: resnet18)')
 parser.add_argument('--captioner',
                     nargs=2,
                     default=(lv.zoo.KEY_CAPTIONER_RESNET101, lv.zoo.KEY_ALL),
