@@ -1,4 +1,4 @@
-"""Run a series of ablations on the captioning model."""
+"""Run a series of sweeps on the captioning model."""
 import argparse
 import pathlib
 import shutil
@@ -180,7 +180,7 @@ lm_file = results_dir / 'lm.pth'
 if lm_file.exists():
     print(f'loading cached lm from {lm_file}')
     lm = models.LanguageModel.load(lm_file, map_location=device)
-elif {SWEEP_GREEDY_MI, SWEEP_BEAM_MI} & set(args.ablations):
+elif {SWEEP_GREEDY_MI, SWEEP_BEAM_MI} & set(args.sweeps):
     lm = models.lm(train).to(device)
     lm.fit(train, device=device, display_progress_as='train lm')
     print(f'saving lm to {lm_file}')
@@ -258,19 +258,19 @@ def evaluate(**kwargs: Any) -> None:
     wandb.log(log)
 
 
-for ablation in args.ablations:
-    if ablation == SWEEP_GREEDY:
+for sweep in args.sweeps:
+    if sweep == SWEEP_GREEDY:
         evaluate(strategy='greedy', mi=False)
-    elif ablation == SWEEP_BEAM:
+    elif sweep == SWEEP_BEAM:
         for beam_size in numpy.arange(args.beam_size_min, args.beam_size_max,
                                       args.beam_size_step):
             evaluate(strategy='beam', mi=False, beam_size=beam_size)
-    elif ablation == SWEEP_GREEDY_MI:
+    elif sweep == SWEEP_GREEDY_MI:
         for temperature in numpy.arange(args.mi_temperature_min,
                                         args.mi_temperature_max,
                                         args.mi_temperature_step):
             evaluate(strategy='greedy', mi=True, temperature=temperature)
-    elif ablation == SWEEP_BEAM_MI:
+    elif sweep == SWEEP_BEAM_MI:
         for beam_size in numpy.arange(args.beam_size_min, args.beam_size_max,
                                       args.beam_size_step):
             for temperature in numpy.arange(args.mi_temperature_min,
@@ -281,7 +281,7 @@ for ablation in args.ablations:
                          mi=True,
                          temperature=temperature)
     else:
-        assert ablation == SWEEP_RERANK
+        assert sweep == SWEEP_RERANK
         for beam_size in numpy.arange(args.beam_size_min, args.beam_size_max,
                                       args.beam_size_step):
             for temperature in numpy.arange(args.mi_temperature_min,
