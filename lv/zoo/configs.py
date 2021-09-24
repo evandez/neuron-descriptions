@@ -174,6 +174,7 @@ def datasets() -> core.DatasetConfigs:
                                url=f'{HOST}/data/biggan-places365.zip',
                                annotation_count=3),
         KEY_DINO_VITS8_IMAGENET:
-            core.DatasetConfig(lv.datasets.TopImagesDataset,
-                               url=f'{HOST}/data/dino_vits8-imagenet.zip'),
+            core.DatasetConfig(lv.datasets.AnnotatedTopImagesDataset,
+                               url=f'{HOST}/data/dino_vits8-imagenet.zip',
+                               annotation_count=3),
     }
