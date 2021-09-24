@@ -215,6 +215,7 @@ for dataset_name in args.datasets:
     assert isinstance(dataset, training.PreloadedImageFolder)
     for cnn_name in args.cnns:
         model_results_dir = results_dir / cnn_name / dataset_name
+        model_results_dir.mkdir(exist_ok=True, parents=True)
 
         cnn, *_ = lv.dissection.zoo.model(cnn_name, dataset_name)
         cnn = models.classifier(cnn).to(device).eval()
