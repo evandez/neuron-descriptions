@@ -68,8 +68,9 @@ parser.add_argument('--scores',
                     default=SCORES,
                     help='scores to compute (default: all)')
 parser.add_argument('--pretrained',
-                    nargs=2,
-                    help='use pretrained captioner (default: train captioner)')
+                    type=pathlib.Path,
+                    help='path to results dir from run_captioner_training.py; '
+                    'if set, use this captioner and its train/val splits')
 parser.add_argument(
     '--hold-out',
     type=float,
@@ -152,6 +153,12 @@ if args.clear_results_dir and results_dir.exists():
     shutil.rmtree(results_dir)
 results_dir.mkdir(exist_ok=True, parents=True)
 
+# Import pretrained captioner if necessary.
+if args.pretrained:
+    for child in args.pretrained.iterdir():
+        shutil.copy(child, results_dir)
+
+# Prepare BERT scorer.
 bert_scorer = None
 if SCORE_BERT_SCORE in args.scores:
     bert_scorer = bert_score.BERTScorer(lang='en',
@@ -185,11 +192,7 @@ elif {ABLATION_GREEDY_MI, ABLATION_BEAM_MI} & set(args.ablations):
     lm.save(lm_file)
 
 captioner_file = results_dir / 'captioner.pth'
-if args.pretrained:
-    decoder, *_ = zoo.model(*args.pretrained, map_location=device)
-    assert isinstance(decoder, models.Decoder)
-    encoder = decoder.encoder
-elif captioner_file.is_file() and splits_file.is_file():
+if captioner_file.is_file() and splits_file.is_file():
     print(f'loading cached captioner from {captioner_file}')
     decoder = models.Decoder.load(captioner_file, map_location=device).eval()
     encoder = decoder.encoder
