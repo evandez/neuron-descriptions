@@ -147,7 +147,7 @@ device = args.device or 'cuda' if cuda.is_available() else 'cpu'
 config = args.encoder
 data_dir = args.data_dir or env.data_dir()
 results_dir = args.results_dir or (env.results_dir() /
-                                   f'captioner-{config}-ablations')
+                                   f'captioner-{config}-sweep')
 if args.clear_results_dir and results_dir.exists():
     shutil.rmtree(results_dir)
 results_dir.mkdir(exist_ok=True, parents=True)
@@ -184,7 +184,7 @@ elif {ABLATION_GREEDY_MI, ABLATION_BEAM_MI} & set(args.ablations):
     print(f'saving lm to {lm_file}')
     lm.save(lm_file)
 
-captioner_file = results_dir / f'captioner-{config}.pth'
+captioner_file = results_dir / 'captioner.pth'
 if args.pretrained:
     decoder, *_ = zoo.model(*args.pretrained, map_location=device)
     assert isinstance(decoder, models.Decoder)
