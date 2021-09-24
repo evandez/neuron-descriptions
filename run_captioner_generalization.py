@@ -198,9 +198,15 @@ for experiment in args.experiments or EXPERIMENTS.keys():
         assert isinstance(test, data.Dataset)
 
         # Train the LM.
-        lm = models.lm(train)
-        lm.fit(train, device=device)
-        lm.save(results_dir / f'{experiment}-split{index}-lm.pth')
+        lm_file = results_dir / f'{experiment}-split{index}-lm.pth'
+        if lm_file.exists():
+            print(f'loading lm from {lm_file}')
+            lm = models.LanguageModel.load(lm_file, map_location=device)
+        else:
+            lm = models.lm(train)
+            lm.fit(train, device=device)
+            print(f'saving lm to {lm_file}')
+            lm.save(lm_file)
 
         # Maybe precompute image features.
         train_features, test_features = None, None
@@ -209,14 +215,21 @@ for experiment in args.experiments or EXPERIMENTS.keys():
             test_features = encoder.map(test, device=device)
 
         # Train the decoder.
-        decoder = models.decoder(train,
-                                 encoder,
-                                 lm=lm,
-                                 strategy='rerank',
-                                 beam_size=50,
-                                 temperature=.5)
-        decoder.fit(train, features=train_features, device=device)
-        decoder.save(results_dir / f'{experiment}-split{index}-captioner.pth')
+        decoder_file = results_dir / f'{experiment}-split{index}-captioner.pth'
+        if decoder_file.exists():
+            print(f'loading decoder from {decoder_file}')
+            decoder = models.Decoder.load(decoder_file, map_location=device)
+            decoder.eval()
+        else:
+            decoder = models.decoder(train,
+                                     encoder,
+                                     lm=lm,
+                                     strategy='rerank',
+                                     beam_size=50,
+                                     temperature=.5)
+            decoder.fit(train, features=train_features, device=device)
+            print(f'saving decoder to {decoder_file}')
+            decoder.save(decoder_file)
 
         # Test the decoder.
         predictions = decoder.predict(test,
