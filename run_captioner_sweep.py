@@ -86,7 +86,7 @@ parser.add_argument(
 parser.add_argument(
     '--beam-size-max',
     type=int,
-    default=25,
+    default=50,
     help='max temperature to try in mi ablations (default: .3)')
 parser.add_argument(
     '--beam-size-step',
@@ -101,12 +101,12 @@ parser.add_argument(
 parser.add_argument(
     '--mi-temperature-max',
     type=float,
-    default=.25,
+    default=.75,
     help='max temperature to try in mi ablations (default: .3)')
 parser.add_argument(
     '--mi-temperature-step',
     type=float,
-    default=.025,
+    default=.05,
     help='step size for temperatures to try in mi ablations (default: .05)')
 parser.add_argument('--data-dir',
                     type=pathlib.Path,
