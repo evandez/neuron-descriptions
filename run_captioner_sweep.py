@@ -123,8 +123,8 @@ parser.add_argument('--wandb-project',
                     default='lv',
                     help='wandb project name (default: lv)')
 parser.add_argument('--wandb-name',
-                    default='captioner-ablations',
-                    help='wandb run name (default: captioner-ablations)')
+                    default='captioner-sweep',
+                    help='wandb run name (default: captioner-sweep)')
 parser.add_argument('--wandb-group',
                     default='captioner',
                     help='wandb group name (default: captioner)')
