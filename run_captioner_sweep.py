@@ -212,11 +212,11 @@ else:
     print(f'saving captioner to {captioner_file}')
     decoder.save(captioner_file)
 
-    test_features = None
-    if args.precompute_features:
-        test_features = encoder.map(test,
-                                    device=device,
-                                    display_progress_as='featurize test set')
+test_features = None
+if args.precompute_features:
+    test_features = encoder.map(test,
+                                device=device,
+                                display_progress_as='featurize test set')
 
 
 def evaluate(**kwargs: Any) -> None:
