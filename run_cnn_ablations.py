@@ -196,7 +196,7 @@ data_dir = args.data_dir or env.data_dir()
 
 results_dir = args.results_dir
 if results_dir is None:
-    results_dir = env.results_dir() / 'cnn-cert'
+    results_dir = env.results_dir() / 'cnn-ablations'
 
 if args.clear_results_dir and results_dir.exists():
     shutil.rmtree(results_dir)
