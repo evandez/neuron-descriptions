@@ -2,7 +2,7 @@
 import argparse
 import pathlib
 import shutil
-from typing import Any
+from typing import Any, Dict
 
 from lv import models, zoo
 from lv.deps.ext import bert_score
@@ -14,15 +14,17 @@ import wandb
 from torch import cuda
 from torch.utils import data
 
-ABLATION_BASE = 'base'
+ABLATION_GREEDY = 'greedy'
 ABLATION_BEAM = 'beam'
-ABLATION_MI = 'mi'
+ABLATION_GREEDY_MI = 'greedy-mi'
 ABLATION_BEAM_MI = 'beam-mi'
+ABLATION_RERANK = 'rerank'
 ABLATIONS = (
-    ABLATION_BASE,
+    ABLATION_GREEDY,
     ABLATION_BEAM,
-    ABLATION_MI,
+    ABLATION_GREEDY_MI,
     ABLATION_BEAM_MI,
+    ABLATION_RERANK,
 )
 
 DATASETS = (
@@ -36,7 +38,8 @@ DATASETS = (
 
 ENCODER_RESNET18 = 'resnet18'
 ENCODER_RESNET50 = 'resnet50'
-ENCODERS = (ENCODER_RESNET18, ENCODER_RESNET50)
+ENCODER_RESNET101 = 'resnet101'
+ENCODERS = (ENCODER_RESNET18, ENCODER_RESNET50, ENCODER_RESNET101)
 
 SCORE_BLEU = 'bleu'
 SCORE_ROUGE = 'rouge'
@@ -56,14 +59,17 @@ parser.add_argument('--datasets',
                     default=DATASETS,
                     nargs='+',
                     help='datasets to train/test on (default: all)')
-parser.add_argument('--encoders',
-                    default=ENCODERS,
-                    nargs='+',
-                    help='encoders to try training decoder on (default: all)')
+parser.add_argument('--encoder',
+                    choices=ENCODERS,
+                    default=ENCODER_RESNET101,
+                    help='encoder config (default: resnet101)')
 parser.add_argument('--scores',
                     nargs='+',
                     default=SCORES,
                     help='scores to compute (default: all)')
+parser.add_argument('--pretrained',
+                    nargs=2,
+                    help='use pretrained captioner (default: train captioner)')
 parser.add_argument(
     '--hold-out',
     type=float,
@@ -138,8 +144,10 @@ assert run is not None, 'failed to initialize wandb?'
 device = args.device or 'cuda' if cuda.is_available() else 'cpu'
 
 # Prepare necessary directories.
+config = args.encoder
 data_dir = args.data_dir or env.data_dir()
-results_dir = args.results_dir or (env.results_dir() / 'captioner-ablations')
+results_dir = args.results_dir or (env.results_dir() /
+                                   f'captioner-{config}-ablations')
 if args.clear_results_dir and results_dir.exists():
     shutil.rmtree(results_dir)
 results_dir.mkdir(exist_ok=True, parents=True)
@@ -153,129 +161,134 @@ if SCORE_BERT_SCORE in args.scores:
                                         device=device)
 
 dataset = zoo.datasets(*args.datasets)
-for config in args.encoders:
-    print(f'---- begin ablations for {config} encoder ----')
 
-    splits_file = results_dir / f'{config}-splits.pth'
-    if splits_file.exists():
-        print(f'loading cached train/test splits from {splits_file}')
-        splits = torch.load(splits_file)
-        train = data.Subset(dataset, splits['train'])
-        test = data.Subset(dataset, splits['test'])
-    else:
-        train, test = training.random_split(dataset, hold_out=args.hold_out)
-        print(f'writing train/test splits to {splits_file}')
-        torch.save({'train': train.indices, 'test': test.indices}, splits_file)
+splits_file = results_dir / 'splits.pth'
+if splits_file.exists():
+    print(f'loading cached train/test splits from {splits_file}')
+    splits = torch.load(splits_file)
+    train = data.Subset(dataset, splits['train'])
+    test = data.Subset(dataset, splits['test'])
+else:
+    train, test = training.random_split(dataset, hold_out=args.hold_out)
+    print(f'writing train/test splits to {splits_file}')
+    torch.save({'train': train.indices, 'test': test.indices}, splits_file)
 
-    lm = None
-    lm_file = results_dir / f'{config}-lm.pth'
-    if lm_file.exists():
-        print(f'loading cached lm from {lm_file}')
-        lm = models.LanguageModel.load(lm_file, map_location=device)
-    elif ABLATION_MI in args.ablations or ABLATION_BEAM_MI in args.ablations:
-        lm = models.lm(train).to(device)
-        lm.fit(train,
-               device=device,
-               display_progress_as=f'(encoder={config}) train lm')
-        print(f'saving lm to {lm_file}')
-        lm.save(lm_file)
+lm = None
+lm_file = results_dir / 'lm.pth'
+if lm_file.exists():
+    print(f'loading cached lm from {lm_file}')
+    lm = models.LanguageModel.load(lm_file, map_location=device)
+elif {ABLATION_GREEDY_MI, ABLATION_BEAM_MI} & set(args.ablations):
+    lm = models.lm(train).to(device)
+    lm.fit(train, device=device, display_progress_as='train lm')
+    print(f'saving lm to {lm_file}')
+    lm.save(lm_file)
 
-    captioner_file = results_dir / f'{config}-captioner.pth'
-    if captioner_file.is_file() and splits_file.is_file():
-        print(f'loading cached captioner from {captioner_file}')
-        decoder = models.Decoder.load(captioner_file, map_location=device)
-        encoder = decoder.encoder
-    else:
-        encoder = models.encoder(config=config).to(device)
-        decoder = models.decoder(train, encoder, lm=lm).to(device)
+captioner_file = results_dir / f'captioner-{config}.pth'
+if args.pretrained:
+    decoder, *_ = zoo.model(*args.pretrained, map_location=device)
+    assert isinstance(decoder, models.Decoder)
+    encoder = decoder.encoder
+elif captioner_file.is_file() and splits_file.is_file():
+    print(f'loading cached captioner from {captioner_file}')
+    decoder = models.Decoder.load(captioner_file, map_location=device).eval()
+    encoder = decoder.encoder
+else:
+    encoder = models.encoder(config=config).to(device)
+    decoder = models.decoder(train, encoder, lm=lm).to(device)
 
-        train_features = None
-        if args.precompute_features:
-            train_features = encoder.map(
-                train,
-                device=device,
-                display_progress_as=f'(encoder={config}) featurize train set')
+    train_features = None
+    if args.precompute_features:
+        train_features = encoder.map(train,
+                                     device=device,
+                                     display_progress_as='featurize train set')
 
-        decoder.fit(train,
-                    features=train_features,
-                    display_progress_as=f'(encoder={config}) train decoder',
-                    device=device)
+    decoder.fit(train,
+                features=train_features,
+                display_progress_as='train decoder',
+                device=device)
 
-        print(f'saving captioner to {captioner_file}')
-        decoder.save(captioner_file)
+    print(f'saving captioner to {captioner_file}')
+    decoder.save(captioner_file)
 
-        test_features = None
-        if args.precompute_features:
-            test_features = encoder.map(
-                test,
-                device=device,
-                display_progress_as=f'(encoder={config}) featurize test set')
+    test_features = None
+    if args.precompute_features:
+        test_features = encoder.map(test,
+                                    device=device,
+                                    display_progress_as='featurize test set')
 
-    def evaluate(**kwargs: Any) -> None:
-        """Evaluate the captioner with the given args."""
-        metadata = viz.kwargs_to_str(**kwargs)
-        predictions = decoder.predict(
-            test,
-            features=test_features,
-            device=device,
-            display_progress_as=f'({metadata}) predict captions',
-            **kwargs)
 
-        log = {
-            'encoder': config,
-            'condition': kwargs,
-        }
-        if SCORE_BLEU in args.scores:
-            bleu = decoder.bleu(test, predictions=predictions)
-            log['bleu'] = bleu.score
-            for index, precision in enumerate(bleu.precisions):
-                log[f'bleu-{index + 1}'] = precision
+def evaluate(**kwargs: Any) -> None:
+    """Evaluate the captioner with the given args."""
+    assert isinstance(decoder, models.Decoder)
+    metadata = viz.kwargs_to_str(**kwargs)
+    predictions = decoder.predict(
+        test,
+        features=test_features,
+        device=device,
+        display_progress_as=f'({metadata}) predict captions',
+        **kwargs)
 
-        if SCORE_ROUGE in args.scores:
-            rouge = decoder.rouge(test, predictions=predictions)
-            for kind, scores in rouge.items():
-                for key, score in scores.items():
-                    log[f'{kind}-{key}'] = score
+    log: Dict[str, Any] = {'condition': kwargs}
+    if SCORE_BLEU in args.scores:
+        bleu = decoder.bleu(test, predictions=predictions)
+        log['bleu'] = bleu.score
+        for index, precision in enumerate(bleu.precisions):
+            log[f'bleu-{index + 1}'] = precision
 
-        if SCORE_BERT_SCORE in args.scores:
-            assert bert_scorer is not None
-            bert_scores = decoder.bert_score(test,
-                                             predictions=predictions,
-                                             bert_scorer=bert_scorer)
-            for kind, score in bert_scores.items():
-                log[f'bert_score-{kind}'] = score
+    if SCORE_ROUGE in args.scores:
+        rouge = decoder.rouge(test, predictions=predictions)
+        for kind, scores in rouge.items():
+            for key, score in scores.items():
+                log[f'{kind}-{key}'] = score
 
-        log['samples'] = viz.random_neuron_wandb_images(
-            test,
-            captions=predictions,
-            k=args.wandb_n_samples,
-            **kwargs,
-        )
+    if SCORE_BERT_SCORE in args.scores:
+        assert bert_scorer is not None
+        bert_scores = decoder.bert_score(test,
+                                         predictions=predictions,
+                                         bert_scorer=bert_scorer)
+        for kind, score in bert_scores.items():
+            log[f'bert_score-{kind}'] = score
 
-        wandb.log(log)
+    log['samples'] = viz.random_neuron_wandb_images(
+        test,
+        captions=predictions,
+        k=args.wandb_n_samples,
+        **kwargs,
+    )
 
-    for ablation in args.ablations:
-        if ablation == ABLATION_BASE:
-            evaluate(strategy='greedy', mi=False)
-        elif ablation == ABLATION_BEAM:
-            for beam_size in numpy.arange(args.beam_size_min,
-                                          args.beam_size_max,
-                                          args.beam_size_step):
-                evaluate(strategy='beam', mi=False, beam_size=beam_size)
-        elif ablation == ABLATION_MI:
+    wandb.log(log)
+
+
+for ablation in args.ablations:
+    if ablation == ABLATION_GREEDY:
+        evaluate(strategy='greedy', mi=False)
+    elif ablation == ABLATION_BEAM:
+        for beam_size in numpy.arange(args.beam_size_min, args.beam_size_max,
+                                      args.beam_size_step):
+            evaluate(strategy='beam', mi=False, beam_size=beam_size)
+    elif ablation == ABLATION_GREEDY_MI:
+        for temperature in numpy.arange(args.mi_temperature_min,
+                                        args.mi_temperature_max,
+                                        args.mi_temperature_step):
+            evaluate(strategy='greedy', mi=True, temperature=temperature)
+    elif ablation == ABLATION_BEAM_MI:
+        for beam_size in numpy.arange(args.beam_size_min, args.beam_size_max,
+                                      args.beam_size_step):
             for temperature in numpy.arange(args.mi_temperature_min,
                                             args.mi_temperature_max,
                                             args.mi_temperature_step):
-                evaluate(strategy='greedy', mi=True, temperature=temperature)
-        else:
-            assert ablation == ABLATION_BEAM_MI
-            for beam_size in numpy.arange(args.beam_size_min,
-                                          args.beam_size_max,
-                                          args.beam_size_step):
-                for temperature in numpy.arange(args.mi_temperature_min,
-                                                args.mi_temperature_max,
-                                                args.mi_temperature_step):
-                    evaluate(strategy='beam',
-                             beam_size=beam_size,
-                             mi=True,
-                             temperature=temperature)
+                evaluate(strategy='beam',
+                         beam_size=beam_size,
+                         mi=True,
+                         temperature=temperature)
+    else:
+        assert ablation == ABLATION_RERANK
+        for beam_size in numpy.arange(args.beam_size_min, args.beam_size_max,
+                                      args.beam_size_step):
+            for temperature in numpy.arange(args.mi_temperature_min,
+                                            args.mi_temperature_max,
+                                            args.mi_temperature_step):
+                evaluate(strategy='rerank',
+                         beam_size=beam_size,
+                         temperature=temperature)
