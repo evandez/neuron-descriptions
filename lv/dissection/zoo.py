@@ -11,7 +11,7 @@ from lv.dissection import datasets as lv_datasets
 from lv.dissection import transforms as lv_transforms
 from lv.utils.typing import Layer
 from lv.zoo import (KEY_ALEXNET, KEY_BIGGAN, KEY_DINO_VITS8, KEY_IMAGENET,
-                    KEY_PLACES365, KEY_RESNET152)
+                    KEY_PLACES365, KEY_RESNET18, KEY_RESNET152)
 
 import torch
 from torch import nn
@@ -21,13 +21,9 @@ from torchvision import datasets, transforms
 LV_HOST = 'https://unitname.csail.mit.edu/dissect/models'
 DISSECT_HOST = 'https://dissect.csail.mit.edu/models'
 
-KEY_RESNET18 = 'resnet18'
-
 KEY_SPURIOUS_IMAGENET_TEXT = 'spurious-imagenet-text'
 KEY_SPURIOUS_IMAGENET_COLOR = 'spurious-imagenet-color'
 
-KEY_RESNET18_IMAGENET = f'{KEY_RESNET18}/{KEY_IMAGENET}'
-KEY_RESNET18_PLACES365 = f'{KEY_RESNET18}/{KEY_PLACES365}'
 KEY_BIGGAN_ZS_IMAGENET = 'biggan-zs-imagenet'
 KEY_BIGGAN_ZS_PLACES365 = 'biggan-zs-places365'
 
