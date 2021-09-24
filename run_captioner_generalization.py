@@ -94,21 +94,6 @@ parser.add_argument('--hold-out',
                     type=float,
                     default=.1,
                     help='hold out this fraction of data for testing')
-parser.add_argument('--strategy',
-                    default='rerank',
-                    help='decoding strategy (default: rerank)')
-parser.add_argument(
-    '--no-mi',
-    action='store_true',
-    help='if set, do not test with mi decoding (default: use mi decoding)')
-parser.add_argument('--beam-size',
-                    type=int,
-                    default=20,
-                    help='beam size for beam search decoding (default: 20)')
-parser.add_argument('--temperature',
-                    type=float,
-                    default=.075,
-                    help='mi decoding temperature (default: .075)')
 parser.add_argument('--precompute-features',
                     action='store_true',
                     help='precompute visual features (default: do not)')
@@ -227,15 +212,14 @@ for experiment in args.experiments or EXPERIMENTS.keys():
         decoder = models.decoder(train,
                                  encoder,
                                  lm=lm,
-                                 strategy=args.strategy,
-                                 beam_size=args.beam_size,
-                                 temperature=args.temperature)
+                                 strategy='rerank',
+                                 beam_size=50,
+                                 temperature=.5)
         decoder.fit(train, features=train_features, device=device)
         decoder.save(results_dir / f'{experiment}-split{index}-captioner.pth')
 
         # Test the decoder.
         predictions = decoder.predict(test,
-                                      mi=not args.no_mi,
                                       features=test_features,
                                       device=device)
         bleu = decoder.bleu(test, predictions=predictions)
