@@ -65,14 +65,14 @@ EXPERIMENTS: Mapping[str, Splits] = {
         ),
         ('biggan/imagenet', 'biggan/places365'),
     ),
-    EXPERIMENT_LEAVE_ONE_OUT: ((
-        'alexnet/imagenet',
-        'alexnet/places365',
-        'resnet152/imagenet',
-        'resnet152/places365',
-        'biggan/imagenet',
-        'biggan/places365',
-    ),)
+    # EXPERIMENT_LEAVE_ONE_OUT: ((
+    #     'alexnet/imagenet',
+    #     'alexnet/places365',
+    #     'resnet152/imagenet',
+    #     'resnet152/places365',
+    #     'biggan/imagenet',
+    #     'biggan/places365',
+    # ),)
 }
 
 parser = argparse.ArgumentParser(
