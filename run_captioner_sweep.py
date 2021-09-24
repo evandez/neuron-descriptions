@@ -12,7 +12,6 @@ import numpy
 import torch
 import wandb
 from torch import cuda
-from torch.utils import data
 
 ABLATION_GREEDY = 'greedy'
 ABLATION_BEAM = 'beam'
@@ -173,8 +172,7 @@ splits_file = results_dir / 'splits.pth'
 if splits_file.exists():
     print(f'loading cached train/test splits from {splits_file}')
     splits = torch.load(splits_file)
-    train = data.Subset(dataset, splits['train'])
-    test = data.Subset(dataset, splits['test'])
+    test, train = training.fixed_split(dataset, splits['train'])
 else:
     train, test = training.random_split(dataset, hold_out=args.hold_out)
     print(f'writing train/test splits to {splits_file}')
