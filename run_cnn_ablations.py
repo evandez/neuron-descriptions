@@ -352,7 +352,7 @@ for dataset_name in args.datasets:
                             display_progress_as='test ablated '
                             f'{cnn_name}/{dataset_name} '
                             f'(cond={experiment}, '
-                            f'trial={trial + 1}, '
+                            f'trial={trial}, '
                             f'order={order}, '
                             f'frac={fraction:.2f})',
                             device=device)
@@ -384,7 +384,7 @@ for dataset_name in args.datasets:
                             'dataset': dataset_name,
                             'group': group,
                             'experiment': experiment,
-                            'trial': trial + 1,
+                            'trial': trial,
                             'order': order,
                             'frac_ablated': fraction,
                             'n_ablated': len(ablated),
