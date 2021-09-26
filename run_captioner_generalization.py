@@ -2,7 +2,7 @@
 import argparse
 import pathlib
 import shutil
-from typing import Dict, Mapping, NamedTuple, Optional, Tuple
+from typing import Mapping, NamedTuple, Tuple
 
 from lv import models, zoo
 from lv.deps.ext import bert_score
@@ -31,7 +31,7 @@ EXPERIMENT_WITHIN_NETWORK = 'within-network'
 EXPERIMENT_ACROSS_NETWORK = 'across-network'
 EXPERIMENT_ACROSS_DATASET = 'across-dataset'
 EXPERIMENT_ACROSS_TASK = 'across-task'
-EXPERIMENT_LEAVE_ONE_OUT = 'leave-one-out'
+EXPERIMENT_ACROSS_ARCH = 'across-arch'
 EXPERIMENTS: Mapping[str, Splits] = {
     EXPERIMENT_WITHIN_NETWORK: ((
         'alexnet/imagenet',
@@ -66,6 +66,17 @@ EXPERIMENTS: Mapping[str, Splits] = {
         ),
         ('biggan/imagenet', 'biggan/places365'),
     ),
+    EXPERIMENT_ACROSS_ARCH: (
+        (
+            'alexnet/imagenet',
+            'alexnet/places365',
+            'resnet152/imagenet',
+            'resnet152/places365',
+            'biggan/imagenet',
+            'biggan/places365',
+        ),
+        ('dino_vits8/imagenet',),
+    )
 }
 
 parser = argparse.ArgumentParser(
@@ -146,11 +157,11 @@ for experiment in args.experiments or EXPERIMENTS.keys():
     if len(splits) == 2:
         left = zoo.datasets(*splits[0], path=data_dir)
         right = zoo.datasets(*splits[1], path=data_dir)
-        configs = [
-            LoadedSplit(left, right, *splits),
-            LoadedSplit(right, left, *reversed(splits)),
-        ]
-    elif experiment == EXPERIMENT_WITHIN_NETWORK:
+        configs = [LoadedSplit(left, right, *splits)]
+        if experiment != EXPERIMENT_ACROSS_ARCH:
+            configs += [LoadedSplit(right, left, *reversed(splits))]
+    else:
+        assert experiment == EXPERIMENT_WITHIN_NETWORK
         assert len(splits) == 1
         names, = splits
         configs = []
@@ -170,37 +181,6 @@ for experiment in args.experiments or EXPERIMENTS.keys():
                         'test': split[1].indices,
                     }, splits_file)
             configs.append(LoadedSplit(*split, (name,), (name,)))
-    else:
-        assert len(splits) == 1
-        assert experiment == EXPERIMENT_LEAVE_ONE_OUT
-
-        names, = splits
-
-        datasets_by_name: Dict[str, data.Dataset] = {}
-        for name in names:
-            dataset = zoo.datasets(name, path=data_dir)
-            datasets_by_name[name] = dataset
-
-        unique = set(names)
-        configs = []
-        for name in unique:
-
-            test_keys: StrSequence = (name,)
-            test = datasets_by_name[name]
-
-            train_keys: StrSequence = tuple(sorted(unique - {name}))
-            assert train_keys
-
-            train: Optional[data.Dataset] = None
-            for other in train_keys:
-                if train is None:
-                    train = datasets_by_name[other]
-                else:
-                    assert train is not None
-                    train += datasets_by_name[other]
-
-            assert train is not None
-            configs.append(LoadedSplit(train, test, train_keys, test_keys))
 
     # For every train/test set, train the captioner, test it, and log.
     for index, (train, test, train_keys, test_keys) in enumerate(configs):
