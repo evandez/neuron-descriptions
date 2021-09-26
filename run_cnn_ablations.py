@@ -239,7 +239,7 @@ for dataset_name in args.datasets:
                 device=device,
                 display_progress_as=f'caption {cnn_name}/{dataset_name}',
                 strategy='rerank',
-                temperature=.5,
+                temperature=.2,
                 beam_size=50)
             print(f'saving captions to {captions_file}')
             with captions_file.open('w') as handle:

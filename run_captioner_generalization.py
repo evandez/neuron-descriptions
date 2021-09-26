@@ -226,7 +226,7 @@ for experiment in args.experiments or EXPERIMENTS.keys():
                                      lm=lm,
                                      strategy='rerank',
                                      beam_size=50,
-                                     temperature=.5)
+                                     temperature=.2)
             decoder.fit(train, features=train_features, device=device)
             print(f'saving decoder to {decoder_file}')
             decoder.save(decoder_file)

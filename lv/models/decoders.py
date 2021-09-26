@@ -226,9 +226,9 @@ class Decoder(serialize.SerializableModule):
                  attention_hidden_size: Optional[int] = None,
                  dropout: float = .5,
                  length: int = 15,
-                 strategy: str = STRATEGY_GREEDY,
-                 temperature: float = .075,
-                 beam_size: int = 20):
+                 strategy: str = STRATEGY_RERANK,
+                 temperature: float = .2,
+                 beam_size: int = 50):
         """Initialize the decoder.
 
         Args:
@@ -250,13 +250,13 @@ class Decoder(serialize.SerializableModule):
             length (int, optional): Default decoding length. Defaults to 15.
             strategy (str, optional): Default decoding strategy. Note that
                 force decoding is not supported as a default.
-                Defaults to 'greedy'.
+                Defaults to 'rerank'.
             temperature (float, optional): Default temperature parameter to use
                 when MI decoding. When not MI decoding, this parameter does
-                nothing. Defaults to .075.
+                nothing. Defaults to .2.
             beam_size (int, optional): Default beam size for beam search
                 decoding. When not decoding with beam search, this parameter
-                does nothing. Defaults to 20.
+                does nothing. Defaults to 50.
 
         Raises:
             ValueError: If LM is set but has a different vocabulary than the

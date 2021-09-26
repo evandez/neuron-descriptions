@@ -258,7 +258,7 @@ for experiment in args.experiments:
         else:
             captions = decoder.predict(dissected,
                                        strategy='rerank',
-                                       temperature=0.075,
+                                       temperature=.2,
                                        beam_size=50,
                                        device=device)
             print(f'saving captions to {captions_file}')
