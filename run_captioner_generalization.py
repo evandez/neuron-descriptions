@@ -9,6 +9,7 @@ from lv.deps.ext import bert_score
 from lv.utils import env, training, viz
 from lv.utils.typing import StrSequence
 
+import torch
 import wandb
 from torch import cuda
 from torch.utils import data
@@ -65,14 +66,6 @@ EXPERIMENTS: Mapping[str, Splits] = {
         ),
         ('biggan/imagenet', 'biggan/places365'),
     ),
-    # EXPERIMENT_LEAVE_ONE_OUT: ((
-    #     'alexnet/imagenet',
-    #     'alexnet/places365',
-    #     'resnet152/imagenet',
-    #     'resnet152/places365',
-    #     'biggan/imagenet',
-    #     'biggan/places365',
-    # ),)
 }
 
 parser = argparse.ArgumentParser(
@@ -80,6 +73,10 @@ parser = argparse.ArgumentParser(
 parser.add_argument('--experiments',
                     nargs='+',
                     help='experiments to run (default: all experiments)')
+parser.add_argument('--trials',
+                    type=int,
+                    default=5,
+                    help='repeat each experiment this many times (default: 5)')
 parser.add_argument('--data-dir',
                     type=pathlib.Path,
                     help='root dir for datasets (default: project data dir)')
@@ -115,7 +112,8 @@ args = parser.parse_args()
 
 wandb.init(project=args.wandb_project,
            name=args.wandb_name,
-           group=args.wandb_group)
+           group=args.wandb_group,
+           config={'trials': args.trials})
 run = wandb.run
 assert run is not None, 'failed to initialize wandb?'
 
@@ -158,7 +156,19 @@ for experiment in args.experiments or EXPERIMENTS.keys():
         configs = []
         for name in names:
             dataset = zoo.datasets(name, path=data_dir)
-            split = training.random_split(dataset, hold_out=.1)
+            splits_file = results_dir / f'{name.replace("/", "_")}-splits.pth'
+            if splits_file.exists():
+                print(f'loading {name} w/i-network splits from {splits_file}')
+                indices = torch.load(splits_file)['test']
+                split = training.fixed_split(dataset, indices)
+            else:
+                split = training.random_split(dataset, hold_out=args.hold_out)
+                print(f'saving {name} w/i-network splits to {splits_file}')
+                torch.save(
+                    {
+                        'train': split[0].indices,
+                        'test': split[1].indices,
+                    }, splits_file)
             configs.append(LoadedSplit(*split, (name,), (name,)))
     else:
         assert len(splits) == 1
@@ -197,69 +207,75 @@ for experiment in args.experiments or EXPERIMENTS.keys():
         assert isinstance(train, data.Dataset)
         assert isinstance(test, data.Dataset)
 
-        # Train the LM.
-        lm_file = results_dir / f'{experiment}-split{index}-lm.pth'
-        if lm_file.exists():
-            print(f'loading lm from {lm_file}')
-            lm = models.LanguageModel.load(lm_file, map_location=device)
-        else:
-            lm = models.lm(train)
-            lm.fit(train, device=device)
-            print(f'saving lm to {lm_file}')
-            lm.save(lm_file)
-
         # Maybe precompute image features.
         train_features, test_features = None, None
         if args.precompute_features:
             train_features = encoder.map(train, device=device)
             test_features = encoder.map(test, device=device)
 
-        # Train the decoder.
-        decoder_file = results_dir / f'{experiment}-split{index}-captioner.pth'
-        if decoder_file.exists():
-            print(f'loading decoder from {decoder_file}')
-            decoder = models.Decoder.load(decoder_file, map_location=device)
-            decoder.eval()
-        else:
-            decoder = models.decoder(train,
-                                     encoder,
-                                     lm=lm,
-                                     strategy='rerank',
-                                     beam_size=50,
-                                     temperature=.2)
-            decoder.fit(train, features=train_features, device=device)
-            print(f'saving decoder to {decoder_file}')
-            decoder.save(decoder_file)
+        for trial in range(args.trials):
+            trial_key = f'{experiment}-split{index}-trial{trial}'
 
-        # Test the decoder.
-        predictions = decoder.predict(test,
-                                      features=test_features,
-                                      device=device)
-        bleu = decoder.bleu(test, predictions=predictions)
-        rouge = decoder.rouge(test, predictions=predictions)
-        bert_scores = decoder.bert_score(test,
-                                         predictions=predictions,
-                                         bert_scorer=bert_scorer)
+            # Train the LM.
+            lm_file = results_dir / f'{trial_key}-lm.pth'
+            if lm_file.exists():
+                print(f'loading lm from {lm_file}')
+                lm = models.LanguageModel.load(lm_file, map_location=device)
+            else:
+                lm = models.lm(train)
+                lm.fit(train, device=device)
+                print(f'saving lm to {lm_file}')
+                lm.save(lm_file)
 
-        # Log ALL the things!
-        log = {
-            'experiment': experiment,
-            'train': tuple(train_keys),
-            'test': tuple(test_keys),
-            'bleu': bleu.score,
-        }
-        for index, precision in enumerate(bleu.precisions):
-            log[f'bleu-{index + 1}'] = precision
-        for kind, scores in rouge.items():
-            for key, score in scores.items():
-                log[f'{kind}-{key}'] = score
-        for kind, score in bert_scores.items():
-            log[f'bert_score-{kind}'] = score
-        log['samples'] = viz.random_neuron_wandb_images(
-            test,
-            captions=predictions,
-            k=args.wandb_n_samples,
-            experiment=experiment,
-            train=tuple(train_keys),
-            test=tuple(test_keys))
-        wandb.log(log)
+            # Train the decoder.
+            decoder_file = results_dir / f'{trial_key}-captioner.pth'
+            if decoder_file.exists():
+                print(f'loading decoder from {decoder_file}')
+                decoder = models.Decoder.load(decoder_file,
+                                              map_location=device)
+                decoder.eval()
+            else:
+                decoder = models.decoder(train,
+                                         encoder,
+                                         lm=lm,
+                                         strategy='rerank',
+                                         beam_size=50,
+                                         temperature=.2)
+                decoder.fit(train, features=train_features, device=device)
+                print(f'saving decoder to {decoder_file}')
+                decoder.save(decoder_file)
+
+            # Test the decoder.
+            predictions = decoder.predict(test,
+                                          features=test_features,
+                                          device=device)
+            bleu = decoder.bleu(test, predictions=predictions)
+            rouge = decoder.rouge(test, predictions=predictions)
+            bert_scores = decoder.bert_score(test,
+                                             predictions=predictions,
+                                             bert_scorer=bert_scorer)
+
+            # Log ALL the things!
+            log = {
+                'experiment': experiment,
+                'trial': trial,
+                'train': tuple(train_keys),
+                'test': tuple(test_keys),
+                'bleu': bleu.score,
+            }
+            for index, precision in enumerate(bleu.precisions):
+                log[f'bleu-{index + 1}'] = precision
+            for kind, scores in rouge.items():
+                for key, score in scores.items():
+                    log[f'{kind}-{key}'] = score
+            for kind, score in bert_scores.items():
+                log[f'bert_score-{kind}'] = score
+            log['samples'] = viz.random_neuron_wandb_images(
+                test,
+                captions=predictions,
+                k=args.wandb_n_samples,
+                experiment=experiment,
+                trial=trial,
+                train=tuple(train_keys),
+                test=tuple(test_keys))
+            wandb.log(log)
