@@ -75,6 +75,9 @@ parser.add_argument(
 parser.add_argument('--fine-tune',
                     action='store_true',
                     help='fine tune last fully-connected cnn layers')
+parser.add_argument('--no-mi',
+                    action='store_true',
+                    help='run the certification, but dont use MI decoding')
 parser.add_argument('--captioner-file',
                     type=pathlib.Path,
                     help='captioner weights file (default: loaded from zoo)')
@@ -256,11 +259,13 @@ for experiment in args.experiments:
                 captions = handle.read().split('\n')
             assert len(captions) == len(dissected)
         else:
-            captions = decoder.predict(dissected,
-                                       strategy='rerank',
-                                       temperature=.2,
-                                       beam_size=50,
-                                       device=device)
+            captions = decoder.predict(
+                dissected,
+                strategy='beam' if args.no_mi else 'rerank',
+                mi=False if args.no_mi else None,
+                temperature=.2,
+                beam_size=50,
+                device=device)
             print(f'saving captions to {captions_file}')
             with captions_file.open('w') as handle:
                 handle.write('\n'.join(captions))
