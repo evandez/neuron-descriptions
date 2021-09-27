@@ -1,4 +1,5 @@
 """Extensions for `bert_score` library."""
+import os
 from typing import Any
 
 import bert_score
@@ -15,6 +16,7 @@ class BERTScorer(bert_score.BERTScorer):
     def __init__(self,
                  *args: Any,
                  silence_warnings: bool = True,
+                 disable_parallelism: bool = True,
                  **kwargs: Any):
         """Initialize BERTScorer.
 
@@ -24,11 +26,16 @@ class BERTScorer(bert_score.BERTScorer):
         Args:
             silence_warnings (bool, optional): Silence all `transformers`
                 warnings when instantiating. Defaults to True.
+            disable_parallelism (bool, optional): Disable `transformers`
+                parallelism because it causes many warnings.
 
         """
         verbosity = logging.get_verbosity()
         if silence_warnings:
             logging.set_verbosity_error()
+
+        if disable_parallelism:
+            os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 
         super().__init__(*args, **kwargs)
 
