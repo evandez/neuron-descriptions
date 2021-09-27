@@ -183,7 +183,7 @@ for experiment in args.experiments or EXPERIMENTS.keys():
             configs.append(LoadedSplit(*split, (name,), (name,)))
 
     # For every train/test set, train the captioner, test it, and log.
-    for index, (train, test, train_keys, test_keys) in enumerate(configs):
+    for split_id, (train, test, train_keys, test_keys) in enumerate(configs):
         assert isinstance(train, data.Dataset)
         assert isinstance(test, data.Dataset)
 
@@ -193,8 +193,8 @@ for experiment in args.experiments or EXPERIMENTS.keys():
             train_features = encoder.map(train, device=device)
             test_features = encoder.map(test, device=device)
 
-        for trial in range(args.trials):
-            trial_key = f'{experiment}-split{index}-trial{trial}'
+        for trial_id in range(args.trials):
+            trial_key = f'{experiment}-split{split_id}-trial{trial_id}'
 
             # Train the LM.
             lm_file = results_dir / f'{trial_key}-lm.pth'
@@ -238,7 +238,7 @@ for experiment in args.experiments or EXPERIMENTS.keys():
             # Log ALL the things!
             log = {
                 'experiment': experiment,
-                'trial': trial,
+                'trial': trial_id,
                 'train': tuple(train_keys),
                 'test': tuple(test_keys),
                 'bleu': bleu.score,
@@ -255,7 +255,7 @@ for experiment in args.experiments or EXPERIMENTS.keys():
                 captions=predictions,
                 k=args.wandb_n_samples,
                 experiment=experiment,
-                trial=trial,
+                trial=trial_id,
                 train=tuple(train_keys),
                 test=tuple(test_keys))
             wandb.log(log)
