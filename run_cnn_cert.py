@@ -7,6 +7,7 @@ import shutil
 
 import lv.zoo
 from lv import datasets, models
+from lv.deps.netdissect import renormalize
 from lv.dissection import dissect, zoo
 from lv.utils import env, training, viz
 from lv.utils.typing import StrSequence
@@ -212,9 +213,9 @@ for experiment in args.experiments:
                 'val': val.indices
             }, splits_file)
 
-        cnn, layers, config = zoo.model(args.cnn,
-                                        zoo.KEY_IMAGENET,
-                                        pretrained=False)
+        cnn, layers, _ = zoo.model(args.cnn,
+                                   zoo.KEY_IMAGENET,
+                                   pretrained=False)
         cnn = models.classifier(cnn).to(device)
 
         cnn_file = experiment_dir / f'{args.cnn}-{version}.pth'
@@ -248,7 +249,11 @@ for experiment in args.experiments:
                 tally_cache_file=dissection_dir / layer / 'tally.npz',
                 masks_cache_file=dissection_dir / layer / 'masks.npz',
                 device=device,
-                **config.dissection.kwargs,
+                # Have to manually set these since they cannot be inferred
+                # from our custom dataset type.
+                image_size=224,
+                renormalizer=renormalize.renormalizer(source='imagenet',
+                                                      target='byte'),
             )
         dissected = datasets.TopImagesDataset(dissection_dir)
 
