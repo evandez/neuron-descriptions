@@ -43,15 +43,10 @@ LAYERS.RESNET152 = LAYERS.RESNET18
 LAYERS.SHUFFLENET_V2_X1_0 = ('conv1', 'stage2', 'stage3', 'stage4', 'conv5')
 LAYERS.SQUEEZENET1_0 = (
     f'features.{index}' for index in (0, 3, 4, 5, 7, 8, 9, 10, 12))
-LAYERS.VGG11 = tuple(
-    f'features.{index}' for index in (0, 3, 6, 8, 11, 13, 16, 18))
-LAYERS.VGG13 = tuple(
-    f'features.{index}' for index in (0, 2, 5, 7, 10, 12, 15, 17, 20, 22))
-LAYERS.VGG16 = tuple(f'features.{index}' for index in (0, 2, 5, 7, 10, 12, 14,
-                                                       17, 19, 21, 24, 26, 28))
-LAYERS.VGG19 = tuple(f'features.{index}' for index in (0, 2, 5, 7, 10, 12, 14,
-                                                       16, 19, 21, 23, 25, 28,
-                                                       30, 32, 34))
+LAYERS.VGG11 = tuple(f'features.{index}' for index in (0, 3, 8, 13, 18))
+LAYERS.VGG13 = tuple(f'features.{index}' for index in (2, 7, 12, 17, 22))
+LAYERS.VGG16 = tuple(f'features.{index}' for index in (2, 7, 14, 21, 28))
+LAYERS.VGG19 = tuple(f'features.{index}' for index in (2, 7, 16, 25, 34))
 
 
 @dataclasses.dataclass(frozen=True)
