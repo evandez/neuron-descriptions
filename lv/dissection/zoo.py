@@ -29,8 +29,9 @@ KEYS.BIGGAN_ZS_PLACES365 = 'biggan-zs-places365'
 LAYERS = easydict.EasyDict()
 LAYERS.ALEXNET = ('conv1', 'conv2', 'conv3', 'conv4', 'conv5')
 LAYERS.BIGGAN = ('layer0', 'layer1', 'layer2', 'layer3', 'layer4', 'layer5')
-LAYERS.DENSENET121 = ()
-LAYERS.DENSENET201 = ()
+LAYERS.DENSENET121 = ('features.conv0', *(
+    f'features.denseblock{index}' for index in range(1, 5)))
+LAYERS.DENSENET201 = LAYERS.DENSENET121
 LAYERS.DINO_VITS8 = tuple(f'blocks.{layer}.mlp.fc1' for layer in range(12))
 LAYERS.MOBILENET_V2 = ()
 LAYERS.RESNET18 = ('conv1', 'layer1', 'layer2', 'layer3', 'layer4')
