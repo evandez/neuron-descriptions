@@ -39,6 +39,10 @@ parser.add_argument('--dataset-path',
 parser.add_argument('--no-viz',
                     action='store_true',
                     help='do not compute visualization')
+parser.add_argument('--num-workers',
+                    type=int,
+                    default=16,
+                    help='number of worker threads (default: 16)')
 parser.add_argument('--device', help='manually set device (default: guessed)')
 args = parser.parse_args()
 
@@ -91,6 +95,7 @@ for layer in layers:
                            viz_dir=viz_dir,
                            save_viz=not args.no_viz,
                            device=device,
+                           num_workers=args.num_workers,
                            **config.dissection.kwargs)
     else:
         dissect.discriminative(model,
@@ -101,4 +106,5 @@ for layer in layers:
                                viz_dir=viz_dir,
                                save_viz=not args.no_viz,
                                device=device,
+                               num_workers=args.num_workers,
                                **config.dissection.kwargs)
