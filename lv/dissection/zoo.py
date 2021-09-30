@@ -34,7 +34,7 @@ LAYERS.DENSENET121 = (
     *(f'features.denseblock{index}' for index in range(1, 5)))
 LAYERS.DENSENET201 = LAYERS.DENSENET121
 LAYERS.DINO_VITS8 = tuple(f'blocks.{layer}.mlp.fc1' for layer in range(12))
-LAYERS.MOBILENET_V2 = (f'features.{index}' for index in range(18))
+LAYERS.MOBILENET_V2 = (f'features.{index}' for index in range(0, 19, 2))
 LAYERS.RESNET18 = ('conv1', 'layer1', 'layer2', 'layer3', 'layer4')
 LAYERS.RESNET34 = LAYERS.RESNET18
 LAYERS.RESNET50 = LAYERS.RESNET18
