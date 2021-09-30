@@ -75,6 +75,7 @@ if results_root is None:
 results_dir = results_root / args.model / args.dataset
 
 viz_root = args.viz_root
+viz_dir = None
 if viz_root is not None:
     viz_dir = viz_root / args.model / args.dataset
 elif not args.no_viz:
