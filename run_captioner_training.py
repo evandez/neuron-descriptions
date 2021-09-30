@@ -25,7 +25,7 @@ parser.add_argument('--clear-results-dir',
                     help='clear results dir (default: do not)')
 parser.add_argument('--dataset',
                     choices=zoo.DATASET_GROUPINGS.keys(),
-                    default=zoo.KEY_ALL,
+                    default=zoo.KEYS.ALL,
                     help='datasets to train on (default: all)')
 parser.add_argument('--encoder',
                     choices=ENCODERS,

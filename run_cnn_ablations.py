@@ -81,12 +81,8 @@ ORDER_INCREASING = 'increasing'
 ORDER_DECREASING = 'decreasing'
 ORDERS = (ORDER_DECREASING, ORDER_INCREASING)
 
-CNNS = (lv.dissection.zoo.KEY_RESNET18,)
-DATASETS = (
-    lv.zoo.KEY_IMAGENET,
-    # TODO(evandez): Figure out why this crashes.
-    # lv.zoo.KEY_PLACES365,
-)
+CNNS = (lv.dissection.zoo.KEYS.RESNET18,)
+DATASETS = (lv.zoo.KEYS.IMAGENET,)
 
 parser = argparse.ArgumentParser(description='run cnn ablation experiments')
 parser.add_argument('--cnns',
@@ -96,7 +92,7 @@ parser.add_argument('--cnns',
                     help='cnns to ablate (default: resnet18)')
 parser.add_argument('--captioner',
                     nargs=2,
-                    default=(lv.zoo.KEY_CAPTIONER_RESNET101, lv.zoo.KEY_ALL),
+                    default=(lv.zoo.KEYS.CAPTIONER_RESNET101, lv.zoo.KEYS.ALL),
                     help='captioner model (default: captioner-resnet101 all)')
 parser.add_argument(
     '--datasets',

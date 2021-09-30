@@ -19,8 +19,8 @@ from torch import cuda
 from tqdm.auto import tqdm
 
 EXPERIMENTS = (
-    zoo.KEY_SPURIOUS_IMAGENET_TEXT,
-    zoo.KEY_SPURIOUS_IMAGENET_COLOR,
+    zoo.KEYS.SPURIOUS_IMAGENET_TEXT,
+    zoo.KEYS.SPURIOUS_IMAGENET_COLOR,
 )
 
 VERSION_ORIGINAL = 'original'
@@ -45,7 +45,7 @@ parser = argparse.ArgumentParser(
     description='certify a cnn trained on bad data')
 parser.add_argument('--experiments',
                     choices=EXPERIMENTS,
-                    default=(zoo.KEY_SPURIOUS_IMAGENET_TEXT,),
+                    default=(zoo.KEYS.SPURIOUS_IMAGENET_TEXT,),
                     nargs='+',
                     help='dataset to experiment with (default: all)')
 parser.add_argument('--versions',
@@ -60,12 +60,12 @@ parser.add_argument('--conditions',
                     help='condition(s) to test under (default: all)')
 parser.add_argument(
     '--cnn',
-    choices=(lv.zoo.KEY_ALEXNET, zoo.KEY_RESNET18),
-    default=zoo.KEY_RESNET18,
+    choices=(lv.zoo.KEYS.ALEXNET, zoo.KEYS.RESNET18),
+    default=zoo.KEYS.RESNET18,
     help='cnn architecture to train and certify (default: resnet18)')
 parser.add_argument('--captioner',
                     nargs=2,
-                    default=(lv.zoo.KEY_CAPTIONER_RESNET101, lv.zoo.KEY_ALL),
+                    default=(lv.zoo.KEYS.CAPTIONER_RESNET101, lv.zoo.KEYS.ALL),
                     help='captioner model (default: captioner-resnet101 all)')
 parser.add_argument(
     '--n-random-trials',
@@ -181,10 +181,10 @@ for experiment in args.experiments:
     experiment_dir.mkdir(exist_ok=True, parents=True)
 
     target_words: StrSequence
-    if experiment == zoo.KEY_SPURIOUS_IMAGENET_TEXT:
+    if experiment == zoo.KEYS.SPURIOUS_IMAGENET_TEXT:
         target_words = ('word', 'text', 'letter')
     else:
-        assert experiment == zoo.KEY_SPURIOUS_IMAGENET_COLOR
+        assert experiment == zoo.KEYS.SPURIOUS_IMAGENET_COLOR
         target_words = ('red', 'yellow', 'green', 'blue', 'cyan', 'purple',
                         'brown', 'black', 'white', 'gray')
 
@@ -214,7 +214,7 @@ for experiment in args.experiments:
             }, splits_file)
 
         cnn, layers, _ = zoo.model(args.cnn,
-                                   zoo.KEY_IMAGENET,
+                                   zoo.KEYS.IMAGENET,
                                    pretrained=False)
         cnn = models.classifier(cnn).to(device)
 
@@ -345,7 +345,7 @@ for experiment in args.experiments:
                             patience=args.patience,
                             optimizer_kwargs={'lr': args.lr},
                             ablate=dissected.units(ablated_indices),
-                            layers=['fc'] if args.cnn == zoo.KEY_RESNET18 else
+                            layers=['fc'] if args.cnn == zoo.KEYS.RESNET18 else
                             ['fc6', 'fc7', 'linear8'],
                             num_workers=0,
                             device=device,

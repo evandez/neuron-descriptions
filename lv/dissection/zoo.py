@@ -10,9 +10,8 @@ from lv.deps.netdissect import renormalize
 from lv.dissection import datasets as lv_datasets
 from lv.dissection import transforms as lv_transforms
 from lv.utils.typing import Layer
-from lv.zoo import (KEY_ALEXNET, KEY_BIGGAN, KEY_DINO_VITS8, KEY_IMAGENET,
-                    KEY_PLACES365, KEY_RESNET18, KEY_RESNET152)
 
+import easydict
 import torch
 from torch import nn
 from torch.utils import data
@@ -21,17 +20,35 @@ from torchvision import datasets, transforms
 LV_HOST = 'https://unitname.csail.mit.edu/dissect/models'
 DISSECT_HOST = 'https://dissect.csail.mit.edu/models'
 
-KEY_SPURIOUS_IMAGENET_TEXT = 'spurious-imagenet-text'
-KEY_SPURIOUS_IMAGENET_COLOR = 'spurious-imagenet-color'
+KEYS = easydict.EasyDict(d=zoo.KEYS)
+KEYS.IMAGENET_SPURIOUS_TEXT = 'imagenet-spurious-text'
+KEYS.IMAGENET_SPURIOUS_COLOR = 'imagenet-spurious-color'
+KEYS.BIGGAN_ZS_IMAGENET = 'biggan-zs-imagenet'
+KEYS.BIGGAN_ZS_PLACES365 = 'biggan-zs-places365'
 
-KEY_BIGGAN_ZS_IMAGENET = 'biggan-zs-imagenet'
-KEY_BIGGAN_ZS_PLACES365 = 'biggan-zs-places365'
-
-LAYERS_ALEXNET = ('conv1', 'conv2', 'conv3', 'conv4', 'conv5')
-LAYERS_RESNET18 = ('conv1', 'layer1', 'layer2', 'layer3', 'layer4')
-LAYERS_RESNET152 = LAYERS_RESNET18
-LAYERS_BIGGAN = ('layer0', 'layer1', 'layer2', 'layer3', 'layer4', 'layer5')
-LAYERS_DINO_VITS8 = tuple(f'blocks.{layer}.mlp.fc1' for layer in range(12))
+LAYERS = easydict.EasyDict()
+LAYERS.ALEXNET = ('conv1', 'conv2', 'conv3', 'conv4', 'conv5')
+LAYERS.BIGGAN = ('layer0', 'layer1', 'layer2', 'layer3', 'layer4', 'layer5')
+LAYERS.DENSENET121 = ()
+LAYERS.DENSENET201 = ()
+LAYERS.DINO_VITS8 = tuple(f'blocks.{layer}.mlp.fc1' for layer in range(12))
+LAYERS.MOBILENET_V2 = ()
+LAYERS.RESNET18 = ('conv1', 'layer1', 'layer2', 'layer3', 'layer4')
+LAYERS.RESNET34 = LAYERS.RESNET18
+LAYERS.RESNET50 = LAYERS.RESNET18
+LAYERS.RESNET101 = LAYERS.RESNET18
+LAYERS.RESNET152 = LAYERS.RESNET18
+LAYERS.SHUFFLENET_V2_X1_0 = ()
+LAYERS.SQUEEZENET1_0 = ()
+LAYERS.VGG11 = tuple(
+    f'features.{index}' for index in (0, 3, 6, 8, 11, 13, 16, 18))
+LAYERS.VGG13 = tuple(
+    f'features.{index}' for index in (0, 2, 5, 7, 10, 12, 15, 17, 20, 22))
+LAYERS.VGG16 = tuple(f'features.{index}' for index in (0, 2, 5, 7, 10, 12, 14,
+                                                       17, 19, 21, 24, 26, 28))
+LAYERS.VGG19 = tuple(f'features.{index}' for index in (0, 2, 5, 7, 10, 12, 14,
+                                                       16, 19, 21, 23, 25, 28,
+                                                       30, 32, 34))
 
 
 @dataclasses.dataclass(frozen=True)
@@ -116,90 +133,251 @@ ModelConfigs = Mapping[str, Mapping[str, ModelConfig]]
 def dissection_models() -> ModelConfigs:
     """Return configs for all models used in dissection."""
     return {
-        KEY_ALEXNET: {
-            KEY_IMAGENET:
+        KEYS.ALEXNET: {
+            KEYS.IMAGENET:
                 ModelConfig(models.alexnet_seq,
                             pretrained=True,
                             load_weights=False,
-                            layers=LAYERS_ALEXNET),
-            KEY_PLACES365:
+                            layers=LAYERS.ALEXNET),
+            KEYS.IMAGENET_BLURRED:
+                ModelConfig(models.alexnet,
+                            load_weights=True,
+                            layers=('features.0', 'features.3', 'features.6',
+                                    'features.8', 'features.10')),
+            KEYS.PLACES365:
                 ModelConfig(
                     alexnet.AlexNet,
                     url=f'{LV_HOST}/alexnet-places365.pth',
                     transform_weights=lambda weights: weights['state_dict'],
-                    layers=LAYERS_ALEXNET),
+                    layers=LAYERS.ALEXNET),
         },
-        KEY_RESNET18: {
-            KEY_IMAGENET:
+        KEYS.BIGGAN: {
+            KEYS.IMAGENET:
                 ModelConfig(
-                    models.resnet18_seq,
-                    pretrained=True,
+                    biggan.SeqBigGAN,
+                    pretrained='imagenet',
                     load_weights=False,
-                    layers=LAYERS_RESNET18,
-                    dissection=DiscriminativeModelDissectionConfig(
-                        image_size=224,
-                        renormalizer=renormalize.renormalizer(
-                            source='imagenet', target='byte'),
+                    layers=LAYERS.BIGGAN,
+                    dissection=GenerativeModelDissectionConfig(
+                        transform_inputs=lambda *xs: (biggan.GInputs(*xs),),
+                        transform_hiddens=lambda hiddens: hiddens.h,
+                        renormalizer=renormalize.renormalizer(target='byte'),
+                        image_size=256,
+                        batch_size=32,
+                        dataset=KEYS.BIGGAN_ZS_IMAGENET,
+                    ),
+                ),
+            KEYS.PLACES365:
+                ModelConfig(
+                    biggan.SeqBigGAN,
+                    pretrained='imagenet',
+                    load_weights=False,
+                    layers=LAYERS.BIGGAN,
+                    dissection=GenerativeModelDissectionConfig(
+                        transform_inputs=lambda *xs: (biggan.GInputs(*xs),),
+                        transform_hiddens=lambda hiddens: hiddens.h,
+                        renormalizer=renormalize.renormalizer(target='byte'),
+                        image_size=256,
+                        batch_size=32,
+                        dataset=KEYS.BIGGAN_ZS_IMAGENET,
                     ),
                 ),
         },
-        KEY_RESNET152: {
-            KEY_IMAGENET:
+        KEYS.DENSENET121: {
+            KEYS.IMAGENET:
+                ModelConfig(models.densenet121,
+                            pretrained=True,
+                            load_weights=False,
+                            layers=LAYERS.DENSENET121),
+            KEYS.IMAGENET_BLURRED:
+                ModelConfig(models.densenet121,
+                            load_weights=True,
+                            layers=LAYERS.DENSENET121),
+        },
+        KEYS.DENSENET201: {
+            KEYS.IMAGENET:
+                ModelConfig(models.densenet121,
+                            pretrained=True,
+                            load_weights=False,
+                            layers=LAYERS.DENSENET201),
+            KEYS.IMAGENET_BLURRED:
+                ModelConfig(models.densenet121,
+                            load_weights=True,
+                            layers=LAYERS.DENSENET201),
+        },
+        KEYS.DINO_VITS8: {
+            KEYS.IMAGENET:
+                ModelConfig(
+                    torch.hub.load,
+                    repo_or_dir='facebookresearch/dino:main',
+                    model=KEYS.DINO_VITS8,
+                    layers=LAYERS.DINO_VITS8,
+                    dissection=DiscriminativeModelDissectionConfig(
+                        transform_hiddens=lv_transforms.spatialize_vit_mlp,
+                        batch_size=32),
+                    load_weights=False,
+                ),
+        },
+        KEYS.MOBILENET_V2: {
+            KEYS.IMAGENET:
+                ModelConfig(
+                    models.mobilenet_v2,
+                    pretrained=True,
+                    load_weights=False,
+                    layers=LAYERS.MOBILENET_V2,
+                ),
+            KEYS.IMAGENET_BLURRED:
+                ModelConfig(models.mobilenet_v2,
+                            load_weights=True,
+                            layers=LAYERS.MOBILENET_V2),
+        },
+        KEYS.RESNET18: {
+            KEYS.IMAGENET:
+                ModelConfig(
+                    # TODO(evandez): No longer use seq version...
+                    models.resnet18_seq,
+                    pretrained=True,
+                    load_weights=False,
+                    layers=LAYERS.RESNET18,
+                ),
+            KEYS.IMAGENET_BLURRED:
+                ModelConfig(models.resnet18,
+                            load_weights=True,
+                            layers=LAYERS.RESNET18),
+        },
+        KEYS.RESNET34: {
+            KEYS.IMAGENET:
+                ModelConfig(
+                    models.resnet34,
+                    pretrained=True,
+                    load_weights=False,
+                    layers=LAYERS.RESNET34,
+                ),
+            KEYS.IMAGENET_BLURRED:
+                ModelConfig(models.resnet34,
+                            load_weights=True,
+                            layers=LAYERS.RESNET34),
+        },
+        KEYS.RESNET50: {
+            KEYS.IMAGENET:
+                ModelConfig(
+                    models.resnet50,
+                    pretrained=True,
+                    load_weights=False,
+                    layers=LAYERS.RESNET50,
+                ),
+            KEYS.IMAGENET_BLURRED:
+                ModelConfig(models.resnet50,
+                            load_weights=True,
+                            layers=LAYERS.RESNET50),
+        },
+        KEYS.RESNET101: {
+            KEYS.IMAGENET:
+                ModelConfig(
+                    models.resnet101,
+                    pretrained=True,
+                    load_weights=False,
+                    layers=LAYERS.RESNET101,
+                ),
+            KEYS.IMAGENET_BLURRED:
+                ModelConfig(models.resnet101,
+                            load_weights=True,
+                            layers=LAYERS.RESNET101),
+        },
+        KEYS.RESNET152: {
+            KEYS.IMAGENET:
                 ModelConfig(models.resnet152_seq,
                             pretrained=True,
                             load_weights=False,
-                            layers=LAYERS_RESNET152),
-            KEY_PLACES365:
+                            layers=LAYERS.RESNET152),
+            KEYS.IMAGENET_BLURRED:
+                ModelConfig(models.resnet152,
+                            load_weights=True,
+                            layers=LAYERS.RESNET152),
+            KEYS.PLACES365:
                 ModelConfig(
                     resnet152.OldResNet152,
                     url=f'{DISSECT_HOST}/resnet152_places365-f928166e5c.pth',
                     layers=(0, 4, 5, 6, 7),
                 ),
         },
-        KEY_BIGGAN: {
-            KEY_IMAGENET:
+        KEYS.SHUFFLENET_V2_X1_0: {
+            KEYS.IMAGENET:
                 ModelConfig(
-                    biggan.SeqBigGAN,
-                    pretrained='imagenet',
+                    models.shufflenet_v2_x1_0,
+                    pretrained=True,
                     load_weights=False,
-                    layers=LAYERS_BIGGAN,
-                    dissection=GenerativeModelDissectionConfig(
-                        transform_inputs=lambda *xs: (biggan.GInputs(*xs),),
-                        transform_hiddens=lambda hiddens: hiddens.h,
-                        renormalizer=renormalize.renormalizer(target='byte'),
-                        image_size=256,
-                        batch_size=32,
-                        dataset=KEY_BIGGAN_ZS_IMAGENET,
-                    ),
+                    layers=LAYERS.SHUFFLENET_V2_X1_0,
                 ),
-            KEY_PLACES365:
-                ModelConfig(
-                    biggan.SeqBigGAN,
-                    pretrained='imagenet',
-                    load_weights=False,
-                    layers=LAYERS_BIGGAN,
-                    dissection=GenerativeModelDissectionConfig(
-                        transform_inputs=lambda *xs: (biggan.GInputs(*xs),),
-                        transform_hiddens=lambda hiddens: hiddens.h,
-                        renormalizer=renormalize.renormalizer(target='byte'),
-                        image_size=256,
-                        batch_size=32,
-                        dataset=KEY_BIGGAN_ZS_IMAGENET,
-                    ),
-                ),
+            KEYS.IMAGENET_BLURRED:
+                ModelConfig(models.shufflenet_v2_x1_0,
+                            load_weights=True,
+                            layers=LAYERS.SHUFFLENET_V2_X1_0),
         },
-        KEY_DINO_VITS8: {
-            KEY_IMAGENET:
+        KEYS.SQUEEZENET1_0: {
+            KEYS.IMAGENET:
                 ModelConfig(
-                    torch.hub.load,
-                    repo_or_dir='facebookresearch/dino:main',
-                    model=KEY_DINO_VITS8,
-                    layers=LAYERS_DINO_VITS8,
-                    dissection=DiscriminativeModelDissectionConfig(
-                        transform_hiddens=lv_transforms.spatialize_vit_mlp,
-                        batch_size=32),
+                    models.squeezenet1_0,
+                    pretrained=True,
                     load_weights=False,
+                    layers=LAYERS.SQUEEZENET1_0,
                 ),
+            KEYS.IMAGENET_BLURRED:
+                ModelConfig(models.squeezenet1_0,
+                            load_weights=True,
+                            layers=LAYERS.SQUEEZENET1_0),
+        },
+        KEYS.VGG11: {
+            KEYS.IMAGENET:
+                ModelConfig(
+                    models.vgg11,
+                    pretrained=True,
+                    load_weights=False,
+                    layers=LAYERS.VGG11,
+                ),
+            KEYS.IMAGENET_BLURRED:
+                ModelConfig(models.vgg11,
+                            load_weights=True,
+                            layers=LAYERS.VGG11),
+        },
+        KEYS.VGG13: {
+            KEYS.IMAGENET:
+                ModelConfig(
+                    models.vgg13,
+                    pretrained=True,
+                    load_weights=False,
+                    layers=LAYERS.VGG13,
+                ),
+            KEYS.IMAGENET_BLURRED:
+                ModelConfig(models.vgg13,
+                            load_weights=True,
+                            layers=LAYERS.VGG13),
+        },
+        KEYS.VGG16: {
+            KEYS.IMAGENET:
+                ModelConfig(
+                    models.vgg16,
+                    pretrained=True,
+                    load_weights=False,
+                    layers=LAYERS.VGG16,
+                ),
+            KEYS.IMAGENET_BLURRED:
+                ModelConfig(models.vgg16,
+                            load_weights=True,
+                            layers=LAYERS.VGG16),
+        },
+        KEYS.VGG19: {
+            KEYS.IMAGENET:
+                ModelConfig(
+                    models.vgg19,
+                    pretrained=True,
+                    load_weights=False,
+                    layers=LAYERS.VGG19,
+                ),
+            KEYS.IMAGENET_BLURRED:
+                ModelConfig(models.vgg19,
+                            load_weights=True,
+                            layers=LAYERS.VGG19),
         },
     }
 
@@ -207,7 +385,7 @@ def dissection_models() -> ModelConfigs:
 def dissection_datasets() -> zoo.DatasetConfigs:
     """Return configs for all datasets used in dissection."""
     return {
-        zoo.KEY_IMAGENET:
+        zoo.KEYS.IMAGENET:
             zoo.DatasetConfig(datasets.ImageFolder,
                               transform=transforms.Compose([
                                   transforms.Resize(256),
@@ -215,7 +393,7 @@ def dissection_datasets() -> zoo.DatasetConfigs:
                                   transforms.ToTensor(),
                                   renormalize.NORMALIZER['imagenet']
                               ])),
-        zoo.KEY_PLACES365:
+        zoo.KEYS.PLACES365:
             zoo.DatasetConfig(datasets.ImageFolder,
                               transform=transforms.Compose([
                                   transforms.Resize(256),
@@ -223,26 +401,26 @@ def dissection_datasets() -> zoo.DatasetConfigs:
                                   transforms.ToTensor(),
                                   renormalize.NORMALIZER['imagenet'],
                               ])),
-        KEY_SPURIOUS_IMAGENET_TEXT:
+        KEYS.IMAGENET_SPURIOUS_TEXT:
             zoo.DatasetConfig(datasets.ImageFolder,
                               transform=transforms.Compose([
                                   transforms.Resize((224, 224)),
                                   transforms.ToTensor(),
                                   renormalize.NORMALIZER['imagenet']
                               ])),
-        KEY_SPURIOUS_IMAGENET_COLOR:
+        KEYS.IMAGENET_SPURIOUS_COLOR:
             zoo.DatasetConfig(datasets.ImageFolder,
                               transform=transforms.Compose([
                                   transforms.Resize((224, 224)),
                                   transforms.ToTensor(),
                                   renormalize.NORMALIZER['imagenet']
                               ])),
-        KEY_BIGGAN_ZS_IMAGENET:
+        KEYS.BIGGAN_ZS_IMAGENET:
             zoo.DatasetConfig(lv_datasets.TensorDatasetOnDisk,
-                              url=f'{LV_HOST}/{KEY_BIGGAN_ZS_IMAGENET}.pth'),
-        KEY_BIGGAN_ZS_PLACES365:
+                              url=f'{LV_HOST}/{KEYS.BIGGAN_ZS_IMAGENET}.pth'),
+        KEYS.BIGGAN_ZS_PLACES365:
             zoo.DatasetConfig(lv_datasets.TensorDatasetOnDisk,
-                              url=f'{LV_HOST}/{KEY_BIGGAN_ZS_PLACES365}.pth'),
+                              url=f'{LV_HOST}/{KEYS.BIGGAN_ZS_PLACES365}.pth'),
     }
 
 

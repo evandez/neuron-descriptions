@@ -34,6 +34,7 @@ decorator==5.0.7
 defusedxml==0.7.1
 dill==0.3.4
 docker-pycreds==0.4.0
+easydict==1.9
 en-core-web-lg @ https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.0.0/en_core_web_lg-3.0.0-py3-none-any.whl
 en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.0.0/en_core_web_sm-3.0.0-py3-none-any.whl
 entrypoints==0.3
@@ -45,6 +46,7 @@ flake8==3.9.0
 flake8-docstrings==1.6.0
 fsspec==2021.8.1
 future==0.18.2
+gdown==3.14.0
 gitdb==4.0.7
 GitPython==3.1.14
 google-api-core==2.0.1
@@ -142,6 +144,7 @@ pyflakes==2.3.1
 Pygments==2.8.1
 pyparsing==2.4.7
 pyrsistent==0.17.3
+PySocks==1.7.1
 pyspellchecker==0.6.2
 pytest==6.2.2
 python-dateutil==2.8.1
