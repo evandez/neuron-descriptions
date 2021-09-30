@@ -221,7 +221,11 @@ for experiment in args.experiments or EXPERIMENTS.keys():
                                          strategy='rerank',
                                          beam_size=50,
                                          temperature=.2)
-                decoder.fit(train, features=train_features, device=device)
+                decoder.fit(train,
+                            features=train_features,
+                            patience=10
+                            if experiment == EXPERIMENT_WITHIN_NETWORK else 4,
+                            device=device)
                 print(f'saving decoder to {decoder_file}')
                 decoder.save(decoder_file)
 
