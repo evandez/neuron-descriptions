@@ -196,12 +196,12 @@ def dissection_models() -> ModelConfigs:
         },
         KEYS.DENSENET201: {
             KEYS.IMAGENET:
-                ModelConfig(models.densenet121,
+                ModelConfig(models.densenet201,
                             pretrained=True,
                             load_weights=False,
                             layers=LAYERS.DENSENET201),
             KEYS.IMAGENET_BLURRED:
-                ModelConfig(models.densenet121,
+                ModelConfig(models.densenet201,
                             load_weights=True,
                             layers=LAYERS.DENSENET201),
         },
