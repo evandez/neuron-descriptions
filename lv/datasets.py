@@ -27,6 +27,7 @@ class TopImages(NamedTuple):
 
     def as_pil_image_grid(self,
                           opacity: float = .75,
+                          limit: Optional[int] = None,
                           **kwargs: Any) -> Image.Image:
         """Pack all images into a grid and return as a PIL Image.
 
@@ -36,6 +37,8 @@ class TopImages(NamedTuple):
             opacity (float, optional): Opacity for mask, with 1 meaning
                 that the masked area is black, and 0 meaning that the masked
                 area is shown as normal. Defaults to .75.
+            limit (Optional[int], optional): If set, only include first `limit`
+                images in the grid. By default, all are included.
 
         Returns:
             Image.Image: Image grid containing all top images.
@@ -43,10 +46,15 @@ class TopImages(NamedTuple):
         """
         if opacity < 0 or opacity > 1:
             raise ValueError(f'opacity must be in [0, 1], got {opacity}')
+        if limit is None:
+            limit = len(self.images)
+        elif limit <= 0:
+            raise ValueError(f'limit must be > 0, got {limit}')
+
         kwargs.setdefault('nrow', 5)
-        masks = self.masks.clone().float()
+        masks = self.masks[:limit].clone().float()
         masks[masks == 0] = 1 - opacity
-        images = self.images * masks
+        images = self.images[:limit] * masks
         grid = utils.make_grid(images, **kwargs)
         return functional.to_pil_image(grid)
 

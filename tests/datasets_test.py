@@ -25,18 +25,30 @@ def top_images():
     )
 
 
-@pytest.mark.parametrize('opacity', (0, .5, 1))
-def test_top_images_as_pil_image_grid(top_images, opacity):
-    """Test TopImages.as_pil_image returns a PIL Image."""
-    actual = top_images.as_pil_image_grid(opacity=opacity)
+@pytest.mark.parametrize('opacity,limit', (
+    (0, None),
+    (.5, None),
+    (1, None),
+    (.75, 2),
+))
+def test_top_images_as_pil_image_grid(top_images, opacity, limit):
+    """Test TopImages.as_pil_image_grid returns a PIL Image."""
+    actual = top_images.as_pil_image_grid(opacity=opacity, limit=limit)
     assert isinstance(actual, Image.Image)
 
 
 @pytest.mark.parametrize('opacity', (-1, 2))
 def test_top_images_as_pil_image_grid_bad_opacity(top_images, opacity):
-    """Test TopImages.as_pil_image dies on bad opacity."""
+    """Test TopImages.as_pil_image_grid dies on bad opacity."""
     with pytest.raises(ValueError, match=f'.*{opacity}.*'):
         top_images.as_pil_image_grid(opacity=opacity)
+
+
+@pytest.mark.parametrize('limit', (0, -1))
+def test_top_images_as_pil_image_grid_bad_limit(top_images, limit):
+    """Test TopImages.as_pil_image_grid dies on bad limit."""
+    with pytest.raises(ValueError, match=f'.*{limit}.*'):
+        top_images.as_pil_image_grid(limit=limit)
 
 
 @pytest.mark.parametrize('device', (None, 'cpu', torch.device('cpu')))
