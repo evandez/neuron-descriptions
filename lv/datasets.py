@@ -25,6 +25,40 @@ class TopImages(NamedTuple):
     images: torch.Tensor
     masks: torch.Tensor
 
+    def as_masked_images_tensor(self, opacity: float = .75) -> torch.Tensor:
+        """Apply the masks to the images, forming a single tensor.
+
+        Args:
+            opacity (float, optional): Opacity for mask, with 1 meaning
+                that the masked area is black, and 0 meaning that the masked
+                area is shown as normal. Defaults to .75.
+
+        Returns:
+            torch.Tensor: Shape (len(self.images), 3, height, width) tensor
+                containing images with masks applied.
+
+        """
+        if opacity < 0 or opacity > 1:
+            raise ValueError(f'opacity must be in [0, 1], got {opacity}')
+        masks = self.masks.clone().float()
+        masks[masks == 0] = 1 - opacity
+        images = self.images * masks
+        return images
+
+    def as_pil_images(self, opacity: float = .75) -> Sequence[Image.Image]:
+        """Convert images into individual PIL images.
+
+        Args:
+            opacity (float, optional): See `as_masked_images_tensor`.
+                Defaults to .75.
+
+        Returns:
+            Sequence[Image.Image]: One PIL Image per top image.
+
+        """
+        images = self.as_masked_images_tensor(opacity=opacity)
+        return [functional.to_pil_image(image) for image in images]
+
     def as_pil_image_grid(self,
                           opacity: float = .75,
                           limit: Optional[int] = None,
@@ -34,9 +68,8 @@ class TopImages(NamedTuple):
         Keyword arguments are forwarded to `torchvision.utils.make_grid`.
 
         Args:
-            opacity (float, optional): Opacity for mask, with 1 meaning
-                that the masked area is black, and 0 meaning that the masked
-                area is shown as normal. Defaults to .75.
+            opacity (float, optional): See `as_masked_images_tensor`.
+                Defaults to .75.
             limit (Optional[int], optional): If set, only include first `limit`
                 images in the grid. By default, all are included.
 
@@ -44,18 +77,16 @@ class TopImages(NamedTuple):
             Image.Image: Image grid containing all top images.
 
         """
-        if opacity < 0 or opacity > 1:
-            raise ValueError(f'opacity must be in [0, 1], got {opacity}')
         if limit is None:
             limit = len(self.images)
         elif limit <= 0:
             raise ValueError(f'limit must be > 0, got {limit}')
 
+        images = self.as_masked_images_tensor(opacity=opacity)[:limit]
+
         kwargs.setdefault('nrow', 5)
-        masks = self.masks[:limit].clone().float()
-        masks[masks == 0] = 1 - opacity
-        images = self.images[:limit] * masks
         grid = utils.make_grid(images, **kwargs)
+
         return functional.to_pil_image(grid)
 
 

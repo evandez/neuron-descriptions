@@ -25,23 +25,33 @@ def top_images():
     )
 
 
-@pytest.mark.parametrize('opacity,limit', (
-    (0, None),
-    (.5, None),
-    (1, None),
-    (.75, 2),
-))
-def test_top_images_as_pil_image_grid(top_images, opacity, limit):
-    """Test TopImages.as_pil_image_grid returns a PIL Image."""
-    actual = top_images.as_pil_image_grid(opacity=opacity, limit=limit)
-    assert isinstance(actual, Image.Image)
+@pytest.mark.parametrize('opacity', (0., .5, 1.))
+def test_top_images_as_masked_images_tensor(top_images, opacity):
+    """Test TopImages.as_masked_image_tensor returns correct shape."""
+    actual = top_images.as_masked_images_tensor(opacity=opacity)
+    assert actual.shape == (conftest.N_TOP_IMAGES_PER_UNIT,
+                            *conftest.IMAGE_SHAPE)
 
 
 @pytest.mark.parametrize('opacity', (-1, 2))
-def test_top_images_as_pil_image_grid_bad_opacity(top_images, opacity):
-    """Test TopImages.as_pil_image_grid dies on bad opacity."""
+def test_top_images_as_masked_images_tensor_bad_opacity(top_images, opacity):
+    """Test TopImages.as_masked_images_tensor dies on bad opacity."""
     with pytest.raises(ValueError, match=f'.*{opacity}.*'):
-        top_images.as_pil_image_grid(opacity=opacity)
+        top_images.as_masked_images_tensor(opacity=opacity)
+
+
+def test_top_images_as_pil_images(top_images):
+    """Test TopImages.as_pil_images returns PIL Images."""
+    actuals = top_images.as_pil_images()
+    for actual in actuals:
+        assert isinstance(actual, Image.Image)
+
+
+@pytest.mark.parametrize('limit', (None, 2))
+def test_top_images_as_pil_image_grid(top_images, limit):
+    """Test TopImages.as_pil_image_grid returns a PIL Image."""
+    actual = top_images.as_pil_image_grid(limit=limit)
+    assert isinstance(actual, Image.Image)
 
 
 @pytest.mark.parametrize('limit', (0, -1))
