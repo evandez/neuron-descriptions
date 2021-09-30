@@ -29,18 +29,20 @@ KEYS.BIGGAN_ZS_PLACES365 = 'biggan-zs-places365'
 LAYERS = easydict.EasyDict()
 LAYERS.ALEXNET = ('conv1', 'conv2', 'conv3', 'conv4', 'conv5')
 LAYERS.BIGGAN = ('layer0', 'layer1', 'layer2', 'layer3', 'layer4', 'layer5')
-LAYERS.DENSENET121 = ('features.conv0', *(
-    f'features.denseblock{index}' for index in range(1, 5)))
+LAYERS.DENSENET121 = (
+    'features.conv0',
+    *(f'features.denseblock{index}' for index in range(1, 5)))
 LAYERS.DENSENET201 = LAYERS.DENSENET121
 LAYERS.DINO_VITS8 = tuple(f'blocks.{layer}.mlp.fc1' for layer in range(12))
-LAYERS.MOBILENET_V2 = ()
+LAYERS.MOBILENET_V2 = (f'features.{index}' for index in range(18))
 LAYERS.RESNET18 = ('conv1', 'layer1', 'layer2', 'layer3', 'layer4')
 LAYERS.RESNET34 = LAYERS.RESNET18
 LAYERS.RESNET50 = LAYERS.RESNET18
 LAYERS.RESNET101 = LAYERS.RESNET18
 LAYERS.RESNET152 = LAYERS.RESNET18
-LAYERS.SHUFFLENET_V2_X1_0 = ()
-LAYERS.SQUEEZENET1_0 = ()
+LAYERS.SHUFFLENET_V2_X1_0 = ('conv1', 'stage2', 'stage3', 'stage4', 'conv5')
+LAYERS.SQUEEZENET1_0 = (
+    f'features.{index}' for index in (0, 3, 4, 5, 7, 8, 9, 10, 12))
 LAYERS.VGG11 = tuple(
     f'features.{index}' for index in (0, 3, 6, 8, 11, 13, 16, 18))
 LAYERS.VGG13 = tuple(
