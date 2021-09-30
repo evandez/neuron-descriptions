@@ -36,6 +36,9 @@ parser.add_argument('--model-file',
 parser.add_argument('--dataset-path',
                     type=pathlib.Path,
                     help='path to dataset')
+parser.add_argument('--no-viz',
+                    action='store_true',
+                    help='do not compute visualization')
 parser.add_argument('--device', help='manually set device (default: guessed)')
 args = parser.parse_args()
 
@@ -50,6 +53,9 @@ dataset, generative = args.dataset, False
 if isinstance(config.dissection, zoo.GenerativeModelDissectionConfig):
     dataset = config.dissection.dataset
     generative = True
+# TODO(evandez): Yuck, push this into config.
+elif dataset == zoo.KEYS.IMAGENET_BLURRED:
+    dataset = zoo.KEYS.IMAGENET
 
 dataset = zoo.dataset(dataset, path=args.dataset_path)
 
@@ -71,7 +77,7 @@ results_dir = results_root / args.model / args.dataset
 viz_root = args.viz_root
 if viz_root is not None:
     viz_dir = viz_root / args.model / args.dataset
-else:
+elif not args.no_viz:
     viz_dir = results_root / 'viz' / args.model / args.dataset
 
 for layer in layers:
@@ -82,6 +88,7 @@ for layer in layers:
                            units=units,
                            results_dir=results_dir,
                            viz_dir=viz_dir,
+                           save_viz=not args.no_viz,
                            device=device,
                            **config.dissection.kwargs)
     else:
@@ -91,5 +98,6 @@ for layer in layers:
                                units=units,
                                results_dir=results_dir,
                                viz_dir=viz_dir,
+                               save_viz=not args.no_viz,
                                device=device,
                                **config.dissection.kwargs)
