@@ -14,6 +14,14 @@ from lv.utils.typing import StrSequence
 import wandb
 from torch import cuda
 
+ALEXNET_IMAGENET_REMAP = {
+    'features-0': 'conv1',
+    'features-3': 'conv2',
+    'features-6': 'conv3',
+    'features-8': 'conv4',
+    'features-10': 'conv5',
+}
+
 EXPERIMENTS = (
     zoo.KEYS.ALEXNET_IMAGENET,
     zoo.KEYS.ALEXNET_PLACES365,
@@ -146,9 +154,11 @@ for experiment in args.experiments:
                 model_subdir = f'{model}_{dataset}_broden_ade20k_neuron_3'
                 results_by_layer_unit = {}
                 for layer in test.layers:
-                    results_name = f'tally_{layer}.csv'
+                    layer_key = layer
+                    if experiment == zoo.KEYS.ALEXNET_IMAGENET:
+                        layer_key = ALEXNET_IMAGENET_REMAP[str(layer)]
                     results_file = (compexp_results_dir / model_subdir /
-                                    results_name)
+                                    f'tally_{layer_key}.csv')
                     with results_file.open('r') as handle:
                         rows = tuple(csv.DictReader(handle))
                     for row in rows:
