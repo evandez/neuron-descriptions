@@ -122,7 +122,7 @@ for experiment in args.experiments:
             train_group_key = f'NOT_{experiment_key.upper()}'
             train = zoo.datasets(*zoo.DATASET_GROUPINGS[train_group_key])
 
-        trials = args.trials in method in {METHOD_PMI, METHOD_NO_PMI} else 1
+        trials = args.trials if method in {METHOD_PMI, METHOD_NO_PMI} else 1
         for trial in range(trials):
             if trials == 1:
                 print(f'---- {experiment_key}/{method} ----')
