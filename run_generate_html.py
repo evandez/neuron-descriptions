@@ -6,6 +6,7 @@ import pathlib
 import lv.datasets
 from lv import models, zoo
 from lv.utils import env, viz
+from lv.utils.typing import StrSequence
 
 from torch import cuda
 
@@ -92,7 +93,7 @@ if captions_file.exists():
     print(f'loading captions from {captions_file}')
     with captions_file.open('r') as handle:
         rows = tuple(csv.DictReader(handle))
-    captions = [row['caption'] for row in rows]
+    predictions: StrSequence = [row['caption'] for row in rows]
 else:
     predictions = decoder.predict(dataset,
                                   strategy='rerank',
