@@ -85,7 +85,7 @@ predictions = decoder.predict(dataset,
                               device=device)
 
 # Save the HTML results.
-html_subdir = f'{args.captioner}-{args.train}' / args.test.replace('/', '-')
+html_subdir = f'{args.captioner}-{args.train}/{args.test.replace("/", "-")}'
 html_dir = results_dir / html_subdir
 html_dir.mkdir(exist_ok=True)
 viz.generate_html(dataset,
