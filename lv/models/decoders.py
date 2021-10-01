@@ -1,14 +1,12 @@
 """Models for decoding neuron captions."""
-import warnings
 from typing import (Any, Dict, Mapping, NamedTuple, Optional, Sequence, Sized,
                     Tuple, Type, Union, cast)
 
 from lv.deps.ext import bert_score
 from lv.models import encoders, lms
-from lv.utils import lang, serialize, training
+from lv.utils import lang, metrics, serialize, training
 from lv.utils.typing import Device, OptionalTensors, StrSequence
 
-import rouge
 import sacrebleu
 import torch
 from allennlp.nn import beam_search
@@ -708,18 +706,9 @@ class Decoder(serialize.SerializableModule):
         """
         if predictions is None:
             predictions = self.predict(dataset, **kwargs)
-        predictions = [pred.lower().strip('. ') for pred in predictions]
-
-        references = []
-        for index in range(len(predictions)):
-            annotations = dataset[index][annotation_index]
-            if isinstance(annotations, str):
-                annotations = [annotations]
-            # Preprocess target annotations in the same way as the predictions.
-            annotations = [anno.lower().strip('. ') for anno in annotations]
-            references.append(annotations)
-
-        return sacrebleu.corpus_bleu(predictions, list(zip(*references)))
+        return metrics.bleu(dataset,
+                            predictions,
+                            annotation_index=annotation_index)
 
     def rouge(self,
               dataset: data.Dataset,
@@ -746,36 +735,14 @@ class Decoder(serialize.SerializableModule):
         """
         if predictions is None:
             predictions = self.predict(dataset, **kwargs)
-
-        hypotheses, references = [], []
-        for index, prediction in enumerate(predictions):
-            prediction = prediction.lower().strip('. ')
-
-            annotations = dataset[index][annotation_index]
-            if isinstance(annotations, str):
-                annotations = [annotations]
-
-            # Preprocess target annotations in the same way model was trained.
-            for annotation in annotations:
-                annotation = annotation.lower().strip('. ')
-
-                # If annotation contains all unknown words, filter it.
-                if not annotation:
-                    continue
-
-                hypotheses.append(prediction)
-                references.append(annotation)
-
-        scorer = rouge.Rouge()
-        return scorer.get_scores(hypotheses,
-                                 references,
-                                 avg=True,
-                                 ignore_empty=True)
+        return metrics.rouge(dataset,
+                             predictions,
+                             annotation_index=annotation_index)
 
     def bert_score(self,
                    dataset: data.Dataset,
                    annotation_index: int = 4,
-                   batch_size: int = 16,
+                   bert_scorer_batch_size: int = 16,
                    predictions: Optional[StrSequence] = None,
                    device: Optional[Device] = None,
                    bert_scorer: Optional[bert_score.BERTScorer] = None,
@@ -787,8 +754,8 @@ class Decoder(serialize.SerializableModule):
             annotation_index (int, optional): Index of language annotations in
                 dataset samples. Defaults to 4 to be compatible with
                 AnnotatedTopImagesDataset.
-            batch_size (int, optional): Batch size to use when computing
-                BERTScore. Defaults to 16.
+            bert_scorer_batch_size (int, optional): Batch size to use
+                when computing BERTScore. Defaults to 16.
             predictions (Optional[StrSequence], optional): Precomputed
                 predicted captions for all images in the dataset.
                 By default, computed from the dataset using `Decoder.predict`.
@@ -801,35 +768,14 @@ class Decoder(serialize.SerializableModule):
             Mapping[str, float]: Average BERTScore precision/recall/F1.
 
         """
-        if bert_scorer is None:
-            bert_scorer = bert_score.BERTScorer(idf=True,
-                                                lang='en',
-                                                rescale_with_baseline=True,
-                                                use_fast_tokenizer=True,
-                                                device=device)
         if predictions is None:
             predictions = self.predict(dataset, **kwargs)
-        predictions = [pred.lower().strip('. ') for pred in predictions]
-
-        references = []
-        for index in range(len(predictions)):
-            annotations = dataset[index][annotation_index]
-            if isinstance(annotations, str):
-                annotations = [annotations]
-            # Preprocess target annotations in the same way as the predictions.
-            annotations = [anno.lower().strip('. ') for anno in annotations]
-            references.append(annotations)
-
-        if bert_scorer.idf:
-            with warnings.catch_warnings():
-                warnings.filterwarnings('ignore', message=r'.*Overwriting.*')
-                bert_scorer.compute_idf([r for rs in references for r in rs])
-
-        prf = bert_scorer.score(predictions, references, batch_size=batch_size)
-        return {
-            key: scores.mean().item()
-            for key, scores in zip(('p', 'r', 'f'), prf)
-        }
+        return metrics.bert_score(dataset,
+                                  predictions,
+                                  annotation_index=annotation_index,
+                                  batch_size=bert_scorer_batch_size,
+                                  device=device,
+                                  bert_scorer=bert_scorer)
 
     def predict(self,
                 dataset: data.Dataset,
