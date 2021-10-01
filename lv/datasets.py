@@ -434,6 +434,7 @@ class AnnotatedTopImagesDataset(data.Dataset):
         self.samples_by_layer_unit = {(s.layer, s.unit): s for s in samples}
 
         self.name = top_images_dataset.name
+        self.layers = top_images_dataset.layers
 
     def __getitem__(self, index: int) -> AnnotatedTopImages:
         """Return the annotated top images.
