@@ -122,11 +122,12 @@ for experiment in args.experiments:
             train_group_key = f'NOT_{experiment_key.upper()}'
             train = zoo.datasets(*zoo.DATASET_GROUPINGS[train_group_key])
 
-        for trial in range(args.trials):
-            if method in {METHOD_NETDISSECT, METHOD_COMPEXP} and trial:
-                continue
-
-            print(f'---- {experiment_key}/{method}/trial {trial} ----')
+        trials = args.trials in method in {METHOD_PMI, METHOD_NO_PMI} else 1
+        for trial in range(trials):
+            if trials == 1:
+                print(f'---- {experiment_key}/{method} ----')
+            else:
+                print(f'---- {experiment_key}/{method}/trial {trial} ----')
 
             predictions: StrSequence
             if method == METHOD_NETDISSECT:
@@ -137,7 +138,7 @@ for experiment in args.experiments:
                     results_file = netdissect_results_dir / results_name
                     with results_file.open('r') as handle:
                         results = json.load(handle)
-                    for result in results:
+                    for result in results['units']:
                         unit = str(result['unit'])
                         results_by_layer_unit[str(layer),
                                               unit] = result['label']
