@@ -86,6 +86,7 @@ for key in args.cnns:
     captions_file = results_dir / f'{key.replace("/", "-")}-captions.csv'
     if captions_file.exists():
         print(f'found captions file at {captions_file}; skipping')
+        continue
 
     path = None
     if args.data_dir is not None:
