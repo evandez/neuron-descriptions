@@ -134,7 +134,7 @@ for experiment in args.experiments:
                 for layer in test.layers:
                     results_name = (f'{experiment_key}-netpqc-conv1-10/'
                                     'report.json')
-                    results_file = results_dir / results_name
+                    results_file = netdissect_results_dir / results_name
                     with results_file.open('r') as handle:
                         results = json.load(handle)
                     for result in results:
