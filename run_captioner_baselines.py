@@ -15,11 +15,11 @@ import wandb
 from torch import cuda
 
 ALEXNET_IMAGENET_REMAP = {
-    'features-0': 'conv1',
-    'features-3': 'conv2',
-    'features-6': 'conv3',
-    'features-8': 'conv4',
-    'features-10': 'conv5',
+    'conv1': 'features-0',
+    'conv2': 'features-3',
+    'conv3': 'features-6',
+    'conv4': 'features-8',
+    'conv5': 'features-10',
 }
 
 EXPERIMENTS = (
