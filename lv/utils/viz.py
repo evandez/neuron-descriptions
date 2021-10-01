@@ -159,7 +159,7 @@ def random_neuron_wandb_images(dataset: data.Dataset[datasets.TopImages],
 
 PredictedCaptions = Union[StrSequence, Sequence[StrMapping]]
 GetHeaderFn = Callable[[AnyTopImages, int], str]
-GetImageUrlsFn = Callable[[AnyTopImages, int], StrSequence]
+GetBaseUrlFn = Callable[[AnyTopImages, int], str]
 
 
 def generate_html(
@@ -167,9 +167,10 @@ def generate_html(
     out_dir: PathLike,
     predictions: Optional[PredictedCaptions] = None,
     get_header: Optional[GetHeaderFn] = None,
-    get_image_urls: Optional[GetImageUrlsFn] = None,
-    include_gt: Optional[bool] = None,
-    save_images: Optional[bool] = None,
+    get_base_url: Optional[GetBaseUrlFn] = None,
+    include_gt: bool = True,
+    save_images: bool = True,
+    grid_images: bool = False,
     image_height: int = 600,
     image_width: int = 1000,
 ) -> None:
@@ -185,14 +186,15 @@ def generate_html(
         get_header (Optional[GetHeaderFn], optional): Fn returning the header
             text for each neuron. Arguments are top images and thier index in
             `dataset`. By default, header is "{layer}-{unit}".
-        get_image_urls (Optional[GetImageUrlsFn], optional): Fn returning the
-            URL(s) of top images for a given neuron. Arguments are top images
-            and their index in `dataset`. By default, images are saved to
-            out_dir and image URLs are local file system paths.
-        include_gt (Optional[bool], optional): If set, also write ground truth
+        get_base_url (Optional[GetBaseUrlFn], optional): Function returning the
+            base URL for a given sample. If this is not set, not images will
+            be included in the generated HTML. Defaults to None
+        include_gt (bool, optional): If set, also write ground truth
             captions to the HTML when possible. Defaults to True.
-        save_images (Optional[bool], optional): If set, save top images in dir.
-            By default, images are saved whenever get_image_url is not set.
+        save_images (bool, optional): If set, save top images in dir.
+            Defaults to True.
+        grid_images (bool, optional): If set, save all top images as a single
+            grid instead of individually. Defaults to False.
         image_height (int, optional): Height (in px) for each saved image.
             By default, 600 to be compatible with default
             `top_images.as_pil_image_grid()` behavior.
@@ -206,12 +208,6 @@ def generate_html(
 
     """
     length = len(cast(Sized, dataset))
-    if include_gt is None:
-        include_gt = bool(length) and isinstance(dataset[0],
-                                                 datasets.AnnotatedTopImages)
-    if save_images is None:
-        save_images = get_image_urls is None
-
     if predictions is not None and len(predictions) != length:
         raise ValueError(f'expected {length} predictions, '
                          f'got {len(predictions)}')
@@ -220,7 +216,10 @@ def generate_html(
     out_dir.mkdir(exist_ok=True, parents=True)
 
     images = []
-    image_file_name_pattern = str(out_dir / 'top_images_%d.png')
+    if grid_images:
+        image_file_name_pattern = 'top_images_%d.png'
+    else:
+        image_file_name_pattern = 'top_images_%d_%d.png'
 
     html = [
         '<!doctype html>',
@@ -241,13 +240,24 @@ def generate_html(
         else:
             header = key
 
-        if get_image_urls is not None:
-            image_urls = get_image_urls(sample, index)
-        elif save_images:
-            image_urls = [image_file_name_pattern % index]
+        base_url = None
+        if get_base_url is not None:
+            base_url = get_base_url(sample, index)
 
-        if save_images:
+        if base_url is None:
+            image_urls = []
+        elif grid_images:
+            image_urls = [f'{base_url}/{image_file_name_pattern % index}']
+        else:
+            image_urls = [
+                f'{base_url}/{image_file_name_pattern % (index, position)}'
+                for position in range(len(sample.images))
+            ]
+
+        if save_images and grid_images:
             images.append(sample.as_pil_image_grid())
+        elif save_images:
+            images.append(sample.as_pil_images())
 
         html += [
             '<div>',
@@ -290,7 +300,7 @@ def generate_html(
     html += ['</body>', '</html>']
 
     if save_images:
-        imgsave.save_image_set(images, image_file_name_pattern)
+        imgsave.save_image_set(images, str(out_dir / image_file_name_pattern))
 
     html_file = out_dir / 'index.html'
     with html_file.open('w') as handle:

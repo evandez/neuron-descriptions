@@ -21,10 +21,15 @@ parser.add_argument('--results-dir',
 parser.add_argument('--base-url',
                     default='https://unitname.csail.mit.edu/generated-html',
                     help='base url for images (default: csail url)')
+parser.add_argument('--grid-images',
+                    action='store_true',
+                    help='save images as grids')
 parser.add_argument('--device', help='manually set device (default: guessed)')
 args = parser.parse_args()
 
 device = args.device or 'cuda' if cuda.is_available() else 'cpu'
+
+base_url = args.base_url.rstrip('/')
 
 # Load model.
 decoder, _ = zoo.model(args.captioner, args.train)
@@ -59,14 +64,13 @@ for key, dataset in datasets.items():
     images_dir = results_dir / images_subdir
     if not images_dir.exists():
         images_dir.mkdir(exist_ok=True, parents=True)
-        viz.generate_html(dataset,
-                          images_dir,
-                          get_image_urls=lambda sample, _: [
-                              f'{args.base_url.rstrip("/")}/{images_subdir}/'
-                              f'{sample.layer}_{sample.unit}.png'
-                          ],
-                          include_gt=True,
-                          save_images=True)
+        viz.generate_html(
+            dataset,
+            images_dir,
+            get_base_url=lambda *_: f'{base_url}/{images_subdir}',
+            include_gt=True,
+            save_images=True,
+            grid_images=args.grid_images)
 
 # Predict the captions.
 key, dataset = next(iter(datasets.items()))
@@ -87,10 +91,8 @@ html_dir.mkdir(exist_ok=True)
 viz.generate_html(dataset,
                   html_dir,
                   predictions=predictions,
-                  get_image_urls=lambda sample, index: [
-                      f'{args.base_url.rstrip("/")}/images/'
-                      f'{keys[index].replace("/", "-")}/'
-                      f'{sample.layer}_{sample.unit}.png'
-                  ],
+                  get_base_url=lambda _, index:
+                  f'{base_url}/images/{keys[index].replace("/", "-")}',
+                  include_gt=True,
                   save_images=False,
-                  include_gt=True)
+                  grid_images=args.grid_images)

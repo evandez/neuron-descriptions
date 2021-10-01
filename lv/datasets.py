@@ -307,12 +307,21 @@ class AnnotatedTopImages(NamedTuple):
     masks: torch.Tensor
     annotations: StrSequence
 
-    def as_pil_image_grid(self, **kwargs: Any) -> Image.Image:
-        """Show masked top images as a PIL image grid.
+    def as_top_images(self) -> TopImages:
+        """Return the annotated top images as regular top images."""
+        return TopImages(*self[:-1])
 
-        Keyword arguments are forwarded to `TopImages.as_pil_image_grid`.
-        """
-        return TopImages(*self[:-1]).as_pil_image_grid(**kwargs)
+    def as_masked_images_tensor(self, **kwargs: Any) -> torch.Tensor:
+        """Forward to `TopImages.as_masked_images_tensor`."""
+        return self.as_top_images().as_masked_images_tensor(**kwargs)
+
+    def as_pil_images(self, **kwargs: Any) -> Sequence[Image.Image]:
+        """Forward to `TopImages.as_pil_images`."""
+        return self.as_top_images().as_pil_images(**kwargs)
+
+    def as_pil_image_grid(self, **kwargs: Any) -> Image.Image:
+        """Forward to `TopImages.as_pil_image_grid`."""
+        return self.as_top_images().as_pil_image_grid(**kwargs)
 
 
 class AnnotatedTopImagesDataset(data.Dataset):
