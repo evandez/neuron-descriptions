@@ -98,7 +98,7 @@ results_dir.mkdir(exist_ok=True, parents=True)
 
 netdissect_results_dir = args.netdissect_results_dir
 if netdissect_results_dir is None:
-    net_dissect_results_dir = env.results_dir() / 'netdissect'
+    netdissect_results_dir = env.results_dir() / 'netdissect'
 
 compexp_results_dir = args.compexp_results_dir
 if compexp_results_dir is None:
@@ -217,19 +217,15 @@ for experiment in args.experiments:
                                               mi=method == METHOD_PMI,
                                               device=device)
 
-                bert_scores = metrics.bert_score(test,
-                                                 predictions,
-                                                 bert_scorer=bert_scorer)
-                bleu = metrics.bleu(test, predictions)
+            bert_scores = metrics.bert_score(test,
+                                             predictions,
+                                             bert_scorer=bert_scorer)
+            bleu = metrics.bleu(test, predictions)
 
-                log = {
-                    'experiment': experiment,
-                    'method': method,
-                    'trial': trial
-                }
-                for index, precision in enumerate(bleu.precisions):
-                    log[f'bleu-{index + 1}'] = precision
-                for kind, score in bert_scores.items():
-                    log[f'bert_score-{kind}'] = score
+            log = {'experiment': experiment, 'method': method, 'trial': trial}
+            for index, precision in enumerate(bleu.precisions):
+                log[f'bleu-{index + 1}'] = precision
+            for kind, score in bert_scores.items():
+                log[f'bert_score-{kind}'] = score
 
-                wandb.log(log)
+            wandb.log(log)
