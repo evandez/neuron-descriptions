@@ -140,7 +140,7 @@ for experiment in args.experiments:
                         results = json.load(handle)
                     for result in results['units']:
                         unit = str(result['unit'])
-                        label = result['label']
+                        label = result['label'].split('-')[0]
                         results_by_layer_unit[str(layer), unit] = label
 
                 predictions = []
