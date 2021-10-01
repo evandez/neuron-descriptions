@@ -1,5 +1,6 @@
 """Generate HTML summary of top-images and captions."""
 import argparse
+import csv
 import pathlib
 
 import lv.datasets
@@ -72,22 +73,43 @@ for key, dataset in datasets.items():
             save_images=True,
             grid_images=args.grid_images)
 
-# Predict the captions.
+# Prepare HTML output directory.
+html_subdir = f'{args.captioner}-{args.train}/{args.test.replace("/", "-")}'
+html_dir = results_dir / html_subdir
+html_dir.mkdir(exist_ok=True, parents=True)
+
+# Combine all the datasets into one, keeping track of where each one
+# came from so we can set the URLs properly.
 key, dataset = next(iter(datasets.items()))
 keys = [key] * len(dataset)
 for other in datasets.keys() - {key}:
     dataset += datasets[other]
     keys += [other] * len(datasets[other])
-predictions = decoder.predict(dataset,
-                              strategy='rerank',
-                              temperature=.2,
-                              beam_size=50,
-                              device=device)
+
+# Run the captioner, or check if we already did.
+captions_file = html_dir / 'captions.csv'
+if captions_file.exists():
+    print(f'loading captions from {captions_file}')
+    with captions_file.open('r') as handle:
+        rows = tuple(csv.DictReader(handle))
+    captions = [row['caption'] for row in rows]
+else:
+    predictions = decoder.predict(dataset,
+                                  strategy='rerank',
+                                  temperature=.2,
+                                  beam_size=50,
+                                  device=device)
+
+    # Save them for later.
+    outputs = [('layer', 'unit', 'caption')]
+    for index, caption in enumerate(predictions):
+        sample = dataset[index]
+        outputs.append((sample.layer, str(sample.unit), caption))
+    print(f'saving captions to {captions_file}')
+    with captions_file.open('w') as handle:
+        csv.writer(handle).writerows(outputs)
 
 # Save the HTML results.
-html_subdir = f'{args.captioner}-{args.train}/{args.test.replace("/", "-")}'
-html_dir = results_dir / html_subdir
-html_dir.mkdir(exist_ok=True, parents=True)
 viz.generate_html(dataset,
                   html_dir,
                   predictions=predictions,
