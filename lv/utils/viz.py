@@ -2,7 +2,7 @@
 import collections
 import pathlib
 import random
-from typing import Any, Callable, Optional, Sequence, Sized, Union, cast
+from typing import Any, Callable, Optional, Sequence, Sized, Tuple, Union, cast
 
 from lv import datasets
 from lv.deps.netdissect import imgsave
@@ -171,8 +171,7 @@ def generate_html(
     include_gt: bool = True,
     save_images: bool = True,
     grid_images: bool = False,
-    image_height: int = 600,
-    image_width: int = 1000,
+    image_size: Optional[Tuple[int, int]] = None,
 ) -> None:
     """Generate an HTML visualization of neuron top images and captions.
 
@@ -195,12 +194,9 @@ def generate_html(
             Defaults to True.
         grid_images (bool, optional): If set, save all top images as a single
             grid instead of individually. Defaults to False.
-        image_height (int, optional): Height (in px) for each saved image.
-            By default, 600 to be compatible with default
-            `top_images.as_pil_image_grid()` behavior.
-        image_width (int, optional): Width (in px) for each saved image.
-            By default, 1000 to be compatible with default
-            `top_images.as_pil_image_grid()` behavior.
+        image_size (Optional[Tuple[int, int], optional): Height and width
+            (in px) for each saved image. Defaults depend on whether
+            grid_images is set or not.
 
     Raises:
         ValueError: If `captions` is set but has different length
@@ -211,6 +207,12 @@ def generate_html(
     if predictions is not None and len(predictions) != length:
         raise ValueError(f'expected {length} predictions, '
                          f'got {len(predictions)}')
+
+    if image_size is None:
+        image_height = 600 if grid_images else 224
+        image_width = 1000 if grid_images else 224
+    else:
+        image_height, image_width = image_size
 
     out_dir = pathlib.Path(out_dir)
     out_dir.mkdir(exist_ok=True, parents=True)
