@@ -119,7 +119,7 @@ for experiment in args.experiments:
     for method in args.methods:
         train = None
         if method in {METHOD_NO_PMI, METHOD_PMI}:
-            train_group_key = f'NOT_{experiment_key.upper()}'
+            train_group_key = f'NOT_{experiment.upper().replace("/", "_")}'
             train = zoo.datasets(*zoo.DATASET_GROUPINGS[train_group_key])
 
         trials = args.trials if method in {METHOD_PMI, METHOD_NO_PMI} else 1
