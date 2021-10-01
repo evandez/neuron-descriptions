@@ -47,6 +47,7 @@ parser = argparse.ArgumentParser(
     description='audit cnns by captioning all neurons')
 parser.add_argument('--captioner',
                     nargs=2,
+                    default=(zoo.KEYS.CAPTIONER_RESNET101, zoo.KEYS.ALL),
                     help='captioner to use (default: captioner-resnet101 all)')
 parser.add_argument('--cnns',
                     nargs='+',
