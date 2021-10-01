@@ -133,8 +133,8 @@ for experiment in args.experiments:
             if method == METHOD_NETDISSECT:
                 results_by_layer_unit = {}
                 for layer in test.layers:
-                    results_name = (f'{experiment_key}-netpqc-{layer}-10/'
-                                    'report.json')
+                    results_name = (f'{experiment_key.replace("365", "")}'
+                                    f'-netpqc-{layer}-10/report.json')
                     results_file = netdissect_results_dir / results_name
                     with results_file.open('r') as handle:
                         results = json.load(handle)
