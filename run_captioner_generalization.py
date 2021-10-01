@@ -32,51 +32,32 @@ EXPERIMENT_ACROSS_NETWORK = 'across-network'
 EXPERIMENT_ACROSS_DATASET = 'across-dataset'
 EXPERIMENT_ACROSS_TASK = 'across-task'
 EXPERIMENT_ACROSS_ARCH = 'across-arch'
+EXPERIMENT_LEAVE_ONE_OUT = 'leave-one-out'
 EXPERIMENTS: Mapping[str, Splits] = {
     EXPERIMENT_WITHIN_NETWORK: ((
-        'alexnet/imagenet',
-        'alexnet/places365',
-        'resnet152/imagenet',
-        'resnet152/places365',
-        'biggan/imagenet',
-        'biggan/places365',
+        zoo.KEYS.ALEXNET_IMAGENET,
+        zoo.KEYS.ALEXNET_PLACES365,
+        zoo.KEYS.RESNET152_IMAGENET,
+        zoo.KEYS.RESNET152_PLACES365,
+        zoo.KEYS.BIGGAN_IMAGENET,
+        zoo.KEYS.BIGGAN_PLACES365,
     ),),
     EXPERIMENT_ACROSS_NETWORK: (
-        ('alexnet/imagenet', 'alexnet/places365'),
-        ('resnet152/imagenet', 'resnet152/places365'),
+        zoo.DATASET_GROUPINGS[zoo.KEYS.ALEXNET],
+        zoo.DATASET_GROUPINGS[zoo.KEYS.RESNET152],
     ),
     EXPERIMENT_ACROSS_DATASET: (
-        (
-            'alexnet/imagenet',
-            'resnet152/imagenet',
-            'biggan/imagenet',
-        ),
-        (
-            'alexnet/places365',
-            'resnet152/places365',
-            'biggan/places365',
-        ),
+        zoo.DATASET_GROUPINGS[zoo.KEYS.IMAGENET],
+        zoo.DATASET_GROUPINGS[zoo.KEYS.PLACES365],
     ),
     EXPERIMENT_ACROSS_TASK: (
-        (
-            'alexnet/imagenet',
-            'alexnet/places365',
-            'resnet152/imagenet',
-            'resnet152/places365',
-        ),
-        ('biggan/imagenet', 'biggan/places365'),
+        zoo.DATASET_GROUPINGS[zoo.KEYS.CLASSIFIERS],
+        zoo.DATASET_GROUPINGS[zoo.KEYS.GENERATORS],
     ),
     EXPERIMENT_ACROSS_ARCH: (
-        (
-            'alexnet/imagenet',
-            'alexnet/places365',
-            'resnet152/imagenet',
-            'resnet152/places365',
-            'biggan/imagenet',
-            'biggan/places365',
-        ),
-        ('dino_vits8/imagenet',),
-    )
+        zoo.DATASET_GROUPINGS[zoo.KEYS.ALL],
+        (zoo.KEYS.DINO_VITS8_IMAGENET,),
+    ),
 }
 
 parser = argparse.ArgumentParser(
