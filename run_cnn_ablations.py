@@ -1,5 +1,6 @@
 """Run CNN ablation experiments."""
 import argparse
+import csv
 import pathlib
 import shutil
 
@@ -7,6 +8,7 @@ import lv.dissection.zoo
 import lv.zoo
 from lv import datasets, models
 from lv.utils import env, training, viz
+from lv.utils.typing import StrSequence
 
 import numpy as np
 import spacy
@@ -204,11 +206,12 @@ for dataset_name in args.datasets:
         assert isinstance(dissected, datasets.TopImagesDataset)
 
         # Obtain captions for every neuron in the CNN.
+        captions: StrSequence
         captions_file = model_results_dir / 'captions.txt'
         if captions_file.exists():
             print(f'loading captions from {captions_file}')
             with captions_file.open('r') as handle:
-                captions = handle.read().split('\n')
+                captions = [row['caption'] for row in csv.DictReader(handle)]
         else:
             decoder, *_ = lv.zoo.model(*args.captioner)
             decoder.to(device)
@@ -220,9 +223,19 @@ for dataset_name in args.datasets:
                 strategy='rerank',
                 temperature=.2,
                 beam_size=50)
+
+            # TODO(evandez): Commonize this.
+            rows = [('layer', 'unit', 'caption')]
+            for index, caption in enumerate(captions):
+                sample = dissected[index]
+                rows.append((sample.layer, str(sample.unit), caption))
             print(f'saving captions to {captions_file}')
             with captions_file.open('w') as handle:
-                handle.write('\n'.join(captions))
+                writer = csv.writer(handle)
+                writer.writerows(rows)
+
+        # Always save the current captions used by this script.
+        wandb.save(str(captions_file))
 
         # Pretokenize the captions for efficiency.
         tokenized = tuple(nlp.pipe(captions))
