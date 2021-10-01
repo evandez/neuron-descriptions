@@ -57,6 +57,13 @@ parser.add_argument('--trials',
 parser.add_argument('--precompute-features',
                     action='store_true',
                     help='precompute visual features (default: do not)')
+parser.add_argument('--results-dir',
+                    type=pathlib.Path,
+                    help='root dir for intermediate and final results '
+                    '(default: project results dir)')
+parser.add_argument('--clear-results-dir',
+                    action='store_true',
+                    help='if set, clear results dir (default: do not)')
 parser.add_argument('--wandb-project',
                     default='lv',
                     help='wandb project name (default: lv)')
