@@ -10,7 +10,7 @@ from lv.utils import env
 
 from torch import cuda
 
-MODELS = (
+CNNS = (
     # zoo.KEYS.ALEXNET_IMAGENET,
     # zoo.KEYS.ALEXNET_IMAGENET_BLURRED,
     zoo.KEYS.DENSENET121_IMAGENET,
@@ -48,11 +48,15 @@ parser = argparse.ArgumentParser(
 parser.add_argument('--captioner',
                     nargs=2,
                     help='captioner to use (default: captioner-resnet101 all)')
-parser.add_argument('--models',
+parser.add_argument('--cnns',
                     nargs='+',
-                    choices=MODELS,
-                    default=MODELS,
+                    choices=CNNS,
+                    default=CNNS,
                     help='models to audit (default: all)')
+parser.add_argument('--data-dir',
+                    type=pathlib.Path,
+                    help='root dir containing models to audit '
+                    '(default: <project data dir> / <cnn key>)')
 parser.add_argument('--results-dir',
                     type=pathlib.Path,
                     help='root dir for intermediate and final results '
@@ -75,15 +79,20 @@ if args.clear_results_dir and results_dir.exists():
     shutil.rmtree(results_dir)
 results_dir.mkdir(exist_ok=True, parents=True)
 
-for key in args.datasets:
+for key in args.cnns:
     print(f'---- audit {key} ----')
 
     captions_file = results_dir / f'{key.replace("/", "-")}-captions.csv'
     if captions_file.exists():
         print(f'found captions file at {captions_file}; skipping')
 
-    dataset = zoo.dataset(key)
+    path = None
+    if args.data_dir is not None:
+        path = args.data_dir / key
+
+    dataset = zoo.dataset(key, path=path)
     assert isinstance(dataset, lv.datasets.TopImagesDataset)
+
     predictions = decoder.predict(dataset,
                                   strategy='rerank',
                                   temperature=.2,
