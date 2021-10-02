@@ -122,7 +122,7 @@ for layer in layers:
     # image in the dataset.
     pbar.descnext('compute seg/unit masks')
     with nethook.InstrumentedModel(model) as instr:
-        instr.retain_layer(layer, detach=False)
+        instr.retain_layer(str(layer), detach=False)
         upsampler = None
 
         def compute_segs_and_unit_masks(
