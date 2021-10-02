@@ -155,7 +155,6 @@ def dissection_models() -> ModelConfigs:
                     biggan.SeqBigGAN,
                     pretrained='imagenet',
                     load_weights=False,
-                    requires_path=False,
                     layers=LAYERS.BIGGAN,
                     dissection=GenerativeModelDissectionConfig(
                         transform_inputs=lambda *xs: (biggan.GInputs(*xs),),
@@ -169,9 +168,8 @@ def dissection_models() -> ModelConfigs:
             KEYS.PLACES365:
                 ModelConfig(
                     biggan.SeqBigGAN,
-                    pretrained='imagenet',
+                    pretrained='places365',
                     load_weights=False,
-                    requires_path=False,
                     layers=LAYERS.BIGGAN,
                     dissection=GenerativeModelDissectionConfig(
                         transform_inputs=lambda *xs: (biggan.GInputs(*xs),),
@@ -179,7 +177,7 @@ def dissection_models() -> ModelConfigs:
                         renormalizer=renormalize.renormalizer(target='byte'),
                         image_size=256,
                         batch_size=32,
-                        dataset=KEYS.BIGGAN_ZS_IMAGENET,
+                        dataset=KEYS.BIGGAN_ZS_PLACES365,
                     ),
                 ),
         },
