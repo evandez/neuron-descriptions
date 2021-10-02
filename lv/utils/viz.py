@@ -160,6 +160,7 @@ def random_neuron_wandb_images(dataset: data.Dataset[datasets.TopImages],
 PredictedCaptions = Union[StrSequence, Sequence[StrMapping]]
 GetHeaderFn = Callable[[AnyTopImages, int], str]
 GetBaseUrlFn = Callable[[AnyTopImages, int], str]
+GetUrlUnitIdFn = Callable[[AnyTopImages, int], int]
 
 
 def generate_html(
@@ -168,6 +169,7 @@ def generate_html(
     predictions: Optional[PredictedCaptions] = None,
     get_header: Optional[GetHeaderFn] = None,
     get_base_url: Optional[GetBaseUrlFn] = None,
+    get_unit_id: Optional[GetUrlUnitIdFn] = None,
     include_gt: bool = True,
     save_images: bool = True,
     grid_images: bool = False,
@@ -187,7 +189,11 @@ def generate_html(
             `dataset`. By default, header is "{layer}-{unit}".
         get_base_url (Optional[GetBaseUrlFn], optional): Function returning the
             base URL for a given sample. If this is not set, not images will
-            be included in the generated HTML. Defaults to None
+            be included in the generated HTML. Defaults to None.
+        get_unit_id (Optional[GetUnitIdFn], optional): Function returning
+            the unit ID to use in the URL for the top images. By default,
+            its index in the dataset will be used. Note this does NOT affect
+            how images are saved on disk! Defaults to None.
         include_gt (bool, optional): If set, also write ground truth
             captions to the HTML when possible. Defaults to True.
         save_images (bool, optional): If set, save top images in dir.
@@ -246,13 +252,18 @@ def generate_html(
         if get_base_url is not None:
             base_url = get_base_url(sample, index)
 
+        if get_unit_id is None:
+            unit_id = index
+        else:
+            unit_id = get_unit_id(sample, index)
+
         if base_url is None:
             image_urls = []
         elif grid_images:
-            image_urls = [f'{base_url}/{image_file_name_pattern % index}']
+            image_urls = [f'{base_url}/{image_file_name_pattern % unit_id}']
         else:
             image_urls = [
-                f'{base_url}/{image_file_name_pattern % (index, position)}'
+                f'{base_url}/{image_file_name_pattern % (unit_id, position)}'
                 for position in range(len(sample.images))
             ]
 

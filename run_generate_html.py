@@ -83,9 +83,11 @@ html_dir.mkdir(exist_ok=True, parents=True)
 # came from so we can set the URLs properly.
 key, dataset = next(iter(datasets.items()))
 keys = [key] * len(dataset)
+ids = list(range(len(dataset)))
 for other in datasets.keys() - {key}:
     dataset += datasets[other]
     keys += [other] * len(datasets[other])
+    ids += range(len(datasets[other]))
 
 # Run the captioner, or check if we already did.
 captions_file = html_dir / 'captions.csv'
@@ -116,6 +118,7 @@ viz.generate_html(dataset,
                   predictions=predictions,
                   get_base_url=lambda _, index:
                   f'{base_url}/images/{keys[index].replace("/", "-")}',
+                  get_unit_id=lambda _, index: ids[index],
                   include_gt=True,
                   save_images=False,
                   grid_images=args.grid_images)
