@@ -34,7 +34,7 @@ device = args.device or 'cuda' if cuda.is_available() else 'cpu'
 base_url = args.base_url.rstrip('/')
 
 # Load model.
-decoder, _ = zoo.model(args.captioner, args.train)
+decoder, _ = zoo.model(args.captioner, args.train, map_location=device)
 assert isinstance(decoder, models.Decoder)
 
 # Load dataset(s).
