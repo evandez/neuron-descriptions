@@ -221,8 +221,8 @@ for experiment in args.experiments:
 
             # Save the predictions.
             outputs = [('layer', 'unit', 'caption')]
-            for index in range(len(dataset)):
-                sample = dataset[index]
+            for index in range(len(test)):
+                sample = test[index]
                 output = (sample.layer, str(sample.unit), predictions[index])
                 outputs.append(output)
             trial_key = f'{experiment_key}-{method}-{trial}'
