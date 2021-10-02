@@ -7,11 +7,13 @@ on the fly from a segmentation model like NetDissect does.
 """
 import argparse
 import pathlib
+import shutil
 from typing import Any, Mapping
 
 from lv.deps.netdissect import (nethook, pbar, renormalize, segmenter, tally,
                                 upsample)
 from lv.dissection import dissect, transforms, zoo
+from lv.utils import env
 
 import torch
 from torch import cuda
@@ -33,10 +35,17 @@ parser.add_argument('--model-file',
 parser.add_argument('--dataset-path',
                     type=pathlib.Path,
                     help='path to dataset (default: None)')
-parser.add_argument('--cache-dir',
+parser.add_argument(
+    '--models-dir',
+    type=pathlib.Path,
+    help='directory to store cache files in (default: project models dir)')
+parser.add_argument('--results-dir',
                     type=pathlib.Path,
-                    default='.cache',
-                    help='directory to store cache files in (default: .cache)')
+                    help='root dir for intermediate and final results '
+                    '(default: project results dir)')
+parser.add_argument('--clear-results-dir',
+                    action='store_true',
+                    help='if set, clear results dir (default: do not)')
 parser.add_argument('--batch-size',
                     type=int,
                     default=128,
@@ -45,6 +54,12 @@ parser.add_argument('--device', help='manually set device (default: guessed)')
 args = parser.parse_args()
 
 device = args.device or 'cuda' if cuda.is_available() else 'cpu'
+
+# Prepare result dir.
+results_dir = args.results_dir or (env.results_dir() / 'compexp')
+if args.clear_results_dir and results_dir.exists():
+    shutil.rmtree(results_dir)
+results_dir.mkdir(exist_ok=True, parents=True)
 
 # Load the model to dissect and the dataset to dissect on.
 model, layers, config = zoo.model(args.model,
@@ -60,7 +75,8 @@ if isinstance(config.dissection, zoo.GenerativeModelDissectionConfig):
 dataset = zoo.dataset(dataset, path=args.dataset_path)
 
 # Load the segmentation model for later.
-segmodel_cache_dir = args.cache_dir / 'segmodel'
+models_dir = args.models_dir or env.models_dir()
+segmodel_cache_dir = models_dir / 'segmodel'
 segmenter.ensure_segmenter_downloaded(str(segmodel_cache_dir), 'color')
 segmodel = segmenter.MergedSegmenter([
     segmenter.UnifiedParsingSegmenter(all_parts=True, segdiv='quad'),
@@ -77,7 +93,7 @@ for layer in layers:
     cache_key = f'{args.model}_{args.dataset}_{layer}'
 
     # Begin by computing activation statistics.
-    tally_cache_file = args.cache_dir / f'{cache_key}_tally.npz'
+    tally_cache_file = results_dir / f'{cache_key}_tally.npz'
     if generative:
         _, rq = dissect.generative(model,
                                    dataset,
