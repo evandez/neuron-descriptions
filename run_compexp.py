@@ -161,7 +161,7 @@ for layer in layers:
                 images, *_ = inputs  # Just assume images are first...
                 with torch.no_grad():
                     inputs = transform_inputs(*inputs)
-                    acts = instr(*inputs, layer=layer)
+                    acts = instr(*inputs, last_layer=layer)
                     acts = transform_outputs(acts)
 
             with torch.no_grad():
