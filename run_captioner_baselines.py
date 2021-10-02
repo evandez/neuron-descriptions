@@ -244,8 +244,11 @@ for experiment in args.experiments:
             bleu = metrics.bleu(test, predictions)
 
             log = {'experiment': experiment, 'method': method, 'trial': trial}
+
+            log['bleu'] = bleu.score
             for index, precision in enumerate(bleu.precisions):
                 log[f'bleu-{index + 1}'] = precision
+
             for kind, score in bert_scores.items():
                 log[f'bert_score-{kind}'] = score
 
