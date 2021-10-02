@@ -194,8 +194,16 @@ for experiment in args.experiments:
                     decoder = models.Decoder.load(captioner_file,
                                                   map_location=device)
                 else:
-                    lm = models.lm(train)
-                    lm.fit(train, device=device)
+                    lm_file = results_dir / f'{captioner_key}-lm.pth'
+                    if lm_file.exists():
+                        print(f'loading lm from {lm_file}')
+                        lm = models.LanguageModel.load(lm_file,
+                                                       map_location=device)
+                    else:
+                        lm = models.lm(train)
+                        lm.fit(train, device=device)
+                        print(f'saving lm to {lm_file}')
+                        lm.save(lm_file)
 
                     encoder = models.encoder()
 
