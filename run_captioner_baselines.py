@@ -217,6 +217,7 @@ for experiment in args.experiments:
                     print(f'saving decoder to {captioner_file}')
                     decoder.save(captioner_file)
 
+                decoder.eval()
                 predictions = decoder.predict(
                     test,
                     strategy='rerank' if method == METHOD_PMI else 'beam',
