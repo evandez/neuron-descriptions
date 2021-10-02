@@ -224,7 +224,7 @@ class Decoder(serialize.SerializableModule):
                  attention_hidden_size: Optional[int] = None,
                  dropout: float = .5,
                  length: int = 15,
-                 strategy: str = STRATEGY_RERANK,
+                 strategy: Optional[str] = None,
                  temperature: float = .2,
                  beam_size: int = 50):
         """Initialize the decoder.
@@ -248,7 +248,7 @@ class Decoder(serialize.SerializableModule):
             length (int, optional): Default decoding length. Defaults to 15.
             strategy (str, optional): Default decoding strategy. Note that
                 force decoding is not supported as a default.
-                Defaults to 'rerank'.
+                Defaults to 'rerank' if lm is set and 'beam' otherwise.
             temperature (float, optional): Default temperature parameter to use
                 when MI decoding. When not MI decoding, this parameter does
                 nothing. Defaults to .2.
@@ -270,6 +270,9 @@ class Decoder(serialize.SerializableModule):
                 raise ValueError('lm and decoder have different vocabs;'
                                  f'lm missing {my_vocab - lm_vocab} and '
                                  f'decoder missing {lm_vocab - my_vocab}')
+
+        if strategy is None:
+            strategy = STRATEGY_BEAM if lm is None else STRATEGY_RERANK
 
         self.indexer = indexer
         self.encoder = encoder
@@ -1019,6 +1022,7 @@ class Decoder(serialize.SerializableModule):
                 val_loss += loss.item()
             val_loss /= len(val_loader)
             val_bleu = self.bleu(val,
+                                 strategy='greedy',
                                  mi=False,
                                  device=device,
                                  display_progress_as=None).score
