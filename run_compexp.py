@@ -74,9 +74,10 @@ if isinstance(config.dissection, zoo.GenerativeModelDissectionConfig):
 
 dataset = zoo.dataset(dataset, path=args.dataset_path)
 
-# Load the segmentation model for later.
+# Load the segmentation model for later; its path must be hardcoded because
+# of how the library is written.
 models_dir = args.models_dir or env.models_dir()
-segmodel_cache_dir = models_dir / 'segmodel'
+segmodel_cache_dir = pathlib.Path('datasets/segmeodel')
 segmodel_cache_dir.mkdir(exist_ok=True, parents=True)
 segmenter.ensure_segmenter_downloaded(str(segmodel_cache_dir), 'color')
 segmodel = segmenter.MergedSegmenter([
@@ -183,7 +184,7 @@ for layer in layers:
         masks = tally.tally_cat_dict(compute_segs_and_unit_masks,
                                      dataset,
                                      batch_size=args.batch_size,
-                                     cachefile=args.cache_dir /
+                                     cachefile=results_dir /
                                      f'{cache_key}_seg_unit_masks.npz')
 
     # Now...finally...we can do the CompExp labeling.
