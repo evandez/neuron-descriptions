@@ -77,6 +77,7 @@ dataset = zoo.dataset(dataset, path=args.dataset_path)
 # Load the segmentation model for later.
 models_dir = args.models_dir or env.models_dir()
 segmodel_cache_dir = models_dir / 'segmodel'
+segmodel_cache_dir.mkdir(exist_ok=True, parents=True)
 segmenter.ensure_segmenter_downloaded(str(segmodel_cache_dir), 'color')
 segmodel = segmenter.MergedSegmenter([
     segmenter.UnifiedParsingSegmenter(all_parts=True, segdiv='quad'),
