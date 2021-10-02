@@ -92,6 +92,8 @@ segrenorm = renormalize.renormalizer(source='zc' if generative else 'imagenet',
 
 # We'll do this layer by layer because of memory constraints.
 for layer in layers:
+    layer = str(layer)
+
     cache_key = f'{args.model}_{args.dataset}_{layer}'
 
     # Begin by computing activation statistics.
@@ -122,7 +124,7 @@ for layer in layers:
     # image in the dataset.
     pbar.descnext('compute seg/unit masks')
     with nethook.InstrumentedModel(model) as instr:
-        instr.retain_layer(str(layer), detach=False)
+        instr.retain_layer(layer, detach=False)
         upsampler = None
 
         def compute_segs_and_unit_masks(
