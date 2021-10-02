@@ -187,8 +187,8 @@ for experiment in args.experiments:
                 assert method in {METHOD_NO_PMI, METHOD_PMI}
                 assert train is not None
 
-                trial_key = f'{experiment_key}-trial{trial}'
-                captioner_file = results_dir / f'{trial_key}-captioner.pth'
+                captioner_key = f'{experiment_key}-trial{trial}'
+                captioner_file = results_dir / f'{captioner_key}-captioner.pth'
                 if captioner_file.exists():
                     print(f'loading captioner from {captioner_file}')
                     decoder = models.Decoder.load(captioner_file,
@@ -219,6 +219,18 @@ for experiment in args.experiments:
                     mi=False,
                     device=device)
 
+            # Save the predictions.
+            outputs = [('layer', 'unit', 'caption')]
+            for index in range(len(dataset)):
+                sample = dataset[index]
+                output = (sample.layer, str(sample.unit), predictions[index])
+                outputs.append(output)
+            trial_key = f'{experiment_key}-{method}-{trial}'
+            captions_file = results_dir / f'{trial_key}-captions.csv'
+            with captions_file.open('w') as handle:
+                csv.writer(handle).writerows(outputs)
+
+            # Compute metrics.
             bert_scores = metrics.bert_score(test,
                                              predictions,
                                              bert_scorer=bert_scorer)
