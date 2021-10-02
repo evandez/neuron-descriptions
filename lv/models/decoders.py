@@ -1022,7 +1022,7 @@ class Decoder(serialize.SerializableModule):
                 val_loss += loss.item()
             val_loss /= len(val_loader)
             val_bleu = self.bleu(val,
-                                 strategy='greedy',
+                                 strategy=STRATEGY_GREEDY,
                                  mi=False,
                                  device=device,
                                  display_progress_as=None).score
