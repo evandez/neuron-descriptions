@@ -211,12 +211,13 @@ for experiment in args.experiments:
                     print(f'saving decoder to {captioner_file}')
                     decoder.save(captioner_file)
 
-                predictions = decoder.predict(test,
-                                              strategy='beam',
-                                              beam_size=50,
-                                              temperature=.2,
-                                              mi=method == METHOD_PMI,
-                                              device=device)
+                predictions = decoder.predict(
+                    test,
+                    strategy='rerank' if method == METHOD_PMI else 'beam',
+                    beam_size=50,
+                    temperature=.2,
+                    mi=False,
+                    device=device)
 
             bert_scores = metrics.bert_score(test,
                                              predictions,
