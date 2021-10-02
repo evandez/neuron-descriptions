@@ -155,6 +155,7 @@ def dissection_models() -> ModelConfigs:
                     biggan.SeqBigGAN,
                     pretrained='imagenet',
                     load_weights=False,
+                    requires_path=False,
                     layers=LAYERS.BIGGAN,
                     dissection=GenerativeModelDissectionConfig(
                         transform_inputs=lambda *xs: (biggan.GInputs(*xs),),
@@ -170,6 +171,7 @@ def dissection_models() -> ModelConfigs:
                     biggan.SeqBigGAN,
                     pretrained='imagenet',
                     load_weights=False,
+                    requires_path=False,
                     layers=LAYERS.BIGGAN,
                     dissection=GenerativeModelDissectionConfig(
                         transform_inputs=lambda *xs: (biggan.GInputs(*xs),),
