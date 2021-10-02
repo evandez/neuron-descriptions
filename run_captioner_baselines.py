@@ -194,10 +194,8 @@ for experiment in args.experiments:
                     decoder = models.Decoder.load(captioner_file,
                                                   map_location=device)
                 else:
-                    lm = None
-                    if method == METHOD_PMI:
-                        lm = models.lm(train)
-                        lm.fit(train, device=device)
+                    lm = models.lm(train)
+                    lm.fit(train, device=device)
 
                     encoder = models.encoder()
 
