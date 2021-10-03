@@ -374,7 +374,7 @@ for layer in layers:
                 torch.zeros(seg_masks.shape[0], *seg_masks.shape[2:]),
             )
         ]
-        for index, label in tqdm(tuple(enumerate(seglabels)),
+        for index, label in tqdm(tuple(enumerate(seglabels[1:])),
                                  desc='precompute seg literals'):
             literal = Literal(index, label,
                               seg_masks.eq(index).sum().bool().long())
