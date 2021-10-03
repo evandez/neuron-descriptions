@@ -75,7 +75,7 @@ if isinstance(config.dissection, zoo.GenerativeModelDissectionConfig):
 
 # TODO(evandez): YUCK! Need to commonize this somewhere.
 kwargs = {}
-if args.model == zoo.KEYS.ALEXNET and args.datset == zoo.KEYS.PLACES365:
+if args.model == zoo.KEYS.ALEXNET and args.dataset == zoo.KEYS.PLACES365:
     kwargs['transform'] = torchvision.transforms.Compose([
         torchvision.transforms.Resize((256, 256)),
         torchvision.transforms.CenterCrop(227),
