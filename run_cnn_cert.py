@@ -19,8 +19,8 @@ from torch import cuda
 from tqdm.auto import tqdm
 
 EXPERIMENTS = (
-    zoo.KEYS.SPURIOUS_IMAGENET_TEXT,
-    zoo.KEYS.SPURIOUS_IMAGENET_COLOR,
+    zoo.KEYS.IMAGENET_SPURIOUS_TEXT,
+    zoo.KEYS.IMAGENET_SPURIOUS_COLOR,
 )
 
 VERSION_ORIGINAL = 'original'
@@ -45,7 +45,7 @@ parser = argparse.ArgumentParser(
     description='certify a cnn trained on bad data')
 parser.add_argument('--experiments',
                     choices=EXPERIMENTS,
-                    default=(zoo.KEYS.SPURIOUS_IMAGENET_TEXT,),
+                    default=(zoo.KEYS.IMAGENET_SPURIOUS_TEXT,),
                     nargs='+',
                     help='dataset to experiment with (default: all)')
 parser.add_argument('--versions',
@@ -181,10 +181,10 @@ for experiment in args.experiments:
     experiment_dir.mkdir(exist_ok=True, parents=True)
 
     target_words: StrSequence
-    if experiment == zoo.KEYS.SPURIOUS_IMAGENET_TEXT:
+    if experiment == zoo.KEYS.IMAGENET_SPURIOUS_TEXT:
         target_words = ('word', 'text', 'letter')
     else:
-        assert experiment == zoo.KEYS.SPURIOUS_IMAGENET_COLOR
+        assert experiment == zoo.KEYS.IMAGENET_SPURIOUS_COLOR
         target_words = ('red', 'yellow', 'green', 'blue', 'cyan', 'purple',
                         'brown', 'black', 'white', 'gray')
 
