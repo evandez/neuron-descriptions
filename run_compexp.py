@@ -387,7 +387,7 @@ for layer in layers:
     # (Again, useful for IOU.)
     unit_totals_file = results_dir / f'{cache_key}_unit_totals.pth'
     if unit_totals_file.exists():
-        print(f'loading seg totals from {unit_totals_file}')
+        print(f'loading unit totals from {unit_totals_file}')
         unit_totals = torch.load(unit_totals_file)
     else:
         unit_totals = unit_masks.sum(dim=(0, 2, 3)).tolist()
