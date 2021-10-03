@@ -390,11 +390,7 @@ for layer in layers:
         print(f'loading seg totals from {unit_totals_file}')
         unit_totals = torch.load(unit_totals_file)
     else:
-        unit_totals = []
-        for unit in tqdm(range(unit_masks.shape[1]),
-                         desc='precompute unit totals'):
-            unit_totals.append(unit_masks[:, unit].sum().item())
-
+        unit_totals = unit_masks.sum(dim=(0, 2, 3)).tolist()
         print(f'saving unit totals to {unit_totals_file}')
         torch.save(unit_totals, unit_totals_file)
 
