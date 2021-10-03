@@ -12,7 +12,6 @@ from lv.dissection import dissect, zoo
 from lv.utils import env, training, viz
 from lv.utils.typing import StrSequence
 
-import numpy
 import torch
 import wandb
 from torch import cuda
@@ -116,18 +115,14 @@ parser.add_argument('--lr',
                     default=1e-4,
                     help='learning rate (default: 1e-4)')
 parser.add_argument('--ablation-min',
-                    type=float,
                     default=0,
-                    help='min fraction of neurons to ablate (default: 0)')
+                    help='min number of neurons to ablate (default: 0)')
 parser.add_argument('--ablation-max',
-                    type=float,
+                    type=int,
+                    help='max number of neurons to ablate (default: all)')
+parser.add_argument('--ablation-step-size',
                     default=1,
-                    help='max fraction of neurons to ablate (default: 1)')
-parser.add_argument(
-    '--ablation-step-size',
-    type=float,
-    default=.01,
-    help='fraction of add\'l neurons to ablate at each step (default: .01)')
+                    help='add\'l neurons to ablate at each step (default: 1)')
 parser.add_argument('--device', help='manually set device (default: guessed)')
 parser.add_argument('--wandb-project',
                     default='lv',
@@ -331,10 +326,11 @@ for experiment in args.experiments:
                     indices = random.sample(range(len(dissected)),
                                             k=len(candidate_indices))
 
-                fractions = numpy.arange(args.ablation_min, args.ablation_max,
-                                         args.ablation_step_size)
-                for fraction in fractions:
-                    ablated_indices = indices[:int(fraction * len(indices))]
+                ns_to_ablate = range(
+                    args.ablation_min, args.ablation_max or
+                    len(candidate_indices), args.ablation_step_size)
+                for n_ablated in ns_to_ablate:
+                    ablated_indices = indices[:n_ablated]
                     copied = copy.deepcopy(cnn)
                     if args.fine_tune:
                         copied.fit(
@@ -350,14 +346,12 @@ for experiment in args.experiments:
                             num_workers=0,
                             device=device,
                             display_progress_as=f'fine tune {args.cnn} '
-                            f'(cond={condition}, t={trial}, f={fraction:.2f})')
+                            f'(cond={condition}, t={trial}, n={n_ablated})')
                     accuracy = copied.accuracy(
                         test,
                         ablate=dissected.units(ablated_indices),
                         display_progress_as=f'test ablated {args.cnn} '
-                        f'(cond={condition}, '
-                        f't={trial}, '
-                        f'f={fraction:.2f})',
+                        f'(cond={condition}, t={trial}, n={n_ablated})',
                         num_workers=0,
                         device=device,
                     )
@@ -369,17 +363,16 @@ for experiment in args.experiments:
                         exp=experiment,
                         ver=version,
                         cond=condition,
-                        frac=fraction)
+                        n_ablated=n_ablated)
                     wandb.log({
                         'experiment': experiment,
                         'version': version,
                         'condition': condition,
                         'trial': trial,
-                        'frac_ablated': fraction,
-                        'n_ablated': len(ablated_indices),
+                        'n_ablated': n_ablated,
                         'accuracy': accuracy,
                         'samples': samples,
                     })
                     print(f'experiment={experiment}', f'version={version}',
                           f'condition={condition}', f'trial={trial}',
-                          f'fraction={fraction:.2f}', f'accuracy={accuracy}')
+                          f'n_ablated={n_ablated}', f'accuracy={accuracy}')
