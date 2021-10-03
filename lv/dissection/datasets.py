@@ -25,4 +25,7 @@ class TensorDatasetOnDisk(data.TensorDataset):
                 continue
             tensors = torch.load(child, **kwargs)
             loaded.append(tensors)
+        loaded = sorted(loaded,
+                        key=lambda tensor: tensor.shape[-1],
+                        reverse=True)
         super().__init__(*loaded)
