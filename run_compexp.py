@@ -404,8 +404,9 @@ for layer in layers:
         for unit in tqdm(range(unit_masks.shape[1]),
                          desc='precompute unit literals'):
             unique = seg_masks.mul(unit_masks[:, unit, None]).unique()
-            unit_literals.append(
-                [seg_literals[key] for key in unique.tolist() if key != 0])
+            unit_literals.append([
+                seg_literals[key] for key in unique.long().tolist() if key != 0
+            ])
 
         print(f'saving unit literals to {unit_literals_file}')
         torch.save(unit_literals, unit_literals_file)
