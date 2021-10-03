@@ -353,7 +353,7 @@ for experiment in args.experiments:
                         accuracies[key] = copied.accuracy(
                             evaluation,
                             ablate=dissected.units(ablated_indices),
-                            display_progress_as=f'test ablated {args.cnn} '
+                            display_progress_as=f'compute {key} accuracy '
                             f'(cond={condition}, t={trial}, n={n_ablated})',
                             num_workers=0,
                             device=device,
