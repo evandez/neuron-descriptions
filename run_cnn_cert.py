@@ -347,14 +347,16 @@ for experiment in args.experiments:
                             device=device,
                             display_progress_as=f'fine tune {args.cnn} '
                             f'(cond={condition}, t={trial}, n={n_ablated})')
-                    accuracy = copied.accuracy(
-                        test,
-                        ablate=dissected.units(ablated_indices),
-                        display_progress_as=f'test ablated {args.cnn} '
-                        f'(cond={condition}, t={trial}, n={n_ablated})',
-                        num_workers=0,
-                        device=device,
-                    )
+                    accuracies = {}
+                    for key, evaluation in (('val', val), ('test', test)):
+                        accuracies[key] = copied.accuracy(
+                            evaluation,
+                            ablate=dissected.units(ablated_indices),
+                            display_progress_as=f'test ablated {args.cnn} '
+                            f'(cond={condition}, t={trial}, n={n_ablated})',
+                            num_workers=0,
+                            device=device,
+                        )
                     samples = viz.random_neuron_wandb_images(
                         dissected,
                         captions,
@@ -370,9 +372,10 @@ for experiment in args.experiments:
                         'condition': condition,
                         'trial': trial,
                         'n_ablated': n_ablated,
-                        'accuracy': accuracy,
                         'samples': samples,
+                        **accuracies,
                     })
                     print(f'experiment={experiment}', f'version={version}',
                           f'condition={condition}', f'trial={trial}',
-                          f'n_ablated={n_ablated}', f'accuracy={accuracy}')
+                          f'n_ablated={n_ablated}', f'val={accuracies["val"]}',
+                          f'test={accuracies["test"]}')
