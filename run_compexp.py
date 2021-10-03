@@ -355,10 +355,10 @@ for layer in layers:
     # `unit_masks`, 0/1 tensor
     #       of shape (n_images, n_neurons, height, width)
     #
-    # `seg_masks`, int tensor
+    # `segs`, int tensor
     #       of shape (n_images, n_labels_per_pixel, height, width)
     unit_masks = masks['unit_masks']
-    seg_masks = masks['seg_masks']
+    seg_masks = masks['segs']
 
     # Let's precompute some expensive values that we will use over and over.
     # First, compute individual masks for each label.
