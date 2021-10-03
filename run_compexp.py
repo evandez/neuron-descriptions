@@ -436,7 +436,8 @@ for layer in layers:
                     for op, negate in ((Or, False), (And, False), (And, True)):
                         cand = op(state.logical_form,
                                   Not(literal) if negate else literal)
-                        iou = cand.iou(unit_masks[:, unit])
+                        iou = cand.iou(unit_masks[:, unit],
+                                       total=unit_totals[unit])
                         frontier.append(State(cand, iou))
             beam = sorted(frontier, key=lambda state: state.iou,
                           reverse=True)[:beam_size]
