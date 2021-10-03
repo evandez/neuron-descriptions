@@ -220,7 +220,7 @@ for experiment in args.experiments:
                 decoder.eval()
                 predictions = decoder.predict(
                     test,
-                    strategy='rerank' if method == METHOD_PMI else 'beam',
+                    strategy='rerank' if method == METHOD_PMI else 'greedy',
                     beam_size=50,
                     temperature=.2,
                     mi=False,
