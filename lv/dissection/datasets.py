@@ -25,4 +25,4 @@ class TensorDatasetOnDisk(data.TensorDataset):
                 continue
             tensors = torch.load(child, **kwargs)
             loaded.append(tensors)
-        super().__init__(*tensors)
+        super().__init__(*loaded)
