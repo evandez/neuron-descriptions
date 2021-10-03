@@ -47,10 +47,6 @@ parser.add_argument('--results-dir',
 parser.add_argument('--clear-results-dir',
                     action='store_true',
                     help='if set, clear results dir (default: do not)')
-parser.add_argument('--batch-size',
-                    type=int,
-                    default=128,
-                    help='image batch size (default: 128)')
 parser.add_argument('--device', help='manually set device (default: guessed)')
 args = parser.parse_args()
 
@@ -114,7 +110,6 @@ for layer in layers:
                                    dataset,
                                    layer=layer,
                                    device=device,
-                                   batch_size=args.batch_size,
                                    save_results=False,
                                    save_viz=False,
                                    tally_cache_file=tally_cache_file,
@@ -124,7 +119,6 @@ for layer in layers:
                                        dataset,
                                        layer=layer,
                                        device=device,
-                                       batch_size=args.batch_size,
                                        save_results=False,
                                        save_viz=False,
                                        tally_cache_file=tally_cache_file,
