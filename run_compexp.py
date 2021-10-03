@@ -16,6 +16,7 @@ from lv.dissection import dissect, transforms, zoo
 from lv.utils import env
 
 import torch
+import torchvision.transforms
 from torch import cuda
 
 parser = argparse.ArgumentParser(description='run compexp baseline')
@@ -72,7 +73,17 @@ if isinstance(config.dissection, zoo.GenerativeModelDissectionConfig):
     dataset = config.dissection.dataset
     generative = True
 
-dataset = zoo.dataset(dataset, path=args.dataset_path)
+# TODO(evandez): YUCK! Need to commonize this somewhere.
+kwargs = {}
+if args.model == zoo.KEYS.ALEXNET and args.datset == zoo.KEYS.PLACES365:
+    kwargs['transform'] = torchvision.transforms.Compose([
+        torchvision.transforms.Resize((256, 256)),
+        torchvision.transforms.CenterCrop(227),
+        torchvision.transforms.ToTensor(),
+        renormalize.NORMALIZER['imagenet'],
+    ])
+
+dataset = zoo.dataset(dataset, path=args.dataset_path, **kwargs)
 
 # Load the segmentation model for later; its path must be hardcoded because
 # of how the library is written.
