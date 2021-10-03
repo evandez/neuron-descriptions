@@ -1,4 +1,5 @@
 """Custom datasets to be used in dissection."""
+import pathlib
 from typing import Any
 
 from lv.utils.typing import PathLike
@@ -10,13 +11,18 @@ from torch.utils import data
 class TensorDatasetOnDisk(data.TensorDataset):
     """Like `torch.utils.data.TensorDataset`, but tensors are pickled."""
 
-    def __init__(self, path: PathLike, **kwargs: Any):
+    def __init__(self, root: PathLike, **kwargs: Any):
         """Load tensors from path and pass to `TensorDataset`.
 
         Args:
-            path (PathLike): Path to file containing tensors.
+            root (PathLike): Root directory containing one or more .pth files
+                of tensors.
 
         """
-        tensors = torch.load(path, **kwargs)
-        assert isinstance(tensors, tuple)
+        loaded = []
+        for child in pathlib.Path(root).iterdir():
+            if not child.is_file() or not child.suffix == '.pth':
+                continue
+            tensors = torch.load(child, **kwargs)
+            loaded.append(tensors)
         super().__init__(*tensors)
