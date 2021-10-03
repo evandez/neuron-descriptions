@@ -119,7 +119,8 @@ parser.add_argument('--ablation-min',
                     help='min number of neurons to ablate (default: 0)')
 parser.add_argument('--ablation-max',
                     type=int,
-                    help='max number of neurons to ablate (default: all)')
+                    default=50,
+                    help='max number of neurons to ablate (default: 50)')
 parser.add_argument('--ablation-step-size',
                     default=1,
                     help='add\'l neurons to ablate at each step (default: 1)')
