@@ -26,5 +26,5 @@ class TensorDatasetOnDisk(data.TensorDataset):
             tensors = torch.load(child, **kwargs)
             loaded.append(tensors)
         loaded = sorted(loaded,
-                        key=lambda tensor: tensor.dtype.is_floating_point)
+                        key=lambda tensor: not tensor.dtype.is_floating_point)
         super().__init__(*loaded)
