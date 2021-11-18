@@ -242,7 +242,7 @@ def dissection_models() -> ModelConfigs:
                 ModelConfig(models.resnet18,
                             load_weights=True,
                             layers=LAYERS.RESNET18),
-            KEYS.RESNET18_PLACES365:
+            KEYS.PLACES365:
                 ModelConfig(
                     models.resnet18,
                     load_weights=True,
