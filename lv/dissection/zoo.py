@@ -242,6 +242,13 @@ def dissection_models() -> ModelConfigs:
                 ModelConfig(models.resnet18,
                             load_weights=True,
                             layers=LAYERS.RESNET18),
+            KEYS.RESNET18_PLACES365:
+                ModelConfig(
+                    models.resnet18,
+                    load_weights=True,
+                    layers=LAYERS.RESNET18,
+                    transform_weights=lambda weights: weights['state_dict'],
+                    url=f'{LV_HOST}/resnet18-places365.pth'),
         },
         KEYS.RESNET34: {
             KEYS.IMAGENET:
