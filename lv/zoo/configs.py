@@ -55,6 +55,7 @@ KEYS.VGG16_IMAGENET = f'{KEYS.VGG16}/{KEYS.IMAGENET}'
 KEYS.VGG19_IMAGENET = f'{KEYS.VGG19}/{KEYS.IMAGENET}'
 
 KEYS.ALEXNET_PLACES365 = f'{KEYS.ALEXNET}/{KEYS.PLACES365}'
+KEYS.RESNET18_PLACES365 = f'{KEYS.RESNET18}/{KEYS.PLACES365}'
 KEYS.RESNET152_PLACES365 = f'{KEYS.RESNET152}/{KEYS.PLACES365}'
 KEYS.BIGGAN_PLACES365 = f'{KEYS.BIGGAN}/{KEYS.PLACES365}'
 
@@ -215,6 +216,11 @@ def datasets() -> core.DatasetConfigs:
     # Extra configs for models that have blurred-imagenet versopns.
     for model in (KEYS.ALEXNET, KEYS.RESNET152):
         key = KEYS[f'{model.upper()}_IMAGENET_BLURRED']
+        configs[key] = core.DatasetConfig(lv.datasets.TopImagesDataset)
+
+    # Extra configs for models that have places365 versions.
+    for model in (KEYS.RESNET18,):
+        key = KEYS[f'{model.upper()}_PLACES365']
         configs[key] = core.DatasetConfig(lv.datasets.TopImagesDataset)
 
     # Configs for all other models that have both imagenet/blurred-imagenet
