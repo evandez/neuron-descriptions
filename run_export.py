@@ -147,4 +147,4 @@ for key, dataset in data.items():
     model_json_file = json_dir / name / 'data.json'
     model_json_file.parent.mkdir(exist_ok=True, parents=True)
     with model_json_file.open('w') as handle:
-        json.dump(data, handle)
+        json.dump(exported, handle)
