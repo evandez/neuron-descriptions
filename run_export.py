@@ -90,5 +90,6 @@ for key in args.sources:
                                       beam_size=50,
                                       device=device)
         print(f'writing {key} captions to {captions_file}')
+        captions_file.parent.mkdir(exist_ok=True, parents=True)
         with captions_file.open('w') as handle:
             handle.write('\n'.join(predictions))
