@@ -48,6 +48,7 @@ parser.add_argument('--captioner',
                     nargs=2,
                     default=(zoo.KEYS.CAPTIONER_RESNET101, zoo.KEYS.ALL),
                     help='captioner to use (default: captioner-resnet101 all)')
+parser.add_argument('--device', help='manually set device (default: guessed)')
 args = parser.parse_args()
 
 device = args.device or 'cuda' if cuda.is_available() else 'cpu'
