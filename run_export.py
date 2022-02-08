@@ -138,7 +138,7 @@ for key, dataset in data.items():
             'layer': layer,
             'unit': unit,
             'images': [
-                f'{args.base_url}/{image_file.name}'
+                f'{args.base_url}/{name}/{image_file.name}'
                 for image_file in image_files
             ],
             'description': captions[key][index],
