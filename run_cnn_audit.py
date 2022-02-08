@@ -5,7 +5,7 @@ import pathlib
 import shutil
 
 import src.datasets
-from src import models, zoo
+from src import milan, zoo
 from src.utils import env
 
 from torch import cuda
@@ -72,7 +72,7 @@ device = args.device or 'cuda' if cuda.is_available() else 'cpu'
 
 decoder, _ = zoo.model(*args.captioner)
 decoder.to(device)
-assert isinstance(decoder, models.Decoder)
+assert isinstance(decoder, milan.Decoder)
 
 results_dir = args.results_dir or (env.results_dir() / 'cnn-audit')
 results_dir.mkdir(exist_ok=True, parents=True)

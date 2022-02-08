@@ -3,7 +3,7 @@ from typing import (Any, Dict, Mapping, NamedTuple, Optional, Sequence, Sized,
                     Tuple, Type, Union, cast)
 
 from src.deps.ext import bert_score
-from src.models import encoders, lms
+from src.milan import encoders, lms
 from src.utils import lang, metrics, serialize, training
 from src.utils.typing import Device, OptionalTensors, StrSequence
 

@@ -2,7 +2,7 @@
 import argparse
 import pathlib
 
-from src.dissection import dissect, zoo
+from src.exemplars import dissect, zoo
 from src.utils import env
 
 from torch import cuda

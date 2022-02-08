@@ -4,7 +4,7 @@ import pathlib
 import shutil
 from typing import Optional
 
-from src import models, zoo
+from src import milan, zoo
 from src.utils import env, training
 
 import torch
@@ -76,17 +76,17 @@ if not args.no_lm:
     lm_file = results_dir / 'lm.pth'
     if lm_file.exists():
         print(f'loading cached lm from {lm_file}')
-        lm = models.LanguageModel.load(lm_file, map_location=device)
+        lm = milan.LanguageModel.load(lm_file, map_location=device)
         lm.eval()
     else:
-        lm = models.lm(dataset)
+        lm = milan.lm(dataset)
         lm.fit(dataset, hold_out=val.indices, device=device)
         lm.eval()
 
         print(f'saving lm to {lm_file}')
         lm.save(lm_file)
 
-encoder = models.encoder(config=args.encoder)
+encoder = milan.encoder(config=args.encoder)
 encoder.eval()
 
 features = None
@@ -96,10 +96,10 @@ if args.precompute_features:
 captioner_file = results_dir / 'captioner.pth'
 if captioner_file.exists():
     print(f'loading cached decoder from {captioner_file}')
-    decoder = models.Decoder.load(captioner_file, map_location=device)
+    decoder = milan.Decoder.load(captioner_file, map_location=device)
     decoder.eval()
 else:
-    decoder = models.decoder(dataset, encoder, lm=lm)
+    decoder = milan.decoder(dataset, encoder, lm=lm)
     decoder.fit(dataset,
                 features=features,
                 hold_out=val.indices,

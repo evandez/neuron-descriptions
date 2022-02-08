@@ -6,7 +6,7 @@ import pathlib
 import re
 import shutil
 
-from src import datasets, models, zoo
+from src import datasets, milan, zoo
 from src.deps.ext import bert_score
 from src.utils import env, metrics
 from src.utils.typing import StrSequence
@@ -191,27 +191,27 @@ for experiment in args.experiments:
                 captioner_file = results_dir / f'{captioner_key}-captioner.pth'
                 if captioner_file.exists():
                     print(f'loading captioner from {captioner_file}')
-                    decoder = models.Decoder.load(captioner_file,
-                                                  map_location=device)
+                    decoder = milan.Decoder.load(captioner_file,
+                                                 map_location=device)
                 else:
                     lm_file = results_dir / f'{captioner_key}-lm.pth'
                     if lm_file.exists():
                         print(f'loading lm from {lm_file}')
-                        lm = models.LanguageModel.load(lm_file,
-                                                       map_location=device)
+                        lm = milan.LanguageModel.load(lm_file,
+                                                      map_location=device)
                     else:
-                        lm = models.lm(train)
+                        lm = milan.lm(train)
                         lm.fit(train, device=device)
                         print(f'saving lm to {lm_file}')
                         lm.save(lm_file)
 
-                    encoder = models.encoder()
+                    encoder = milan.encoder()
 
                     train_features = None
                     if args.precompute_features:
                         train_features = encoder.map(train, device=device)
 
-                    decoder = models.decoder(train, encoder, lm=lm)
+                    decoder = milan.decoder(train, encoder, lm=lm)
                     decoder.fit(train, features=train_features, device=device)
 
                     print(f'saving decoder to {captioner_file}')

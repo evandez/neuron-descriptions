@@ -4,7 +4,7 @@ import csv
 import pathlib
 
 import src.datasets
-from src import models, zoo
+from src import milan, zoo
 from src.utils import env, viz
 from src.utils.typing import StrSequence
 
@@ -35,7 +35,7 @@ base_url = args.base_url.rstrip('/')
 
 # Load model.
 decoder, _ = zoo.model(args.captioner, args.train, map_location=device)
-assert isinstance(decoder, models.Decoder)
+assert isinstance(decoder, milan.Decoder)
 
 # Load dataset(s).
 if args.test in zoo.DATASET_GROUPINGS:

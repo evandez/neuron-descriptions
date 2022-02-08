@@ -4,9 +4,9 @@ import csv
 import pathlib
 import shutil
 
-import src.dissection.zoo
+import src.exemplars.zoo
 import src.zoo
-from src import datasets, models
+from src import datasets, milan
 from src.utils import env, training, viz
 from src.utils.typing import StrSequence
 
@@ -83,7 +83,7 @@ ORDER_INCREASING = 'increasing'
 ORDER_DECREASING = 'decreasing'
 ORDERS = (ORDER_DECREASING, ORDER_INCREASING)
 
-CNNS = (src.dissection.zoo.KEYS.RESNET18,)
+CNNS = (src.exemplars.zoo.KEYS.RESNET18,)
 DATASETS = (src.zoo.KEYS.IMAGENET,)
 
 parser = argparse.ArgumentParser(description='run cnn ablation experiments')
@@ -192,15 +192,15 @@ if args.groups:
 
 nlp = spacy.load('en_core_web_lg')
 for dataset_name in args.datasets:
-    dataset = src.dissection.zoo.dataset(dataset_name,
-                                         factory=training.PreloadedImageFolder)
+    dataset = src.exemplars.zoo.dataset(dataset_name,
+                                        factory=training.PreloadedImageFolder)
     assert isinstance(dataset, training.PreloadedImageFolder)
     for cnn_name in args.cnns:
         model_results_dir = results_dir / cnn_name / dataset_name
         model_results_dir.mkdir(exist_ok=True, parents=True)
 
-        cnn, *_ = src.dissection.zoo.model(cnn_name, dataset_name)
-        cnn = models.classifier(cnn).to(device).eval()
+        cnn, *_ = src.exemplars.zoo.model(cnn_name, dataset_name)
+        cnn = milan.classifier(cnn).to(device).eval()
 
         dissected = src.zoo.datasets(f'{cnn_name}/{dataset_name}',
                                      path=data_dir)
@@ -216,7 +216,7 @@ for dataset_name in args.datasets:
         else:
             decoder, *_ = src.zoo.model(*args.captioner)
             decoder.to(device)
-            assert isinstance(decoder, models.Decoder)
+            assert isinstance(decoder, milan.Decoder)
             captions = decoder.predict(
                 dissected,
                 device=device,

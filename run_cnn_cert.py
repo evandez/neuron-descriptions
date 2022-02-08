@@ -6,9 +6,9 @@ import random
 import shutil
 
 import src.zoo
-from src import datasets, models
+from src import datasets, milan
 from src.deps.netdissect import renormalize
-from src.dissection import dissect, zoo
+from src.exemplars import dissect, zoo
 from src.utils import env, training, viz
 from src.utils.typing import StrSequence
 
@@ -169,8 +169,8 @@ decoder, _ = src.zoo.model(captioner_model,
                            path=args.captioner_file,
                            map_location=device)
 encoder = decoder.encoder
-assert isinstance(decoder, models.Decoder)
-assert isinstance(encoder, models.Encoder)
+assert isinstance(decoder, milan.Decoder)
+assert isinstance(encoder, milan.Encoder)
 
 # Now that we have the captioner, we can start the experiments.
 for experiment in args.experiments:
@@ -213,7 +213,7 @@ for experiment in args.experiments:
         cnn, layers, _ = zoo.model(args.cnn,
                                    zoo.KEYS.IMAGENET,
                                    pretrained=False)
-        cnn = models.classifier(cnn).to(device)
+        cnn = milan.classifier(cnn).to(device)
 
         cnn_file = experiment_dir / f'{args.cnn}-{version}.pth'
         if cnn_file.exists():

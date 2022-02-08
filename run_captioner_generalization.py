@@ -4,7 +4,7 @@ import pathlib
 import shutil
 from typing import Mapping, NamedTuple, Tuple
 
-from src import models, zoo
+from src import milan, zoo
 from src.deps.ext import bert_score
 from src.utils import env, training, viz
 from src.utils.typing import StrSequence
@@ -127,7 +127,7 @@ bert_scorer = bert_score.BERTScorer(lang='en',
                                     device=device)
 
 # Load encoder.
-encoder = models.encoder().to(device)
+encoder = milan.encoder().to(device)
 
 # Start experiments.
 for experiment in args.experiments or EXPERIMENTS.keys():
@@ -181,9 +181,9 @@ for experiment in args.experiments or EXPERIMENTS.keys():
             lm_file = results_dir / f'{trial_key}-lm.pth'
             if lm_file.exists():
                 print(f'loading lm from {lm_file}')
-                lm = models.LanguageModel.load(lm_file, map_location=device)
+                lm = milan.LanguageModel.load(lm_file, map_location=device)
             else:
-                lm = models.lm(train)
+                lm = milan.lm(train)
                 lm.fit(train, device=device)
                 print(f'saving lm to {lm_file}')
                 lm.save(lm_file)
@@ -192,16 +192,15 @@ for experiment in args.experiments or EXPERIMENTS.keys():
             decoder_file = results_dir / f'{trial_key}-captioner.pth'
             if decoder_file.exists():
                 print(f'loading decoder from {decoder_file}')
-                decoder = models.Decoder.load(decoder_file,
-                                              map_location=device)
+                decoder = milan.Decoder.load(decoder_file, map_location=device)
                 decoder.eval()
             else:
-                decoder = models.decoder(train,
-                                         encoder,
-                                         lm=lm,
-                                         strategy='rerank',
-                                         beam_size=50,
-                                         temperature=.2)
+                decoder = milan.decoder(train,
+                                        encoder,
+                                        lm=lm,
+                                        strategy='rerank',
+                                        beam_size=50,
+                                        temperature=.2)
                 decoder.fit(train,
                             features=train_features,
                             patience=10

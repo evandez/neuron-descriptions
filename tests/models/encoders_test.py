@@ -1,5 +1,5 @@
 """Unit tests for lv/models/encoders module."""
-from src.models import encoders
+from src.milan import encoders
 from tests import conftest as root
 from tests.models import conftest as local
 

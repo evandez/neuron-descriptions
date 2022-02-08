@@ -1,7 +1,7 @@
 """Unit tests for dissection zoo."""
 import collections
 
-from src.dissection import zoo
+from src.exemplars import zoo
 
 import pytest
 from torch import nn

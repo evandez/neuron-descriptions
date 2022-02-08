@@ -5,7 +5,7 @@ import pathlib
 import shutil
 from typing import Dict
 
-from src import datasets, models, zoo
+from src import datasets, milan, zoo
 from src.utils import env
 
 from torch import cuda
@@ -75,7 +75,7 @@ results_dir.mkdir(exist_ok=True, parents=True)
 
 decoder, _ = zoo.model(*args.captioner)
 decoder.to(device)
-assert isinstance(decoder, models.Decoder)
+assert isinstance(decoder, milan.Decoder)
 
 # Read in all datasets.
 data: Dict[str, datasets.TopImagesDataset] = {}

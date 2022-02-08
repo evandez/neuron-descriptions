@@ -16,7 +16,7 @@ from typing import Any, Mapping, Optional, Tuple, cast
 
 from src.deps.netdissect import (nethook, pbar, renormalize, segmenter, tally,
                                  upsample)
-from src.dissection import dissect, transforms, zoo
+from src.exemplars import dissect, transforms, zoo
 from src.utils import env
 
 import torch

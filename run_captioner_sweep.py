@@ -4,7 +4,7 @@ import pathlib
 import shutil
 from typing import Any, Dict
 
-from src import models, zoo
+from src import milan, zoo
 from src.deps.ext import bert_score
 from src.utils import env, training, viz
 
@@ -179,9 +179,9 @@ lm = None
 lm_file = results_dir / 'lm.pth'
 if lm_file.exists():
     print(f'loading cached lm from {lm_file}')
-    lm = models.LanguageModel.load(lm_file, map_location=device)
+    lm = milan.LanguageModel.load(lm_file, map_location=device)
 elif {SWEEP_GREEDY_MI, SWEEP_BEAM_MI} & set(args.sweeps):
-    lm = models.lm(train).to(device)
+    lm = milan.lm(train).to(device)
     lm.fit(train, device=device, display_progress_as='train lm')
     print(f'saving lm to {lm_file}')
     lm.save(lm_file)
@@ -189,11 +189,11 @@ elif {SWEEP_GREEDY_MI, SWEEP_BEAM_MI} & set(args.sweeps):
 captioner_file = results_dir / 'captioner.pth'
 if captioner_file.is_file() and splits_file.is_file():
     print(f'loading cached captioner from {captioner_file}')
-    decoder = models.Decoder.load(captioner_file, map_location=device).eval()
+    decoder = milan.Decoder.load(captioner_file, map_location=device).eval()
     encoder = decoder.encoder
 else:
-    encoder = models.encoder(config=config).to(device)
-    decoder = models.decoder(train, encoder, lm=lm).to(device)
+    encoder = milan.encoder(config=config).to(device)
+    decoder = milan.decoder(train, encoder, lm=lm).to(device)
 
     train_features = None
     if args.precompute_features:
@@ -218,7 +218,7 @@ if args.precompute_features:
 
 def evaluate(**kwargs: Any) -> None:
     """Evaluate the captioner with the given args."""
-    assert isinstance(decoder, models.Decoder)
+    assert isinstance(decoder, milan.Decoder)
     metadata = viz.kwargs_to_str(**kwargs)
     predictions = decoder.predict(
         test,

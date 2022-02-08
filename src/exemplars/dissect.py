@@ -6,7 +6,7 @@ from typing import Any, Callable, Optional, Sequence, Tuple
 from src.deps.ext.netdissect import imgviz
 from src.deps.netdissect import (imgsave, nethook, pbar, renormalize,
                                  runningstats, tally)
-from src.dissection import transforms
+from src.exemplars import transforms
 from src.utils.typing import Device, Layer, PathLike, TensorPair
 
 import numpy

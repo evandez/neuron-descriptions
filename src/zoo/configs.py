@@ -6,7 +6,7 @@ part of this project--you are at the wrong zoo. You want to look at the configs
 in lv/dissection/zoo.py instead.
 """
 import src.datasets
-import src.models
+import src.milan
 from src.zoo import core
 
 import easydict
@@ -189,7 +189,7 @@ def models() -> core.ModelConfigs:
     return {
         KEYS.CAPTIONER_RESNET101: {
             dataset: core.ModelConfig(
-                src.models.Decoder.load,
+                src.milan.Decoder.load,
                 url=f'{HOST}/models/captioner-resnet101-'
                 f'{dataset.replace("/", "_")}.pth',
                 requires_path=True,
