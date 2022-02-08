@@ -3,7 +3,7 @@ import dataclasses
 import pathlib
 import tempfile
 
-from lv.utils import serialize
+from src.utils import serialize
 
 import pytest
 import spacy

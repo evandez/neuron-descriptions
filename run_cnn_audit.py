@@ -4,9 +4,9 @@ import csv
 import pathlib
 import shutil
 
-import lv.datasets
-from lv import models, zoo
-from lv.utils import env
+import src.datasets
+from src import models, zoo
+from src.utils import env
 
 from torch import cuda
 
@@ -93,7 +93,7 @@ for key in args.cnns:
         path = args.data_dir / key
 
     dataset = zoo.dataset(key, path=path)
-    assert isinstance(dataset, lv.datasets.TopImagesDataset)
+    assert isinstance(dataset, src.datasets.TopImagesDataset)
 
     predictions = decoder.predict(dataset,
                                   strategy='rerank',

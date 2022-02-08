@@ -22,13 +22,13 @@ jobs:
         pip install -r requirements.txt
     - name: flake8
       run: |
-        flake8 --count --show-source --statistics *.py lv
+        flake8 --count --show-source --statistics *.py src
     - name: isort
       run: |
-        isort -c *.py lv
+        isort -c *.py src
     - name: mypy
       run: |
-        mypy *.py lv
+        mypy *.py src
     - name: pytest
       run: |
         pytest tests

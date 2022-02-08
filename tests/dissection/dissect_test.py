@@ -5,7 +5,7 @@ import math
 import pathlib
 import tempfile
 
-from lv.dissection import dissect
+from src.dissection import dissect
 from tests import conftest
 
 import numpy

@@ -5,8 +5,8 @@ import pathlib
 import shutil
 from typing import Dict
 
-from lv import datasets, models, zoo
-from lv.utils import env
+from src import datasets, models, zoo
+from src.utils import env
 
 from torch import cuda
 from tqdm.auto import tqdm

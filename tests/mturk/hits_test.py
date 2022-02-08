@@ -4,8 +4,8 @@ import pathlib
 import tempfile
 
 from tests import conftest
-from lv import datasets
-from lv.mturk import hits
+from src import datasets
+from src.mturk import hits
 
 import pytest
 

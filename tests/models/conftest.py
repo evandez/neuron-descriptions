@@ -1,5 +1,5 @@
 """Test configuration shared by all lv/models tests."""
-from lv.models import encoders
+from src.models import encoders
 
 import numpy
 import pytest

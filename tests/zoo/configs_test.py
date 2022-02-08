@@ -1,5 +1,5 @@
 """Unit tests for lv/zoo/configs module."""
-from lv.zoo import configs
+from src.zoo import configs
 
 
 def test_models():

@@ -1,5 +1,5 @@
 """Unit tests for transforms module."""
-from lv.dissection import transforms
+from src.dissection import transforms
 
 import pytest
 import torch

@@ -2,7 +2,7 @@
 import argparse
 import pathlib
 
-from lv.mturk import qualification
+from src.mturk import qualification
 
 import boto3
 

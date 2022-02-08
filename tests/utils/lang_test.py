@@ -2,7 +2,7 @@
 import collections
 import itertools
 
-from lv.utils import lang
+from src.utils import lang
 
 import pytest
 import spacy

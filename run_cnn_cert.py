@@ -5,12 +5,12 @@ import pathlib
 import random
 import shutil
 
-import lv.zoo
-from lv import datasets, models
-from lv.deps.netdissect import renormalize
-from lv.dissection import dissect, zoo
-from lv.utils import env, training, viz
-from lv.utils.typing import StrSequence
+import src.zoo
+from src import datasets, models
+from src.deps.netdissect import renormalize
+from src.dissection import dissect, zoo
+from src.utils import env, training, viz
+from src.utils.typing import StrSequence
 
 import torch
 import wandb
@@ -59,12 +59,13 @@ parser.add_argument('--conditions',
                     help='condition(s) to test under (default: all)')
 parser.add_argument(
     '--cnn',
-    choices=(lv.zoo.KEYS.ALEXNET, zoo.KEYS.RESNET18),
+    choices=(src.zoo.KEYS.ALEXNET, zoo.KEYS.RESNET18),
     default=zoo.KEYS.RESNET18,
     help='cnn architecture to train and certify (default: resnet18)')
 parser.add_argument('--captioner',
                     nargs=2,
-                    default=(lv.zoo.KEYS.CAPTIONER_RESNET101, lv.zoo.KEYS.ALL),
+                    default=(src.zoo.KEYS.CAPTIONER_RESNET101,
+                             src.zoo.KEYS.ALL),
                     help='captioner model (default: captioner-resnet101 all)')
 parser.add_argument(
     '--n-random-trials',
@@ -163,10 +164,10 @@ results_dir.mkdir(exist_ok=True, parents=True)
 
 # Load the captioner.
 captioner_model, captioner_dataset = args.captioner
-decoder, _ = lv.zoo.model(captioner_model,
-                          captioner_dataset,
-                          path=args.captioner_file,
-                          map_location=device)
+decoder, _ = src.zoo.model(captioner_model,
+                           captioner_dataset,
+                           path=args.captioner_file,
+                           map_location=device)
 encoder = decoder.encoder
 assert isinstance(decoder, models.Decoder)
 assert isinstance(encoder, models.Encoder)

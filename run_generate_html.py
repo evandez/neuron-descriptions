@@ -3,10 +3,10 @@ import argparse
 import csv
 import pathlib
 
-import lv.datasets
-from lv import models, zoo
-from lv.utils import env, viz
-from lv.utils.typing import StrSequence
+import src.datasets
+from src import models, zoo
+from src.utils import env, viz
+from src.utils.typing import StrSequence
 
 from torch import cuda
 
@@ -43,15 +43,15 @@ if args.test in zoo.DATASET_GROUPINGS:
     for key in zoo.DATASET_GROUPINGS[args.test]:
         dataset = zoo.dataset(key)
         assert isinstance(dataset, (
-            lv.datasets.TopImagesDataset,
-            lv.datasets.AnnotatedTopImagesDataset,
+            src.datasets.TopImagesDataset,
+            src.datasets.AnnotatedTopImagesDataset,
         ))
         datasets[key] = dataset
 else:
     dataset = zoo.dataset(args.test)
     assert isinstance(dataset, (
-        lv.datasets.TopImagesDataset,
-        lv.datasets.AnnotatedTopImagesDataset,
+        src.datasets.TopImagesDataset,
+        src.datasets.AnnotatedTopImagesDataset,
     ))
     datasets = {args.test: dataset}
 

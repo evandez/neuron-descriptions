@@ -4,8 +4,8 @@ import pathlib
 import shutil
 from typing import Optional
 
-from lv import models, zoo
-from lv.utils import env, training
+from src import models, zoo
+from src.utils import env, training
 
 import torch
 from torch import cuda

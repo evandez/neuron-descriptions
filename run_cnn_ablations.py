@@ -4,11 +4,11 @@ import csv
 import pathlib
 import shutil
 
-import lv.dissection.zoo
-import lv.zoo
-from lv import datasets, models
-from lv.utils import env, training, viz
-from lv.utils.typing import StrSequence
+import src.dissection.zoo
+import src.zoo
+from src import datasets, models
+from src.utils import env, training, viz
+from src.utils.typing import StrSequence
 
 import numpy as np
 import spacy
@@ -83,8 +83,8 @@ ORDER_INCREASING = 'increasing'
 ORDER_DECREASING = 'decreasing'
 ORDERS = (ORDER_DECREASING, ORDER_INCREASING)
 
-CNNS = (lv.dissection.zoo.KEYS.RESNET18,)
-DATASETS = (lv.zoo.KEYS.IMAGENET,)
+CNNS = (src.dissection.zoo.KEYS.RESNET18,)
+DATASETS = (src.zoo.KEYS.IMAGENET,)
 
 parser = argparse.ArgumentParser(description='run cnn ablation experiments')
 parser.add_argument('--cnns',
@@ -94,7 +94,8 @@ parser.add_argument('--cnns',
                     help='cnns to ablate (default: resnet18)')
 parser.add_argument('--captioner',
                     nargs=2,
-                    default=(lv.zoo.KEYS.CAPTIONER_RESNET101, lv.zoo.KEYS.ALL),
+                    default=(src.zoo.KEYS.CAPTIONER_RESNET101,
+                             src.zoo.KEYS.ALL),
                     help='captioner model (default: captioner-resnet101 all)')
 parser.add_argument(
     '--datasets',
@@ -191,18 +192,18 @@ if args.groups:
 
 nlp = spacy.load('en_core_web_lg')
 for dataset_name in args.datasets:
-    dataset = lv.dissection.zoo.dataset(dataset_name,
-                                        factory=training.PreloadedImageFolder)
+    dataset = src.dissection.zoo.dataset(dataset_name,
+                                         factory=training.PreloadedImageFolder)
     assert isinstance(dataset, training.PreloadedImageFolder)
     for cnn_name in args.cnns:
         model_results_dir = results_dir / cnn_name / dataset_name
         model_results_dir.mkdir(exist_ok=True, parents=True)
 
-        cnn, *_ = lv.dissection.zoo.model(cnn_name, dataset_name)
+        cnn, *_ = src.dissection.zoo.model(cnn_name, dataset_name)
         cnn = models.classifier(cnn).to(device).eval()
 
-        dissected = lv.zoo.datasets(f'{cnn_name}/{dataset_name}',
-                                    path=data_dir)
+        dissected = src.zoo.datasets(f'{cnn_name}/{dataset_name}',
+                                     path=data_dir)
         assert isinstance(dissected, datasets.TopImagesDataset)
 
         # Obtain captions for every neuron in the CNN.
@@ -213,7 +214,7 @@ for dataset_name in args.datasets:
             with captions_file.open('r') as handle:
                 captions = [row['caption'] for row in csv.DictReader(handle)]
         else:
-            decoder, *_ = lv.zoo.model(*args.captioner)
+            decoder, *_ = src.zoo.model(*args.captioner)
             decoder.to(device)
             assert isinstance(decoder, models.Decoder)
             captions = decoder.predict(

@@ -4,8 +4,8 @@ import collections
 import pathlib
 from typing import Dict
 
-from lv import zoo
-from lv.utils import env
+from src import zoo
+from src.utils import env
 
 import gdown
 import torch

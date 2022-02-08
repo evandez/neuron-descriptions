@@ -14,10 +14,10 @@ import pathlib
 import shutil
 from typing import Any, Mapping, Optional, Tuple, cast
 
-from lv.deps.netdissect import (nethook, pbar, renormalize, segmenter, tally,
-                                upsample)
-from lv.dissection import dissect, transforms, zoo
-from lv.utils import env
+from src.deps.netdissect import (nethook, pbar, renormalize, segmenter, tally,
+                                 upsample)
+from src.dissection import dissect, transforms, zoo
+from src.utils import env
 
 import torch
 import torchvision.transforms

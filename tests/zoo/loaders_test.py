@@ -2,7 +2,7 @@
 import pathlib
 import tempfile
 
-from lv.zoo import loaders
+from src.zoo import loaders
 
 import torch
 from torch import nn

@@ -4,9 +4,9 @@ import pathlib
 import shutil
 from typing import Any, Dict
 
-from lv import models, zoo
-from lv.deps.ext import bert_score
-from lv.utils import env, training, viz
+from src import models, zoo
+from src.deps.ext import bert_score
+from src.utils import env, training, viz
 
 import numpy
 import torch

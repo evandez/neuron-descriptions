@@ -1,5 +1,5 @@
 """Unit tests for the lv/utils/training module."""
-from lv.utils import training
+from src.utils import training
 
 PATIENCE = 5
 

@@ -6,10 +6,10 @@ import pathlib
 import re
 import shutil
 
-from lv import datasets, models, zoo
-from lv.deps.ext import bert_score
-from lv.utils import env, metrics
-from lv.utils.typing import StrSequence
+from src import datasets, models, zoo
+from src.deps.ext import bert_score
+from src.utils import env, metrics
+from src.utils.typing import StrSequence
 
 import wandb
 from torch import cuda

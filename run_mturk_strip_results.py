@@ -2,7 +2,7 @@
 import argparse
 import pathlib
 
-from lv.mturk import hits
+from src.mturk import hits
 
 parser = argparse.ArgumentParser(description='strip mturk results csv')
 parser.add_argument('results_csv_file', type=pathlib.Path, help='results csv')

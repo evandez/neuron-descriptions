@@ -2,8 +2,8 @@
 import argparse
 import pathlib
 
-from lv.dissection import dissect, zoo
-from lv.utils import env
+from src.dissection import dissect, zoo
+from src.utils import env
 
 from torch import cuda
 

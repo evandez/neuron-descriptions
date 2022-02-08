@@ -3,7 +3,7 @@ import pathlib
 import tempfile
 from xml.etree import ElementTree
 
-from lv.mturk import qualification
+from src.mturk import qualification
 
 import pytest
 

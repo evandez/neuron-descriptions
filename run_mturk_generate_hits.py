@@ -3,9 +3,9 @@ import argparse
 import pathlib
 from typing import Sequence
 
-from lv import datasets, zoo
-from lv.mturk import hits
-from lv.utils.typing import Layer
+from src import datasets, zoo
+from src.mturk import hits
+from src.utils.typing import Layer
 
 parser = argparse.ArgumentParser(description='generate mturk hits')
 parser.add_argument('dataset', help='name of top images dataset')

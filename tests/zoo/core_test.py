@@ -3,7 +3,7 @@ import collections
 import pathlib
 import tempfile
 
-from lv.zoo import core
+from src.zoo import core
 
 import pytest
 import torch

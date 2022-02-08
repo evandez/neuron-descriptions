@@ -3,7 +3,7 @@ import csv
 import shutil
 
 from tests import conftest
-from lv import datasets
+from src import datasets
 
 import numpy
 import pytest

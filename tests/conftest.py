@@ -3,7 +3,7 @@ import csv
 import pathlib
 import tempfile
 
-from lv import datasets
+from src import datasets
 
 import numpy
 import pytest
