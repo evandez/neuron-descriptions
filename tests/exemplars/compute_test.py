@@ -5,7 +5,7 @@ import math
 import pathlib
 import tempfile
 
-from src.exemplars import dissect
+from src.exemplars import compute
 from tests import conftest
 
 import numpy
@@ -23,7 +23,7 @@ from torch import nn
 def test_run_bad_inputs(dataset, kwargs, error_pattern):
     """Test run dies on various bad inputs."""
     with pytest.raises(ValueError, match=error_pattern):
-        dissect.run(lambda *_: None, lambda *_: None, dataset, **kwargs)
+        compute.compute(lambda *_: None, lambda *_: None, dataset, **kwargs)
 
 
 def assert_results_dir_populated(results_dir, layer=None, units=None):
@@ -178,7 +178,7 @@ def test_discriminative_no_layer(model, dataset, results_dir, viz_dir,
                                  tally_cache_file, masks_cache_file,
                                  save_results, save_viz):
     """Test discriminative runs when layer not set."""
-    dissect.discriminative(model,
+    compute.discriminative(model,
                            dataset,
                            device='cpu',
                            results_dir=results_dir,
@@ -213,7 +213,7 @@ def test_discriminative_layer(model, dataset, results_dir, viz_dir,
                               tally_cache_file, masks_cache_file, save_results,
                               save_viz):
     """Test discriminative runs when layer is set."""
-    dissect.discriminative(model,
+    compute.discriminative(model,
                            dataset,
                            layer='conv_2',
                            device='cpu',
@@ -242,7 +242,7 @@ UNITS = (0, 1)
 def test_discriminative_units(model, dataset, results_dir, viz_dir,
                               tally_cache_file, masks_cache_file):
     """Test discriminative runs when subset of units specified."""
-    dissect.discriminative(model,
+    compute.discriminative(model,
                            dataset,
                            layer='conv_2',
                            device='cpu',
@@ -287,7 +287,7 @@ def test_generative(model, dataset, results_dir, viz_dir, tally_cache_file,
     layers = list(model.named_children())
     layers.append(('output', FeaturesToImage()))
     model = nn.Sequential(collections.OrderedDict(layers))
-    dissect.generative(model,
+    compute.generative(model,
                        dataset,
                        'conv_2',
                        device='cpu',
@@ -316,7 +316,7 @@ def test_generative_units(model, dataset, results_dir, viz_dir,
     layers = list(model.named_children())
     layers.append(('output', FeaturesToImage()))
     model = nn.Sequential(collections.OrderedDict(layers))
-    dissect.generative(model,
+    compute.generative(model,
                        dataset,
                        'conv_2',
                        device='cpu',

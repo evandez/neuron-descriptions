@@ -1,7 +1,7 @@
 """Unit tests for lv/models/encoders module."""
 from src.milan import encoders
 from tests import conftest as root
-from tests.models import conftest as local
+from tests.milan import conftest as local
 
 import pytest
 import torch

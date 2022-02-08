@@ -7,8 +7,8 @@ from src.deps import alexnet, resnet152
 from src.deps.ext.pretorched.gans import biggan
 from src.deps.ext.torchvision import models
 from src.deps.netdissect import renormalize
-from src.exemplars import datasets as lv_datasets
 from src.exemplars import transforms as lv_transforms
+from src.utils import datasets as lv_datasets
 from src.utils.typing import Layer
 
 import easydict

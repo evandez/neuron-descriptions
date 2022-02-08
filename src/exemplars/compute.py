@@ -7,6 +7,7 @@ from src.deps.ext.netdissect import imgviz
 from src.deps.netdissect import (imgsave, nethook, pbar, renormalize,
                                  runningstats, tally)
 from src.exemplars import transforms
+from src.utils import env
 from src.utils.typing import Device, Layer, PathLike, TensorPair
 
 import numpy
@@ -14,37 +15,36 @@ import torch
 from torch import nn
 from torch.utils import data
 
-DissectionResults = Tuple[runningstats.RunningTopK,
-                          runningstats.RunningQuantile]
+ActivationStats = Tuple[runningstats.RunningTopK, runningstats.RunningQuantile]
 
 
-def run(compute_topk_and_quantile: Callable[..., TensorPair],
-        compute_activations: imgviz.ComputeActivationsFn,
-        dataset: data.Dataset,
-        units: Optional[Sequence[int]] = None,
-        k: int = 15,
-        quantile: float = 0.99,
-        output_size: int = 224,
-        batch_size: int = 128,
-        image_size: Optional[int] = None,
-        renormalizer: Optional[renormalize.Renormalizer] = None,
-        num_workers: int = 30,
-        results_dir: Optional[PathLike] = None,
-        viz_dir: Optional[PathLike] = None,
-        tally_cache_file: Optional[PathLike] = None,
-        masks_cache_file: Optional[PathLike] = None,
-        save_results: bool = True,
-        save_viz: bool = True,
-        clear_cache_files: bool = False,
-        clear_results_dir: bool = False,
-        clear_viz_dir: bool = False,
-        display_progress: bool = True) -> DissectionResults:
+def compute(compute_topk_and_quantile: Callable[..., TensorPair],
+            compute_activations: imgviz.ComputeActivationsFn,
+            dataset: data.Dataset,
+            units: Optional[Sequence[int]] = None,
+            k: int = 15,
+            quantile: float = 0.99,
+            output_size: int = 224,
+            batch_size: int = 128,
+            image_size: Optional[int] = None,
+            renormalizer: Optional[renormalize.Renormalizer] = None,
+            num_workers: int = 30,
+            results_dir: Optional[PathLike] = None,
+            viz_dir: Optional[PathLike] = None,
+            tally_cache_file: Optional[PathLike] = None,
+            masks_cache_file: Optional[PathLike] = None,
+            save_results: bool = True,
+            save_viz: bool = True,
+            clear_cache_files: bool = False,
+            clear_results_dir: bool = False,
+            clear_viz_dir: bool = False,
+            display_progress: bool = True) -> ActivationStats:
     """Find and visualize the top-activating images for each unit.
 
-    Top-activating images are found with network dissection [Bau et al., 2017].
-    This function just forwards to the NetDissect library. We do not explicitly
-    take a model as input but rather two blackbox functions which take dataset
-    batches as input and return unit activations as output.
+    Top-activating images are found using netdissect [Bau et al., 2017].
+    This function just forwards to the library. We do not explicitly take a
+    model as input but rather two blackbox functions which take dataset batches
+    as input and return unit activations as output.
 
     Args:
         compute_topk_and_quantile (Callable[..., TensorPair]): Function taking
@@ -56,8 +56,8 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
             (batch_size, channels, *) and optionally the associated images
             of shape (batch_size, channels, height, width).
         dataset (data.Dataset): Dataset to compute activations on.
-        units (Optional[Sequence[int]], optional): Only dissect these units.
-            By default, all units dissected.
+        units (Optional[Sequence[int]], optional): Only compute exemplars for
+            these units. Defaults to all units.
         k (int, optional): Number of top-activating images to save.
             Defaults to 15.
         quantile (float, optional): Activation quantile to use when visualizing
@@ -68,8 +68,8 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
             square in this size. Defaults to 224.
         image_size (Optional[int], optional): Expected size of dataset images.
             If not set, will attempt to infer from the dataset's `transform`
-            property. If dataset does not have `transform`, dissection fails.
-            Defaults to None.
+            property. If dataset does not have `transform`, this function will
+            self-destruct. Defaults to None.
         renormalizer (Optional[renormalize.Renormalizer], optional): NetDissect
             renormalizer for the dataset images. If not set, NetDissect will
             attempt to infer it from the dataset's `transform` property.
@@ -77,7 +77,7 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
         num_workers (int, optional): When loading or saving data in parallel,
             use this many worker threads. Defaults to 30.
         results_dir (Optional[PathLike], optional): Directory to write
-            results to. Defaults to 'dissection-results'.
+            results to. Defaults to 'results/exemplars'.
         viz_dir (Optional[PathLike], optional): Directory to write top image
             visualizations to (e.g., individual png images, lightbox, etc.).
             Defaults to f'{results_dir}/viz'.
@@ -86,9 +86,9 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
         masks_cache_file (Optional[PathLike], optional): Write intermediate
             results for determining top-k image masks to this file.
             Defaults to None.
-        save_results (bool, optional): If set, save dissection results and
-            metadata to results_dir. Otherwise, save nothing (viz may still
-            be saved, see `save_viz` arg). Defaults to True.
+        save_results (bool, optional): If set, save exemplars and metadata
+            to results_dir. Otherwise, save nothing (viz may still be saved,
+            see `save_viz` arg). Defaults to True.
         save_viz (bool, optional): If set, save individual masked images to
             `viz_dir`. Otherwise, `viz_dir` will not be used. Defaults to True.
         clear_cache_files (bool, optional): If set, clear existing cache files
@@ -106,7 +106,7 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
         ValueError: If `k` or `quantile` are invalid.
 
     Returns:
-        DissectionResults: The top-k and quantile statistics for every unit.
+        ActivationStats: The top-k and quantile statistics for every unit.
 
     """
     if units is not None and not units:
@@ -121,7 +121,7 @@ def run(compute_topk_and_quantile: Callable[..., TensorPair],
                          'image_size= must be set')
 
     if results_dir is None:
-        results_dir = pathlib.Path(__file__).parents[2] / 'dissection-results'
+        results_dir = env.results_dir() / 'exemplars'
     if not isinstance(results_dir, pathlib.Path):
         results_dir = pathlib.Path(results_dir)
 
@@ -250,13 +250,13 @@ def discriminative(
     transform_inputs: transforms.TransformToTuple = transforms.first,
     transform_hiddens: transforms.TransformToTensor = transforms.identity,
     **kwargs: Any,
-) -> DissectionResults:
-    """Run dissection on a discriminative model.
+) -> ActivationStats:
+    """Compute exemplars for a discriminative model.
 
     That is, a model for which image goes in, prediction comes out. Its outputs
     will be interpretted as the neuron activations to track.
 
-    Keyword arguments are forwarded to `run`.
+    Keyword arguments are forwarded to `compute`.
 
     Args:
         model (nn.Module): The model to dissect.
@@ -283,7 +283,7 @@ def discriminative(
             data will be tracked by netdissect.
 
     Returns:
-        DissectionResults: The top-k and quantile statistics for every unit.
+        ActivationStats: The top-k and quantile statistics for every unit.
 
     """
     model.to(device)
@@ -321,12 +321,12 @@ def discriminative(
             hiddens = transform_hiddens(hiddens)
             return hiddens
 
-        return run(compute_topk_and_quantile,
-                   compute_activations,
-                   dataset,
-                   results_dir=results_dir,
-                   viz_dir=viz_dir,
-                   **kwargs)
+        return compute(compute_topk_and_quantile,
+                       compute_activations,
+                       dataset,
+                       results_dir=results_dir,
+                       viz_dir=viz_dir,
+                       **kwargs)
 
 
 def generative(
@@ -340,14 +340,14 @@ def generative(
     transform_hiddens: transforms.TransformToTensor = transforms.identity,
     transform_outputs: transforms.TransformToTensor = transforms.identity,
     **kwargs: Any,
-) -> DissectionResults:
-    """Run dissection on a generative model of images.
+) -> ActivationStats:
+    """Compute exemplars for a generative model of images.
 
     That is, a model for which representation goes in, image comes out.
     Because of the way these models are structured, we need both the generated
     images and the intermediate activation.
 
-    Keyword arguments are forwarded to `run`.
+    Keyword arguments are forwarded to `compute`.
 
     Args:
         model (nn.Module): The model to dissect.
@@ -378,7 +378,7 @@ def generative(
             data will be tracked by netdissect.
 
     Returns:
-        DissectionResults: The top-k and quantile statistics for every unit.
+        ActivationStats: The top-k and quantile statistics for every unit.
 
     """
     if results_dir is not None:
@@ -408,9 +408,9 @@ def generative(
             images = transform_outputs(images)
             return hiddens, images
 
-        return run(compute_topk_and_quantile,
-                   compute_activations,
-                   dataset,
-                   results_dir=results_dir,
-                   viz_dir=viz_dir,
-                   **kwargs)
+        return compute(compute_topk_and_quantile,
+                       compute_activations,
+                       dataset,
+                       results_dir=results_dir,
+                       viz_dir=viz_dir,
+                       **kwargs)
