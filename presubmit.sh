@@ -89,9 +89,9 @@ function spinner() {
 }
 
 COMMANDS=(
-    'mypy *.py src'
-    'flake8 *.py src'
-    'isort -c *.py src'
+    'mypy experiments scripts src'
+    'flake8 experiments scripts src'
+    'isort -c experiments scripts src'
     'pytest tests')
 for CMD in "${COMMANDS[@]}"
 do

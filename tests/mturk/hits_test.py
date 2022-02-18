@@ -4,7 +4,7 @@ import pathlib
 import tempfile
 
 from tests import conftest
-from src import datasets
+from src.milannotations import datasets
 from src.mturk import hits
 
 import pytest

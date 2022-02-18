@@ -2,8 +2,8 @@
 from typing import (Any, Callable, Mapping, Optional, Sequence, Tuple, Type,
                     Union, overload)
 
-from src import datasets
 from src.deps.netdissect import nethook, renormalize
+from src.milannotations import datasets
 from src.utils import serialize
 from src.utils.typing import Device
 

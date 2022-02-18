@@ -1,7 +1,8 @@
-"""Unit tests for dissection zoo."""
+"""Unit tests for exemplars zoo."""
 import collections
 
-from src.exemplars import zoo
+from src.exemplars import models
+from src.utils import hubs
 
 import pytest
 from torch import nn
@@ -13,16 +14,16 @@ from torch import nn
     dict(k=5, batch_size=64),
     dict(k=5, quantile=.95, output_size=256, batch_size=64, image_size=224),
 ))
-def test_model_dissection_config_kwargs(kwargs):
-    """Test ModelDissectionConfig.kwargs returns all kwargs."""
-    config = zoo.ModelDissectionConfig(**kwargs)
+def test_model_exemplars_config_kwargs(kwargs):
+    """Test ModelExemplarsConfig.kwargs returns all kwargs."""
+    config = models.ModelExemplarsConfig(**kwargs)
     assert config.kwargs == kwargs
 
 
-def test_generative_model_dissection_config_post_init():
-    """Test GenerativeModelDissectionConfig.__post_init__ validates."""
+def test_generative_model_exemplars_config_post_init():
+    """Test GenerativeModelExemplarsConfig.__post_init__ validates."""
     with pytest.raises(ValueError, match='.*requires dataset.*'):
-        zoo.GenerativeModelDissectionConfig()
+        models.GenerativeModelExemplarsConfig()
 
 
 @pytest.mark.parametrize('kwargs', (
@@ -31,13 +32,13 @@ def test_generative_model_dissection_config_post_init():
     dict(k=5, batch_size=64),
     dict(k=5, quantile=.95, output_size=256, batch_size=64, image_size=224),
 ))
-def test_generative_model_dissection_config_kwargs(kwargs):
-    """Test GenerativeModelDissectionConfig.kwargs does not return dataset."""
-    config = zoo.GenerativeModelDissectionConfig(dataset='foo', **kwargs)
+def test_generative_model_exemplars_config_kwargs(kwargs):
+    """Test GenerativeModelExemplarsConfig.kwargs does not return dataset."""
+    config = models.GenerativeModelExemplarsConfig(dataset='foo', **kwargs)
     assert config.kwargs == kwargs
 
 
-class FakeModelConfig(zoo.ModelConfig):
+class FakeModelConfig(models.ModelConfig):
     """A fake model config object."""
 
     def __init__(self, model, layers=None):
@@ -50,8 +51,7 @@ class FakeModelConfig(zoo.ModelConfig):
         return self.model
 
 
-MODEL_NAME = 'model'
-DATASET_NAME = 'dataset'
+MODEL_KEY = 'model'
 
 LAYER_1 = 'layer_1'
 LAYER_2 = 'layer_2'
@@ -71,11 +71,11 @@ def model():
     (None, (LAYER_1, LAYER_2)),
     ((LAYER_1,), (LAYER_1,)),
 ))
-def test_model(model, layers, expected):
-    """Test model loader returns layers."""
+def test_load(model, layers, expected):
+    """Test load returns layers."""
     config = FakeModelConfig(model, layers)
-    configs = {MODEL_NAME: {DATASET_NAME: config}}
-    actuals = zoo.model(MODEL_NAME, DATASET_NAME, source=configs)
+    hub = hubs.ModelHub(**{MODEL_KEY: config})
+    actuals = models.load(MODEL_KEY, hub=hub)
     assert len(actuals) == 3
     actual_model, actual_layers, actual_config = actuals
     assert actual_model is model

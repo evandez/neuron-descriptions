@@ -5,31 +5,32 @@ import pathlib
 import shutil
 from typing import Dict
 
-from src import datasets, milan, zoo
+from src import milan, milannotations
+from src.milannotations import datasets
 from src.utils import env
 
 from torch import cuda
 from tqdm.auto import tqdm
 
 SOURCES = (
-    zoo.KEYS.DENSENET121_IMAGENET,
-    zoo.KEYS.DENSENET121_IMAGENET_BLURRED,
-    zoo.KEYS.DENSENET201_IMAGENET,
-    zoo.KEYS.DENSENET201_IMAGENET_BLURRED,
-    zoo.KEYS.MOBILENET_V2_IMAGENET,
-    zoo.KEYS.MOBILENET_V2_IMAGENET_BLURRED,
-    zoo.KEYS.SHUFFLENET_V2_X1_0_IMAGENET,
-    zoo.KEYS.SHUFFLENET_V2_X1_0_IMAGENET_BLURRED,
-    zoo.KEYS.SQUEEZENET1_0_IMAGENET,
-    zoo.KEYS.SQUEEZENET1_0_IMAGENET_BLURRED,
-    zoo.KEYS.VGG11_IMAGENET,
-    zoo.KEYS.VGG11_IMAGENET_BLURRED,
-    zoo.KEYS.VGG13_IMAGENET,
-    zoo.KEYS.VGG13_IMAGENET_BLURRED,
-    zoo.KEYS.VGG16_IMAGENET,
-    zoo.KEYS.VGG16_IMAGENET_BLURRED,
-    zoo.KEYS.VGG19_IMAGENET,
-    zoo.KEYS.VGG19_IMAGENET_BLURRED,
+    milannotations.KEYS.DENSENET121_IMAGENET,
+    milannotations.KEYS.DENSENET121_IMAGENET_BLURRED,
+    milannotations.KEYS.DENSENET201_IMAGENET,
+    milannotations.KEYS.DENSENET201_IMAGENET_BLURRED,
+    milannotations.KEYS.MOBILENET_V2_IMAGENET,
+    milannotations.KEYS.MOBILENET_V2_IMAGENET_BLURRED,
+    milannotations.KEYS.SHUFFLENET_V2_X1_0_IMAGENET,
+    milannotations.KEYS.SHUFFLENET_V2_X1_0_IMAGENET_BLURRED,
+    milannotations.KEYS.SQUEEZENET1_0_IMAGENET,
+    milannotations.KEYS.SQUEEZENET1_0_IMAGENET_BLURRED,
+    milannotations.KEYS.VGG11_IMAGENET,
+    milannotations.KEYS.VGG11_IMAGENET_BLURRED,
+    milannotations.KEYS.VGG13_IMAGENET,
+    milannotations.KEYS.VGG13_IMAGENET_BLURRED,
+    milannotations.KEYS.VGG16_IMAGENET,
+    milannotations.KEYS.VGG16_IMAGENET_BLURRED,
+    milannotations.KEYS.VGG19_IMAGENET,
+    milannotations.KEYS.VGG19_IMAGENET_BLURRED,
 )
 
 parser = argparse.ArgumentParser(description='export descriptions')
@@ -46,11 +47,10 @@ parser.add_argument('--clear-results-dir',
 parser.add_argument('--sources',
                     nargs='+',
                     default=SOURCES,
-                    help='models to caption and export (default: all)')
-parser.add_argument('--captioner',
-                    nargs=2,
-                    default=(zoo.KEYS.CAPTIONER_RESNET101, zoo.KEYS.ALL),
-                    help='captioner to use (default: captioner-resnet101 all)')
+                    help='models to describe and export (default: all)')
+parser.add_argument('--milan',
+                    default=milannotations.KEYS.BASE,
+                    help='milan model to use (default: base)')
 parser.add_argument('--base-url',
                     default='https://unitname.csail.mit.edu/catalog',
                     help='base url for images (default: csail url)')
@@ -73,36 +73,36 @@ if args.clear_results_dir and results_dir.exists():
     shutil.rmtree(results_dir)
 results_dir.mkdir(exist_ok=True, parents=True)
 
-decoder, _ = zoo.model(*args.captioner)
+decoder = milan.pretrained(args.milan)
 decoder.to(device)
-assert isinstance(decoder, milan.Decoder)
 
 # Read in all datasets.
 data: Dict[str, datasets.TopImagesDataset] = {}
 for key in args.sources:
-    dataset = zoo.dataset(key,
-                          factory=datasets.TopImagesDataset,
-                          path=data_dir / key)
+    dataset = milannotations.load(key,
+                                  factory=datasets.TopImagesDataset,
+                                  path=data_dir / key)
     assert isinstance(dataset, datasets.TopImagesDataset)
     data[key] = dataset
 
 # Caption all the data.
-captions = {}
+descriptions = {}
 for key in args.sources:
-    captions_file = results_dir / f'cache/{key.replace("/", "_")}_captions.csv'
-    if captions_file.exists():
-        print(f'reading {key} captions from {captions_file}')
-        with captions_file.open('r') as handle:
-            captions[key] = tuple(handle.read().split('\n'))
+    descriptions_file = (results_dir /
+                         f'cache/{key.replace("/", "_")}_descriptions.csv')
+    if descriptions_file.exists():
+        print(f'reading {key} descriptions from {descriptions_file}')
+        with descriptions_file.open('r') as handle:
+            descriptions[key] = tuple(handle.read().split('\n'))
     else:
         predictions = decoder.predict(data[key],
                                       strategy='rerank',
                                       temperature=.2,
                                       beam_size=50,
                                       device=device)
-        print(f'writing {key} captions to {captions_file}')
-        captions_file.parent.mkdir(exist_ok=True, parents=True)
-        with captions_file.open('w') as handle:
+        print(f'writing {key} descriptions to {descriptions_file}')
+        descriptions_file.parent.mkdir(exist_ok=True, parents=True)
+        with descriptions_file.open('w') as handle:
             handle.write('\n'.join(predictions))
 
 # Save images and JSON files.
@@ -141,7 +141,7 @@ for key, dataset in data.items():
                 f'{args.base_url}/{name}/{image_file.name}'
                 for image_file in image_files
             ],
-            'description': captions[key][index],
+            'description': descriptions[key][index],
         })
 
     model_json_file = json_dir / name / 'data.json'

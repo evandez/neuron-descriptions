@@ -2,7 +2,7 @@
 import argparse
 import pathlib
 
-from src.exemplars import compute, zoo
+from src.exemplars import compute, datasets, models
 from src.utils import env
 
 from torch import cuda
@@ -48,20 +48,19 @@ args = parser.parse_args()
 
 device = args.device or 'cuda' if cuda.is_available() else 'cpu'
 
-model, layers, config = zoo.model(args.model,
-                                  args.dataset,
-                                  map_location=device,
-                                  path=args.model_file)
+model, layers, config = models.load(f'{args.model}/{args.dataset}',
+                                    map_location=device,
+                                    path=args.model_file)
 
 dataset, generative = args.dataset, False
-if isinstance(config.dissection, zoo.GenerativeModelDissectionConfig):
-    dataset = config.dissection.dataset
+if isinstance(config.exemplars, models.GenerativeModelExemplarsConfig):
+    dataset = config.exemplars.dataset
     generative = True
 # TODO(evandez): Yuck, push this into config.
-elif dataset == zoo.KEYS.IMAGENET_BLURRED:
-    dataset = zoo.KEYS.IMAGENET
+elif dataset == datasets.KEYS.IMAGENET_BLURRED:
+    dataset = datasets.KEYS.IMAGENET
 
-dataset = zoo.dataset(dataset, path=args.dataset_path)
+dataset = datasets.load(dataset, path=args.dataset_path)
 
 if args.layer_names:
     layers = args.layer_names
@@ -96,7 +95,7 @@ for layer in layers:
                            save_viz=not args.no_viz,
                            device=device,
                            num_workers=args.num_workers,
-                           **config.dissection.kwargs)
+                           **config.exemplars.kwargs)
     else:
         compute.discriminative(model,
                                dataset,
@@ -107,4 +106,4 @@ for layer in layers:
                                save_viz=not args.no_viz,
                                device=device,
                                num_workers=args.num_workers,
-                               **config.dissection.kwargs)
+                               **config.exemplars.kwargs)

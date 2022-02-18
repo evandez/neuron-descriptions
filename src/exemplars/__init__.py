@@ -12,3 +12,6 @@ In addition to defining useful adapters for `third_party/netdissect`, this
 module provides wrappers for many well known vision models and datasets
 so that they can be plugged directly into dissection.
 """
+# flake8: noqa
+from src.exemplars import datasets, models
+from src.exemplars.compute import discriminative, generative

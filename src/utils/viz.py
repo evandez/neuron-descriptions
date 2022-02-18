@@ -4,8 +4,8 @@ import pathlib
 import random
 from typing import Any, Callable, Optional, Sequence, Sized, Tuple, Union, cast
 
-from src import datasets
 from src.deps.netdissect import imgsave
+from src.milannotations import datasets
 from src.utils.typing import PathLike, StrMapping, StrSequence
 
 import wandb
@@ -123,9 +123,6 @@ def random_wandb_images(
     return wandb_images(images, captions, **metadata)
 
 
-AnyTopImages = Union[datasets.TopImages, datasets.AnnotatedTopImages]
-
-
 def random_neuron_wandb_images(dataset: data.Dataset[datasets.TopImages],
                                captions: StrSequence,
                                indices: Optional[Sequence[int]] = None,
@@ -158,13 +155,13 @@ def random_neuron_wandb_images(dataset: data.Dataset[datasets.TopImages],
 
 
 PredictedCaptions = Union[StrSequence, Sequence[StrMapping]]
-GetHeaderFn = Callable[[AnyTopImages, int], str]
-GetBaseUrlFn = Callable[[AnyTopImages, int], str]
-GetUrlUnitIdFn = Callable[[AnyTopImages, int], int]
+GetHeaderFn = Callable[[datasets.AnyTopImages, int], str]
+GetBaseUrlFn = Callable[[datasets.AnyTopImages, int], str]
+GetUrlUnitIdFn = Callable[[datasets.AnyTopImages, int], int]
 
 
 def generate_html(
-    dataset: data.Dataset[AnyTopImages],
+    dataset: data.Dataset[datasets.AnyTopImages],
     out_dir: PathLike,
     predictions: Optional[PredictedCaptions] = None,
     get_header: Optional[GetHeaderFn] = None,

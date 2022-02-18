@@ -503,3 +503,7 @@ class AnnotatedTopImagesDataset(data.Dataset):
         """Return the "k" in "top-k images"."""
         assert len(self) > 0, 'empty dataset?'
         return self.samples[0].images.shape[0]
+
+
+AnyTopImages = Union[TopImages, AnnotatedTopImages]
+AnyTopImagesDataset = Union[TopImagesDataset, AnnotatedTopImagesDataset]

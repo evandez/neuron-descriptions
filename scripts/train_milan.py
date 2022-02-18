@@ -4,7 +4,7 @@ import pathlib
 import shutil
 from typing import Optional
 
-from src import milan, zoo
+from src import milan, milannotations
 from src.utils import env, training
 
 import torch
@@ -15,7 +15,7 @@ ENCODER_RESNET50 = 'resnet50'
 ENCODER_RESNET101 = 'resnet101'
 ENCODERS = (ENCODER_RESNET18, ENCODER_RESNET50, ENCODER_RESNET101)
 
-parser = argparse.ArgumentParser(description='train a captioner')
+parser = argparse.ArgumentParser(description='train milan')
 parser.add_argument(
     '--results-dir',
     type=pathlib.Path,
@@ -24,9 +24,8 @@ parser.add_argument('--clear-results-dir',
                     action='store_true',
                     help='clear results dir (default: do not)')
 parser.add_argument('--dataset',
-                    choices=zoo.DATASET_GROUPINGS.keys(),
-                    default=zoo.KEYS.ALL,
-                    help='datasets to train on (default: all)')
+                    default=milannotations.KEYS.BASE,
+                    help='milannotations to train on (default: base)')
 parser.add_argument('--encoder',
                     choices=ENCODERS,
                     default=ENCODER_RESNET101,
@@ -50,7 +49,7 @@ device = args.device or 'cuda' if cuda.is_available() else 'cpu'
 
 results_dir: Optional[pathlib.Path] = args.results_dir
 if not results_dir:
-    subdir = f'captioner-{args.encoder}-{args.dataset.replace("/", "_")}'
+    subdir = f'milan-{args.dataset.replace("/", "_")}'
     if args.no_lm:
         subdir += '-no_lm'
     results_dir = env.results_dir() / subdir
@@ -59,7 +58,7 @@ if args.clear_results_dir:
     shutil.rmtree(results_dir)
 results_dir.mkdir(exist_ok=True, parents=True)
 
-dataset = zoo.datasets(*zoo.DATASET_GROUPINGS[args.dataset])
+dataset = milannotations.load(args.dataset)
 
 splits_file = results_dir / 'splits.pth'
 if splits_file.exists():
@@ -93,10 +92,10 @@ features = None
 if args.precompute_features:
     features = encoder.map(dataset, device=device)
 
-captioner_file = results_dir / 'captioner.pth'
-if captioner_file.exists():
-    print(f'loading cached decoder from {captioner_file}')
-    decoder = milan.Decoder.load(captioner_file, map_location=device)
+decoder_file = results_dir / 'decoder.pth'
+if decoder_file.exists():
+    print(f'loading cached decoder from {decoder_file}')
+    decoder = milan.Decoder.load(decoder_file, map_location=device)
     decoder.eval()
 else:
     decoder = milan.decoder(dataset, encoder, lm=lm)
@@ -106,12 +105,12 @@ else:
                 device=device)
     decoder.eval()
 
-    print(f'saving decoder to {captioner_file}')
-    decoder.save(captioner_file)
+    print(f'saving decoder to {decoder_file}')
+    decoder.save(decoder_file)
 
 predictions = decoder.predict(val,
                               device=device,
-                              display_progress_as='caption val set')
+                              display_progress_as='describe val set')
 
 bleu = decoder.bleu(val, predictions=predictions)
 print('BLEU:', f'{bleu.score:.1f}')

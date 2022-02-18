@@ -1,9 +1,9 @@
-"""Unit tests for the lv/datasets module."""
+"""Unit tests for the datasets submodule."""
 import csv
 import shutil
 
 from tests import conftest
-from src import datasets
+from src.milannotations import datasets
 
 import numpy
 import pytest

@@ -1,15 +1,18 @@
-"""Core tools for interacting with the zoo."""
+"""Tools for accessing models and datasets stored remotely."""
 import dataclasses
 import pathlib
 import tempfile
 import zipfile
 from typing import Any, Callable, Mapping, Optional, OrderedDict
 
+from src.utils import env
 from src.utils.typing import Device, PathLike
 
 import torch
 from torch import hub, nn
 from torch.utils import data
+
+HOST = 'https://milan.csail.mit.edu'
 
 TransformWeights = Callable[[Any], OrderedDict[str, torch.Tensor]]
 ModelFactory = Callable[..., nn.Module]
@@ -127,7 +130,45 @@ class ModelConfig:
         return model.eval()
 
 
-ModelConfigs = Mapping[str, Mapping[str, ModelConfig]]
+class ModelHub:
+    """A model hub."""
+
+    configs: Mapping[str, ModelConfig]
+
+    def __init__(self, **configs: ModelConfig):
+        """Initialize the hub with the given configs."""
+        self.configs = configs
+
+    def load(self,
+             name: str,
+             path: Optional[PathLike] = None,
+             **kwargs: Any) -> nn.Module:
+        """Load the model trained on the given dataset.
+
+        Args:
+            name (str): Name of the model.
+            path (Optional[PathLike], optional): Path to the model weights.
+                If not set, defaults to `<project model dir>/{name}.pth`.
+                If path does not exist but `url` is set on the model config,
+                weights will be downloaded from URL to the path.
+
+        Raises:
+            KeyError: If no model with given name exists.
+
+        Returns:
+            Model: The loaded model and its config.
+
+        """
+        if name not in self.configs:
+            raise KeyError(f'no such model in hub: {name}')
+        config = self.configs[name]
+
+        if path is None:
+            path = env.models_dir() / f'{name}.pth'
+
+        model = config.load(path, **kwargs)
+        return model
+
 
 DatasetFactory = Callable[..., data.Dataset]
 
@@ -210,4 +251,65 @@ class DatasetConfig:
         return factory(path, **kwargs)
 
 
-DatasetConfigs = Mapping[str, DatasetConfig]
+class DatasetHub:
+    """A dataset hub."""
+
+    def __init__(self, **configs: DatasetConfig):
+        """Initialize the hub with the given configs."""
+        self.configs = configs
+
+    def load(self,
+             name: str,
+             path: Optional[PathLike] = None,
+             **kwargs: Any) -> data.Dataset:
+        """Load the dataset with the given name.
+
+        Args:
+            name (str): Dataset configuration name.
+            path (Optional[PathLike], optional): Path to dataset. Defaults to
+                project default (see `src.utils.env`).
+
+        Returns:
+            data.Dataset: The loaded dataset.
+
+        Raises:
+            KeyError: If no dataset with the given name exists.
+
+        """
+        if name not in self.configs:
+            raise KeyError(f'no such dataset in hub: {name}')
+        config = self.configs[name]
+
+        if path is None and config.requires_path:
+            path = env.data_dir() / name
+
+        dataset = config.load(path=path, **kwargs)
+
+        return dataset
+
+    def load_all(self,
+                 name: str,
+                 *others: str,
+                 path: Optional[PathLike] = None,
+                 **kwargs: Any) -> data.Dataset:
+        """Load each dataset and concatenate them.
+
+        Args:
+            name (str): First dataset configuration name. Must specify at least
+                this argument.
+            path (Optional[PathLike], optional): Root path for all datasets.
+                Individual paths will be computed by appending dataset name to
+                this path. Defaults to project default.
+
+        Returns:
+            data.Dataset: All datasets concatenated into one.
+
+        """
+        if path is None:
+            path = env.data_dir()
+        concated = self.load(name, path=pathlib.Path(path) / name, **kwargs)
+        for other in others:
+            concated += self.load(other,
+                                  path=pathlib.Path(path) / other,
+                                  **kwargs)
+        return concated

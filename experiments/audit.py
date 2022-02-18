@@ -4,51 +4,49 @@ import csv
 import pathlib
 import shutil
 
-import src.datasets
-from src import milan, zoo
+from src import milan, milannotations
 from src.utils import env
 
 from torch import cuda
 
 CNNS = (
-    # zoo.KEYS.ALEXNET_IMAGENET,
-    # zoo.KEYS.ALEXNET_IMAGENET_BLURRED,
-    zoo.KEYS.DENSENET121_IMAGENET,
-    zoo.KEYS.DENSENET121_IMAGENET_BLURRED,
-    zoo.KEYS.DENSENET201_IMAGENET,
-    zoo.KEYS.DENSENET201_IMAGENET_BLURRED,
-    zoo.KEYS.MOBILENET_V2_IMAGENET,
-    zoo.KEYS.MOBILENET_V2_IMAGENET_BLURRED,
-    zoo.KEYS.RESNET18_IMAGENET,
-    zoo.KEYS.RESNET18_IMAGENET_BLURRED,
-    zoo.KEYS.RESNET34_IMAGENET,
-    zoo.KEYS.RESNET34_IMAGENET_BLURRED,
-    zoo.KEYS.RESNET50_IMAGENET,
-    zoo.KEYS.RESNET50_IMAGENET_BLURRED,
-    # zoo.KEYS.RESNET101_IMAGENET,
-    # zoo.KEYS.RESNET101_IMAGENET_BLURRED,
-    # zoo.KEYS.RESNET152_IMAGENET,
-    # zoo.KEYS.RESNET152_IMAGENET_BLURRED,
-    zoo.KEYS.SQUEEZENET1_0_IMAGENET,
-    zoo.KEYS.SQUEEZENET1_0_IMAGENET_BLURRED,
-    zoo.KEYS.SHUFFLENET_V2_X1_0_IMAGENET,
-    zoo.KEYS.SHUFFLENET_V2_X1_0_IMAGENET_BLURRED,
-    zoo.KEYS.VGG11_IMAGENET,
-    zoo.KEYS.VGG11_IMAGENET_BLURRED,
-    zoo.KEYS.VGG13_IMAGENET,
-    zoo.KEYS.VGG13_IMAGENET_BLURRED,
-    zoo.KEYS.VGG16_IMAGENET,
-    zoo.KEYS.VGG16_IMAGENET_BLURRED,
-    zoo.KEYS.VGG19_IMAGENET,
-    zoo.KEYS.VGG19_IMAGENET_BLURRED,
+    # milannotations.KEYS.ALEXNET_IMAGENET,
+    # milannotations.KEYS.ALEXNET_IMAGENET_BLURRED,
+    milannotations.KEYS.DENSENET121_IMAGENET,
+    milannotations.KEYS.DENSENET121_IMAGENET_BLURRED,
+    milannotations.KEYS.DENSENET201_IMAGENET,
+    milannotations.KEYS.DENSENET201_IMAGENET_BLURRED,
+    milannotations.KEYS.MOBILENET_V2_IMAGENET,
+    milannotations.KEYS.MOBILENET_V2_IMAGENET_BLURRED,
+    milannotations.KEYS.RESNET18_IMAGENET,
+    milannotations.KEYS.RESNET18_IMAGENET_BLURRED,
+    milannotations.KEYS.RESNET34_IMAGENET,
+    milannotations.KEYS.RESNET34_IMAGENET_BLURRED,
+    milannotations.KEYS.RESNET50_IMAGENET,
+    milannotations.KEYS.RESNET50_IMAGENET_BLURRED,
+    # milannotations.KEYS.RESNET101_IMAGENET,
+    # milannotations.KEYS.RESNET101_IMAGENET_BLURRED,
+    # milannotations.KEYS.RESNET152_IMAGENET,
+    # milannotations.KEYS.RESNET152_IMAGENET_BLURRED,
+    milannotations.KEYS.SQUEEZENET1_0_IMAGENET,
+    milannotations.KEYS.SQUEEZENET1_0_IMAGENET_BLURRED,
+    milannotations.KEYS.SHUFFLENET_V2_X1_0_IMAGENET,
+    milannotations.KEYS.SHUFFLENET_V2_X1_0_IMAGENET_BLURRED,
+    milannotations.KEYS.VGG11_IMAGENET,
+    milannotations.KEYS.VGG11_IMAGENET_BLURRED,
+    milannotations.KEYS.VGG13_IMAGENET,
+    milannotations.KEYS.VGG13_IMAGENET_BLURRED,
+    milannotations.KEYS.VGG16_IMAGENET,
+    milannotations.KEYS.VGG16_IMAGENET_BLURRED,
+    milannotations.KEYS.VGG19_IMAGENET,
+    milannotations.KEYS.VGG19_IMAGENET_BLURRED,
 )
 
 parser = argparse.ArgumentParser(
     description='audit cnns by captioning all neurons')
-parser.add_argument('--captioner',
-                    nargs=2,
-                    default=(zoo.KEYS.CAPTIONER_RESNET101, zoo.KEYS.ALL),
-                    help='captioner to use (default: captioner-resnet101 all)')
+parser.add_argument('--milan',
+                    default='base',
+                    help='milan config to use (default: base)')
 parser.add_argument('--cnns',
                     nargs='+',
                     choices=CNNS,
@@ -70,11 +68,10 @@ args = parser.parse_args()
 
 device = args.device or 'cuda' if cuda.is_available() else 'cpu'
 
-decoder, _ = zoo.model(*args.captioner)
+decoder = milan.pretrained(args.milan)
 decoder.to(device)
-assert isinstance(decoder, milan.Decoder)
 
-results_dir = args.results_dir or (env.results_dir() / 'cnn-audit')
+results_dir = args.results_dir or (env.results_dir() / 'audit')
 results_dir.mkdir(exist_ok=True, parents=True)
 if args.clear_results_dir and results_dir.exists():
     shutil.rmtree(results_dir)
@@ -92,8 +89,8 @@ for key in args.cnns:
     if args.data_dir is not None:
         path = args.data_dir / key
 
-    dataset = zoo.dataset(key, path=path)
-    assert isinstance(dataset, src.datasets.TopImagesDataset)
+    dataset = milannotations.load(key, path=path)
+    assert isinstance(dataset, milannotations.TopImagesDataset)
 
     predictions = decoder.predict(dataset,
                                   strategy='rerank',

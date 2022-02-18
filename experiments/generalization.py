@@ -1,10 +1,10 @@
-"""Run captioner generalization experiments."""
+"""Run MILAN generalization experiments."""
 import argparse
 import pathlib
 import shutil
 from typing import Mapping, NamedTuple, Tuple
 
-from src import milan, zoo
+from src import milan, milannotations
 from src.deps.ext import bert_score
 from src.utils import env, training, viz
 from src.utils.typing import StrSequence
@@ -20,8 +20,8 @@ class LoadedSplit(NamedTuple):
 
     train: data.Dataset
     test: data.Dataset
-    train_keys: StrSequence
-    test_keys: StrSequence
+    train_key: str
+    test_key: str
 
 
 DatasetNames = StrSequence
@@ -34,34 +34,59 @@ EXPERIMENT_ACROSS_TASK = 'across-task'
 EXPERIMENT_ACROSS_ARCH = 'across-arch'
 EXPERIMENT_LEAVE_ONE_OUT = 'leave-one-out'
 EXPERIMENTS: Mapping[str, Splits] = {
-    EXPERIMENT_WITHIN_NETWORK: ((
-        zoo.KEYS.ALEXNET_IMAGENET,
-        zoo.KEYS.ALEXNET_PLACES365,
-        zoo.KEYS.RESNET152_IMAGENET,
-        zoo.KEYS.RESNET152_PLACES365,
-        zoo.KEYS.BIGGAN_IMAGENET,
-        zoo.KEYS.BIGGAN_PLACES365,
+    EXPERIMENT_WITHIN_NETWORK: (
+        milannotations.KEYS.ALEXNET_IMAGENET,
+        milannotations.KEYS.ALEXNET_PLACES365,
+        milannotations.KEYS.RESNET152_IMAGENET,
+        milannotations.KEYS.RESNET152_PLACES365,
+        milannotations.KEYS.BIGGAN_IMAGENET,
+        milannotations.KEYS.BIGGAN_PLACES365,
+    ),
+    EXPERIMENT_ACROSS_NETWORK: ((
+        milannotations.KEYS.ALEXNET,
+        milannotations.KEYS.RESNET152,
     ),),
-    EXPERIMENT_ACROSS_NETWORK: (
-        zoo.DATASET_GROUPINGS[zoo.KEYS.ALEXNET],
-        zoo.DATASET_GROUPINGS[zoo.KEYS.RESNET152],
-    ),
-    EXPERIMENT_ACROSS_DATASET: (
-        zoo.DATASET_GROUPINGS[zoo.KEYS.IMAGENET],
-        zoo.DATASET_GROUPINGS[zoo.KEYS.PLACES365],
-    ),
-    EXPERIMENT_ACROSS_TASK: (
-        zoo.DATASET_GROUPINGS[zoo.KEYS.CLASSIFIERS],
-        zoo.DATASET_GROUPINGS[zoo.KEYS.GENERATORS],
-    ),
-    EXPERIMENT_ACROSS_ARCH: (
-        zoo.DATASET_GROUPINGS[zoo.KEYS.ALL],
-        (zoo.KEYS.DINO_VITS8_IMAGENET,),
+    EXPERIMENT_ACROSS_DATASET: ((
+        milannotations.KEYS.IMAGENET,
+        milannotations.KEYS.PLACES365,
+    ),),
+    EXPERIMENT_ACROSS_TASK: ((
+        milannotations.KEYS.CLASSIFIERS,
+        milannotations.KEYS.GENERATORS,
+    ),),
+    EXPERIMENT_ACROSS_ARCH: ((
+        milannotations.KEYS.BASE,
+        milannotations.KEYS.DINO_VITS8_IMAGENET,
+    ),),
+    EXPERIMENT_LEAVE_ONE_OUT: (
+        (
+            milannotations.KEYS.NOT_ALEXNET_IMAGENET,
+            milannotations.KEYS.ALEXNET_IMAGENET,
+        ),
+        (
+            milannotations.KEYS.NOT_ALEXNET_PLACES365,
+            milannotations.KEYS.ALEXNET_PLACES365,
+        ),
+        (
+            milannotations.KEYS.NOT_RESNET152_IMAGENET,
+            milannotations.KEYS.RESNET152_IMAGENET,
+        ),
+        (
+            milannotations.KEYS.NOT_RESNET152_PLACES365,
+            milannotations.KEYS.RESNET152_PLACES365,
+        ),
+        (
+            milannotations.KEYS.NOT_BIGGAN_IMAGENET,
+            milannotations.KEYS.BIGGAN_IMAGENET,
+        ),
+        (
+            milannotations.KEYS.NOT_BIGGAN_PLACES365,
+            milannotations.KEYS.BIGGAN_PLACES365,
+        ),
     ),
 }
 
-parser = argparse.ArgumentParser(
-    description='run captioner generalization experiments')
+parser = argparse.ArgumentParser(description='run generalization experiments')
 parser.add_argument('--experiments',
                     nargs='+',
                     help='experiments to run (default: all experiments)')
@@ -74,7 +99,7 @@ parser.add_argument('--data-dir',
                     help='root dir for datasets (default: project data dir)')
 parser.add_argument('--results-dir',
                     type=pathlib.Path,
-                    help='root dir for intermediate and final results '
+                    help='root dir for all results '
                     '(default: project results dir)')
 parser.add_argument('--clear-results-dir',
                     action='store_true',
@@ -87,14 +112,14 @@ parser.add_argument('--precompute-features',
                     action='store_true',
                     help='precompute visual features (default: do not)')
 parser.add_argument('--wandb-project',
-                    default='lv',
-                    help='wandb project name (default: lv)')
+                    default='milan',
+                    help='wandb project name (default: milan)')
 parser.add_argument('--wandb-name',
-                    default='captioner-generalization',
-                    help='wandb run name (default: captioner-generalization)')
+                    default='generalization',
+                    help='wandb run name (default: generalization)')
 parser.add_argument('--wandb-group',
-                    default='captioner',
-                    help='wandb group name (default: captioner)')
+                    default='experiments',
+                    help='wandb group name (default: experiments)')
 parser.add_argument('--wandb-n-samples',
                     type=int,
                     default=25,
@@ -113,8 +138,7 @@ device = args.device or 'cuda' if cuda.is_available() else 'cpu'
 
 # Prepare necessary directories.
 data_dir = args.data_dir or env.data_dir()
-results_dir = args.results_dir or (env.results_dir() /
-                                   'captioner-generalization')
+results_dir = args.results_dir or (env.results_dir() / 'generalization')
 if args.clear_results_dir and results_dir.exists():
     shutil.rmtree(results_dir)
 results_dir.mkdir(exist_ok=True, parents=True)
@@ -135,19 +159,22 @@ for experiment in args.experiments or EXPERIMENTS.keys():
 
     # Have to handle within-network and across-* experiments differently.
     splits = EXPERIMENTS[experiment]
-    if len(splits) == 2:
-        left = zoo.datasets(*splits[0], path=data_dir)
-        right = zoo.datasets(*splits[1], path=data_dir)
-        configs = [LoadedSplit(left, right, *splits)]
-        if experiment != EXPERIMENT_ACROSS_ARCH:
-            configs += [LoadedSplit(right, left, *reversed(splits))]
+    if isinstance(splits[0], tuple):
+        configs = []
+        for left_key, right_key in splits:
+            left = milannotations.load(left_key, path=data_dir)
+            right = milannotations.load(right_key, path=data_dir)
+            config = LoadedSplit(left, right, left_key, right_key)
+            configs.append(config)
+            if experiment != EXPERIMENT_ACROSS_ARCH:
+                config = LoadedSplit(right, left, right_key, left_key)
+                configs.append(config)
     else:
         assert experiment == EXPERIMENT_WITHIN_NETWORK
-        assert len(splits) == 1
-        names, = splits
         configs = []
-        for name in names:
-            dataset = zoo.datasets(name, path=data_dir)
+        for name in splits:
+            assert isinstance(name, str), name
+            dataset = milannotations.load(name, path=data_dir)
             splits_file = results_dir / f'{name.replace("/", "_")}-splits.pth'
             if splits_file.exists():
                 print(f'loading {name} w/i-network splits from {splits_file}')
@@ -163,7 +190,7 @@ for experiment in args.experiments or EXPERIMENTS.keys():
                     }, splits_file)
             configs.append(LoadedSplit(*split, (name,), (name,)))
 
-    # For every train/test set, train the captioner, test it, and log.
+    # For every train/test set, train the decoder, test it, and log.
     for split_id, (train, test, train_keys, test_keys) in enumerate(configs):
         assert isinstance(train, data.Dataset)
         assert isinstance(test, data.Dataset)
@@ -189,7 +216,7 @@ for experiment in args.experiments or EXPERIMENTS.keys():
                 lm.save(lm_file)
 
             # Train the decoder.
-            decoder_file = results_dir / f'{trial_key}-captioner.pth'
+            decoder_file = results_dir / f'{trial_key}-decoder.pth'
             if decoder_file.exists():
                 print(f'loading decoder from {decoder_file}')
                 decoder = milan.Decoder.load(decoder_file, map_location=device)

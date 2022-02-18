@@ -1,17 +1,11 @@
-"""Zoo configs for latent vocabulary models.
+"""Defines the hub for MILANNOTATIONS data."""
+from typing import Any
 
-This module contains configs for all models trained on latent vocabulary data.
-If you're looking for the original models--whose neurons we've annotated as
-part of this project--you are at the wrong zoo. You want to look at the configs
-in lv/dissection/zoo.py instead.
-"""
-import src.datasets
-import src.milan
-from src.zoo import core
+from src.milannotations import datasets
+from src.utils import hubs
 
 import easydict
-
-HOST = 'https://unitname.csail.mit.edu'
+import torch.utils.data
 
 KEYS = easydict.EasyDict()
 KEYS.ALEXNET = 'alexnet'
@@ -82,15 +76,13 @@ KEYS.SQUEEZENET1_0_IMAGENET_BLURRED = (f'{KEYS.SQUEEZENET1_0}/'
 
 KEYS.GENERATORS = 'gen'
 KEYS.CLASSIFIERS = 'cls'
-KEYS.ALL = 'all'
+KEYS.BASE = 'base'
 KEYS.NOT_ALEXNET_IMAGENET = f'not-{KEYS.ALEXNET}-{KEYS.IMAGENET}'
 KEYS.NOT_ALEXNET_PLACES365 = f'not-{KEYS.ALEXNET}-{KEYS.PLACES365}'
 KEYS.NOT_RESNET152_IMAGENET = f'not-{KEYS.RESNET152}-{KEYS.IMAGENET}'
 KEYS.NOT_RESNET152_PLACES365 = f'not-{KEYS.RESNET152}-{KEYS.PLACES365}'
 KEYS.NOT_BIGGAN_IMAGENET = f'not-{KEYS.BIGGAN}-{KEYS.IMAGENET}'
 KEYS.NOT_BIGGAN_PLACES365 = f'not-{KEYS.BIGGAN}-{KEYS.PLACES365}'
-
-KEYS.CAPTIONER_RESNET101 = 'captioner-resnet101'
 
 # We can group the datasets of neuron annotations in a bunch of interesting
 # ways. Here are the most common, used throughout the project. To load a
@@ -99,7 +91,7 @@ KEYS.CAPTIONER_RESNET101 = 'captioner-resnet101'
 # >>> group = lv.zoo.DATASET_GROUPS['gen']
 # >>> dataset = lv.zoo.datasets(*group)
 DATASET_GROUPINGS = {
-    KEYS.ALL: (
+    KEYS.BASE: (
         KEYS.ALEXNET_IMAGENET,
         KEYS.ALEXNET_PLACES365,
         KEYS.RESNET152_IMAGENET,
@@ -184,22 +176,7 @@ DATASET_GROUPINGS = {
 }
 
 
-def models() -> core.ModelConfigs:
-    """Return all model configs."""
-    return {
-        KEYS.CAPTIONER_RESNET101: {
-            dataset: core.ModelConfig(
-                src.milan.Decoder.load,
-                url=f'{HOST}/models/captioner-resnet101-'
-                f'{dataset.replace("/", "_")}.pth',
-                requires_path=True,
-                load_weights=False,
-            ) for dataset in DATASET_GROUPINGS.keys()
-        },
-    }
-
-
-def datasets() -> core.DatasetConfigs:
+def hub() -> hubs.DatasetHub:
     """Return all dataset configs."""
     configs = {}
 
@@ -208,20 +185,20 @@ def datasets() -> core.DatasetConfigs:
                 KEYS.BIGGAN_IMAGENET, KEYS.BIGGAN_PLACES365,
                 KEYS.DINO_VITS8_IMAGENET, KEYS.RESNET152_IMAGENET,
                 KEYS.RESNET152_PLACES365):
-        configs[key] = core.DatasetConfig(
-            src.datasets.AnnotatedTopImagesDataset,
-            url=f'{HOST}/data/{key.replace("/", "-")}.zip',
+        configs[key] = hubs.DatasetConfig(
+            datasets.AnnotatedTopImagesDataset,
+            url=f'{hubs.HOST}/data/{key.replace("/", "-")}.zip',
             annotation_count=3)
 
     # Extra configs for models that have blurred-imagenet versopns.
     for model in (KEYS.ALEXNET, KEYS.RESNET152):
         key = KEYS[f'{model.upper()}_IMAGENET_BLURRED']
-        configs[key] = core.DatasetConfig(src.datasets.TopImagesDataset)
+        configs[key] = hubs.DatasetConfig(datasets.TopImagesDataset)
 
     # Extra configs for models that have places365 versions.
     for model in (KEYS.RESNET18,):
         key = KEYS[f'{model.upper()}_PLACES365']
-        configs[key] = core.DatasetConfig(src.datasets.TopImagesDataset)
+        configs[key] = hubs.DatasetConfig(datasets.TopImagesDataset)
 
     # Configs for all other models that have both imagenet/blurred-imagenet
     # versions available.
@@ -231,6 +208,32 @@ def datasets() -> core.DatasetConfigs:
                   KEYS.VGG13, KEYS.VGG16, KEYS.VGG19):
         for dataset in (KEYS.IMAGENET, KEYS.IMAGENET_BLURRED):
             key = KEYS[f'{model.upper()}_{dataset.upper().replace("-", "_")}']
-            configs[key] = core.DatasetConfig(src.datasets.TopImagesDataset)
+            configs[key] = hubs.DatasetConfig(datasets.TopImagesDataset)
 
-    return configs
+    return hubs.DatasetHub(**configs)
+
+
+def load(name: str = 'all', **kwargs: Any) -> torch.utils.data.Dataset:
+    """Load some or all of MILANNOTATIONS.
+
+    Args:
+        name (str): Name of specific model to load top images and/or
+            annotations for, or name of a group of models
+            (see DATASET_GROUPINGS) to load. Defaults to all annotated models
+            used for training MILAN.
+
+    Returns:
+        torch.utils.data.Dataset: The loaded dataset.
+
+    """
+    if name in DATASET_GROUPINGS:
+        dataset = hub().load_all(*DATASET_GROUPINGS[name], **kwargs)
+    elif name in KEYS:
+        dataset = hub().load(name, **kwargs)
+        assert isinstance(
+            dataset,
+            (datasets.TopImagesDataset, datasets.AnnotatedTopImagesDataset),
+        ), dataset
+    else:
+        raise KeyError(f'unknown milannotations set: {name}')
+    return dataset

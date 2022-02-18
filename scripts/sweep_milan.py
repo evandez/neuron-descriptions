@@ -4,7 +4,7 @@ import pathlib
 import shutil
 from typing import Any, Dict
 
-from src import milan, zoo
+from src import milan, milannotations
 from src.deps.ext import bert_score
 from src.utils import env, training, viz
 
@@ -27,12 +27,12 @@ SWEEPS = (
 )
 
 DATASETS = (
-    zoo.KEYS.ALEXNET_IMAGENET,
-    zoo.KEYS.ALEXNET_PLACES365,
-    zoo.KEYS.RESNET152_IMAGENET,
-    zoo.KEYS.RESNET152_PLACES365,
-    zoo.KEYS.BIGGAN_IMAGENET,
-    zoo.KEYS.BIGGAN_PLACES365,
+    milannotations.KEYS.ALEXNET_IMAGENET,
+    milannotations.KEYS.ALEXNET_PLACES365,
+    milannotations.KEYS.RESNET152_IMAGENET,
+    milannotations.KEYS.RESNET152_PLACES365,
+    milannotations.KEYS.BIGGAN_IMAGENET,
+    milannotations.KEYS.BIGGAN_PLACES365,
 )
 
 ENCODER_RESNET18 = 'resnet18'
@@ -49,16 +49,14 @@ SCORES = (
     SCORE_BERT_SCORE,
 )
 
-parser = argparse.ArgumentParser(
-    description='sweep over captioner hyperparams')
+parser = argparse.ArgumentParser(description='sweep over milan hyperparams')
 parser.add_argument('--sweeps',
                     default=SWEEPS,
                     nargs='+',
                     help='sweeps to run (default: all)')
-parser.add_argument('--datasets',
-                    default=DATASETS,
-                    nargs='+',
-                    help='datasets to train/test on (default: all)')
+parser.add_argument('--dataset',
+                    default=milannotations.KEYS.BASE,
+                    help='milannotations to train/test on (default: base)')
 parser.add_argument('--encoder',
                     choices=ENCODERS,
                     default=ENCODER_RESNET101,
@@ -69,8 +67,8 @@ parser.add_argument('--scores',
                     help='scores to compute (default: all)')
 parser.add_argument('--pretrained',
                     type=pathlib.Path,
-                    help='path to results dir from run_captioner_training.py; '
-                    'if set, use this captioner and its train/val splits')
+                    help='path to results dir from run_milan_training.py; '
+                    'if set, use this milan and its train/val splits')
 parser.add_argument(
     '--hold-out',
     type=float,
@@ -108,11 +106,10 @@ parser.add_argument(
 parser.add_argument('--data-dir',
                     type=pathlib.Path,
                     help='root dir for datasets (default: project data dir)')
-parser.add_argument(
-    '--results-dir',
-    type=pathlib.Path,
-    help='directory to write intermediate and final results '
-    '(default: <project results dir>/captioner-<encoder>-sweep)')
+parser.add_argument('--results-dir',
+                    type=pathlib.Path,
+                    help='directory to write intermediate and final results '
+                    '(default: <project results dir>/milan-<encoder>-sweep)')
 parser.add_argument('--clear-results-dir',
                     action='store_true',
                     help='if set, clear results dir (default: do not)')
@@ -120,10 +117,10 @@ parser.add_argument('--wandb-project',
                     default='lv',
                     help='wandb project name (default: lv)')
 parser.add_argument('--wandb-name',
-                    help='wandb run name (default: captioner-<encoder>-sweep)')
+                    help='wandb run name (default: milan-<encoder>-sweep)')
 parser.add_argument('--wandb-group',
-                    default='captioner',
-                    help='wandb group name (default: captioner)')
+                    default='milan',
+                    help='wandb group name (default: milan)')
 parser.add_argument(
     '--wandb-n-samples',
     type=int,
@@ -133,7 +130,7 @@ parser.add_argument('--device', help='manually set device (default: guessed)')
 args = parser.parse_args()
 
 config = args.encoder
-key = f'captioner-{config}-sweep'
+key = f'milan-{config}-sweep'
 wandb.init(project=args.wandb_project,
            name=args.wandb_name or key,
            group=args.wandb_group)
@@ -149,7 +146,7 @@ if args.clear_results_dir and results_dir.exists():
     shutil.rmtree(results_dir)
 results_dir.mkdir(exist_ok=True, parents=True)
 
-# Import pretrained captioner if necessary.
+# Import pretrained milan if necessary.
 if args.pretrained:
     for child in args.pretrained.iterdir():
         shutil.copy(child, results_dir)
@@ -163,7 +160,7 @@ if SCORE_BERT_SCORE in args.scores:
                                         use_fast_tokenizer=True,
                                         device=device)
 
-dataset = zoo.datasets(*args.datasets)
+dataset = milannotations.load(args.dataset, path=data_dir)
 
 splits_file = results_dir / 'splits.pth'
 if splits_file.exists():
@@ -186,10 +183,10 @@ elif {SWEEP_GREEDY_MI, SWEEP_BEAM_MI} & set(args.sweeps):
     print(f'saving lm to {lm_file}')
     lm.save(lm_file)
 
-captioner_file = results_dir / 'captioner.pth'
-if captioner_file.is_file() and splits_file.is_file():
-    print(f'loading cached captioner from {captioner_file}')
-    decoder = milan.Decoder.load(captioner_file, map_location=device).eval()
+decoder_file = results_dir / 'decoder.pth'
+if decoder_file.is_file() and splits_file.is_file():
+    print(f'loading cached decoder from {decoder_file}')
+    decoder = milan.Decoder.load(decoder_file, map_location=device).eval()
     encoder = decoder.encoder
 else:
     encoder = milan.encoder(config=config).to(device)
@@ -206,8 +203,8 @@ else:
                 display_progress_as='train decoder',
                 device=device)
 
-    print(f'saving captioner to {captioner_file}')
-    decoder.save(captioner_file)
+    print(f'saving decoder to {decoder_file}')
+    decoder.save(decoder_file)
 
 test_features = None
 if args.precompute_features:
@@ -217,14 +214,14 @@ if args.precompute_features:
 
 
 def evaluate(**kwargs: Any) -> None:
-    """Evaluate the captioner with the given args."""
+    """Evaluate the milan with the given args."""
     assert isinstance(decoder, milan.Decoder)
     metadata = viz.kwargs_to_str(**kwargs)
     predictions = decoder.predict(
         test,
         features=test_features,
         device=device,
-        display_progress_as=f'({metadata}) predict captions',
+        display_progress_as=f'({metadata}) predict descriptions',
         **kwargs)
 
     log: Dict[str, Any] = {'condition': kwargs}

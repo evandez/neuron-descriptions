@@ -3,7 +3,7 @@ import argparse
 import pathlib
 from typing import Sequence
 
-from src import datasets, zoo
+from src import milannotations
 from src.mturk import hits
 from src.utils.typing import Layer
 
@@ -29,10 +29,10 @@ parser.add_argument('--no-display-progress',
                     help='do not show progress bar')
 args = parser.parse_args()
 
-dataset = zoo.dataset(args.dataset,
-                      path=args.dataset_path,
-                      display_progress=not args.no_display_progress)
-if not isinstance(dataset, datasets.TopImagesDataset):
+dataset = milannotations.load(args.dataset,
+                              path=args.dataset_path,
+                              display_progress=not args.no_display_progress)
+if not isinstance(dataset, milannotations.TopImagesDataset):
     raise ValueError(f'bad dataset type: {type(dataset).__name__}')
 
 base_url = f'{args.host_url.strip("/")}/{args.dataset}'

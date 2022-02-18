@@ -5,3 +5,4 @@ from src.milan.decoders import Decoder, decoder
 from src.milan.encoders import (Encoder, PyramidConvEncoder,
                                 SpatialConvEncoder, encoder)
 from src.milan.lms import LanguageModel, lm
+from src.milan.loaders import pretrained

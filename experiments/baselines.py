@@ -6,7 +6,7 @@ import pathlib
 import re
 import shutil
 
-from src import datasets, milan, zoo
+from src import milan, milannotations
 from src.deps.ext import bert_score
 from src.utils import env, metrics
 from src.utils.typing import StrSequence
@@ -23,10 +23,10 @@ ALEXNET_IMAGENET_REMAP = {
 }
 
 EXPERIMENTS = (
-    zoo.KEYS.ALEXNET_IMAGENET,
-    zoo.KEYS.ALEXNET_PLACES365,
-    zoo.KEYS.RESNET152_IMAGENET,
-    zoo.KEYS.RESNET152_PLACES365,
+    milannotations.KEYS.ALEXNET_IMAGENET,
+    milannotations.KEYS.ALEXNET_PLACES365,
+    milannotations.KEYS.RESNET152_IMAGENET,
+    milannotations.KEYS.RESNET152_PLACES365,
 )
 
 METHOD_NETDISSECT = 'netdissect'
@@ -40,7 +40,7 @@ METHODS = (
     METHOD_PMI,
 )
 
-parser = argparse.ArgumentParser(description='run captioner baselines')
+parser = argparse.ArgumentParser(description='run baselines')
 parser.add_argument('--experiments',
                     nargs='+',
                     choices=EXPERIMENTS,
@@ -73,14 +73,14 @@ parser.add_argument('--clear-results-dir',
                     action='store_true',
                     help='if set, clear results dir (default: do not)')
 parser.add_argument('--wandb-project',
-                    default='lv',
-                    help='wandb project name (default: lv)')
+                    default='milan',
+                    help='wandb project name (default: milan)')
 parser.add_argument('--wandb-name',
-                    default='captioner-generalization',
-                    help='wandb run name (default: captioner-generalization)')
+                    default='baselines',
+                    help='wandb run name (default: baselines)')
 parser.add_argument('--wandb-group',
-                    default='captioner',
-                    help='wandb group name (default: captioner)')
+                    default='experiments',
+                    help='wandb group name (default: experiments)')
 parser.add_argument('--device', help='manually set device (default: guessed)')
 args = parser.parse_args()
 
@@ -91,7 +91,7 @@ wandb.init(project=args.wandb_project,
 
 device = args.device or 'cuda' if cuda.is_available() else 'cpu'
 
-results_dir = args.results_dir or (env.results_dir() / 'captioner-baselines')
+results_dir = args.results_dir or (env.results_dir() / 'baselines')
 if args.clear_results_dir and results_dir.exists():
     shutil.rmtree(results_dir)
 results_dir.mkdir(exist_ok=True, parents=True)
@@ -113,14 +113,14 @@ bert_scorer = bert_score.BERTScorer(lang='en',
 for experiment in args.experiments:
     experiment_key = experiment.replace('/', '-')
 
-    test = zoo.dataset(experiment)
-    assert isinstance(test, datasets.AnnotatedTopImagesDataset)
+    test = milannotations.load(experiment)
+    assert isinstance(test, milannotations.AnnotatedTopImagesDataset)
 
     for method in args.methods:
         train = None
         if method in {METHOD_NO_PMI, METHOD_PMI}:
             train_group_key = f'not-{experiment_key}'
-            train = zoo.datasets(*zoo.DATASET_GROUPINGS[train_group_key])
+            train = milannotations.load(train_group_key)
 
         trials = args.trials if method in {METHOD_PMI, METHOD_NO_PMI} else 1
         for trial in range(trials):
@@ -156,7 +156,7 @@ for experiment in args.experiments:
                 results_by_layer_unit = {}
                 for layer in test.layers:
                     layer_key = layer
-                    if experiment == zoo.KEYS.ALEXNET_IMAGENET:
+                    if experiment == milannotations.KEYS.ALEXNET_IMAGENET:
                         layer_key = ALEXNET_IMAGENET_REMAP[str(layer)]
                     results_file = (compexp_results_dir / model_subdir /
                                     f'tally_{layer_key}.csv')
@@ -187,14 +187,14 @@ for experiment in args.experiments:
                 assert method in {METHOD_NO_PMI, METHOD_PMI}
                 assert train is not None
 
-                captioner_key = f'{experiment_key}-trial{trial}'
-                captioner_file = results_dir / f'{captioner_key}-captioner.pth'
-                if captioner_file.exists():
-                    print(f'loading captioner from {captioner_file}')
-                    decoder = milan.Decoder.load(captioner_file,
+                milan_key = f'{experiment_key}-trial{trial}'
+                milan_file = results_dir / f'{milan_key}-captioner.pth'
+                if milan_file.exists():
+                    print(f'loading decoder from {milan_file}')
+                    decoder = milan.Decoder.load(milan_file,
                                                  map_location=device)
                 else:
-                    lm_file = results_dir / f'{captioner_key}-lm.pth'
+                    lm_file = results_dir / f'{milan_key}-lm.pth'
                     if lm_file.exists():
                         print(f'loading lm from {lm_file}')
                         lm = milan.LanguageModel.load(lm_file,
@@ -214,8 +214,8 @@ for experiment in args.experiments:
                     decoder = milan.decoder(train, encoder, lm=lm)
                     decoder.fit(train, features=train_features, device=device)
 
-                    print(f'saving decoder to {captioner_file}')
-                    decoder.save(captioner_file)
+                    print(f'saving decoder to {milan_file}')
+                    decoder.save(milan_file)
 
                 decoder.eval()
                 predictions = decoder.predict(
@@ -227,13 +227,13 @@ for experiment in args.experiments:
                     device=device)
 
             # Save the predictions.
-            outputs = [('layer', 'unit', 'caption')]
+            outputs = [('layer', 'unit', 'description')]
             for index in range(len(test)):
                 sample = test[index]
                 output = (sample.layer, str(sample.unit), predictions[index])
                 outputs.append(output)
             trial_key = f'{experiment_key}-{method}-{trial}'
-            captions_file = results_dir / f'{trial_key}-captions.csv'
+            captions_file = results_dir / f'{trial_key}-descriptions.csv'
             with captions_file.open('w') as handle:
                 csv.writer(handle).writerows(outputs)
 

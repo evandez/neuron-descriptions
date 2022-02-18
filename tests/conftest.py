@@ -3,7 +3,7 @@ import csv
 import pathlib
 import tempfile
 
-from src import datasets
+from src.milannotations import datasets
 
 import numpy
 import pytest

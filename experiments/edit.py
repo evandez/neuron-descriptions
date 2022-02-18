@@ -5,10 +5,8 @@ import pathlib
 import random
 import shutil
 
-import src.zoo
-from src import datasets, milan
+from src import exemplars, milan, milannotations
 from src.deps.netdissect import renormalize
-from src.exemplars import compute, zoo
 from src.utils import env, training, viz
 from src.utils.typing import StrSequence
 
@@ -18,8 +16,8 @@ from torch import cuda
 from tqdm.auto import tqdm
 
 EXPERIMENTS = (
-    zoo.KEYS.IMAGENET_SPURIOUS_TEXT,
-    zoo.KEYS.IMAGENET_SPURIOUS_COLOR,
+    exemplars.datasets.KEYS.IMAGENET_SPURIOUS_TEXT,
+    exemplars.datasets.KEYS.IMAGENET_SPURIOUS_COLOR,
 )
 
 VERSION_ORIGINAL = 'original'
@@ -44,7 +42,7 @@ parser = argparse.ArgumentParser(
     description='certify a cnn trained on bad data')
 parser.add_argument('--experiments',
                     choices=EXPERIMENTS,
-                    default=(zoo.KEYS.IMAGENET_SPURIOUS_TEXT,),
+                    default=(exemplars.datasets.KEYS.IMAGENET_SPURIOUS_TEXT,),
                     nargs='+',
                     help='dataset to experiment with (default: all)')
 parser.add_argument('--versions',
@@ -59,14 +57,12 @@ parser.add_argument('--conditions',
                     help='condition(s) to test under (default: all)')
 parser.add_argument(
     '--cnn',
-    choices=(src.zoo.KEYS.ALEXNET, zoo.KEYS.RESNET18),
-    default=zoo.KEYS.RESNET18,
+    choices=(exemplars.models.KEYS.ALEXNET, exemplars.models.KEYS.RESNET18),
+    default=exemplars.models.KEYS.RESNET18,
     help='cnn architecture to train and certify (default: resnet18)')
-parser.add_argument('--captioner',
-                    nargs=2,
-                    default=(src.zoo.KEYS.CAPTIONER_RESNET101,
-                             src.zoo.KEYS.ALL),
-                    help='captioner model (default: captioner-resnet101 all)')
+parser.add_argument('--milan',
+                    default='milan',
+                    help='milan config (default: base)')
 parser.add_argument(
     '--n-random-trials',
     type=int,
@@ -79,9 +75,9 @@ parser.add_argument('--fine-tune',
 parser.add_argument('--no-mi',
                     action='store_true',
                     help='run the certification, but dont use MI decoding')
-parser.add_argument('--captioner-file',
+parser.add_argument('--milan-file',
                     type=pathlib.Path,
-                    help='captioner weights file (default: loaded from zoo)')
+                    help='milan weights file (default: default pretrained)')
 parser.add_argument('--data-dir',
                     type=pathlib.Path,
                     help='root dir for datasets (default: project data dir)')
@@ -127,12 +123,12 @@ parser.add_argument('--ablation-step-size',
                     help='add\'l neurons to ablate at each step (default: 1)')
 parser.add_argument('--device', help='manually set device (default: guessed)')
 parser.add_argument('--wandb-project',
-                    default='lv',
-                    help='wandb project name (default: lv)')
+                    default='milan',
+                    help='wandb project name (default: milan)')
 parser.add_argument('--wandb-name', help='wandb run name (default: generated)')
 parser.add_argument('--wandb-group',
-                    default='applications',
-                    help='wandb group name (default: applications)')
+                    default='experiments',
+                    help='wandb group name (default: experiments)')
 parser.add_argument('--wandb-n-samples',
                     type=int,
                     default=25,
@@ -140,10 +136,10 @@ parser.add_argument('--wandb-n-samples',
 args = parser.parse_args()
 
 wandb.init(project=args.wandb_project,
-           name=args.wandb_name or 'cnn-cert',
+           name=args.wandb_name or 'edit',
            group=args.wandb_group,
            config={
-               'captioner': '/'.join(args.captioner),
+               'milan': args.milan,
                'cnn': args.cnn,
                'n_random_trials': args.n_random_trials,
                'fine_tune': bool(args.fine_tune),
@@ -156,32 +152,28 @@ data_dir = args.data_dir or env.data_dir()
 
 results_dir = args.results_dir
 if results_dir is None:
-    results_dir = env.results_dir() / 'cnn-cert'
+    results_dir = env.results_dir() / 'edit'
 
 if args.clear_results_dir and results_dir.exists():
     shutil.rmtree(results_dir)
 results_dir.mkdir(exist_ok=True, parents=True)
 
-# Load the captioner.
-captioner_model, captioner_dataset = args.captioner
-decoder, _ = src.zoo.model(captioner_model,
-                           captioner_dataset,
-                           path=args.captioner_file,
-                           map_location=device)
+# Load MILAN.
+decoder = milan.pretrained(args.milan,
+                           map_location=device,
+                           path=args.milan_file)
 encoder = decoder.encoder
-assert isinstance(decoder, milan.Decoder)
-assert isinstance(encoder, milan.Encoder)
 
-# Now that we have the captioner, we can start the experiments.
+# Now that we have MILAN, we can start the experiments.
 for experiment in args.experiments:
     experiment_dir = results_dir / experiment
     experiment_dir.mkdir(exist_ok=True, parents=True)
 
     target_words: StrSequence
-    if experiment == zoo.KEYS.IMAGENET_SPURIOUS_TEXT:
+    if experiment == exemplars.datasets.KEYS.IMAGENET_SPURIOUS_TEXT:
         target_words = ('word', 'text', 'letter')
     else:
-        assert experiment == zoo.KEYS.IMAGENET_SPURIOUS_COLOR
+        assert experiment == exemplars.datasets.KEYS.IMAGENET_SPURIOUS_COLOR
         target_words = ('red', 'yellow', 'green', 'blue', 'cyan', 'purple',
                         'brown', 'black', 'white', 'gray')
 
@@ -189,12 +181,16 @@ for experiment in args.experiments:
         print(f'\n-------- BEGIN EXPERIMENT: {experiment}/{version} --------')
 
         # Start by training the classifier on spurious data.
-        dataset = zoo.dataset(experiment,
-                              factory=training.PreloadedImageFolder,
-                              path=data_dir / experiment / version / 'train')
-        test = zoo.dataset(experiment,
-                           factory=training.PreloadedImageFolder,
-                           path=data_dir / experiment / version / 'test')
+        dataset = exemplars.datasets.load(
+            experiment,
+            factory=training.PreloadedImageFolder,
+            path=data_dir / experiment / version / 'train',
+        )
+        test = exemplars.datasets.load(
+            experiment,
+            factory=training.PreloadedImageFolder,
+            path=data_dir / experiment / version / 'test',
+        )
 
         # Sample a small validation set for early stopping, etc.
         splits_file = experiment_dir / 'splits.pth'
@@ -210,9 +206,10 @@ for experiment in args.experiments:
                 'val': val.indices
             }, splits_file)
 
-        cnn, layers, _ = zoo.model(args.cnn,
-                                   zoo.KEYS.IMAGENET,
-                                   pretrained=False)
+        cnn, layers, _ = exemplars.models.load(
+            f'{args.cnn}/{exemplars.datasets.KEYS.IMAGENET}',
+            pretrained=False,
+        )
         cnn = milan.classifier(cnn).to(device)
 
         cnn_file = experiment_dir / f'{args.cnn}-{version}.pth'
@@ -238,7 +235,7 @@ for experiment in args.experiments:
         dissection_dir = experiment_dir / f'{args.cnn}-{version}'
         for layer in layers:
             print(f'dissecting: {layer}')
-            compute.discriminative(
+            exemplars.discriminative(
                 cnn.model,
                 val,
                 layer=layer,
@@ -252,30 +249,30 @@ for experiment in args.experiments:
                 renormalizer=renormalize.renormalizer(source='imagenet',
                                                       target='byte'),
             )
-        dissected = datasets.TopImagesDataset(dissection_dir)
+        dissected = milannotations.TopImagesDataset(dissection_dir)
 
-        captions_file = experiment_dir / f'{args.cnn}-{version}-captions.txt'
-        if captions_file.exists():
-            print(f'loading cached captions from {captions_file}')
-            with captions_file.open('r') as handle:
-                captions = handle.read().split('\n')
-            assert len(captions) == len(dissected)
+        descriptions_file = experiment_dir / f'{args.cnn}-{version}-descs.txt'
+        if descriptions_file.exists():
+            print(f'loading cached descriptions from {descriptions_file}')
+            with descriptions_file.open('r') as handle:
+                descriptions = handle.read().split('\n')
+            assert len(descriptions) == len(dissected)
         else:
-            captions = decoder.predict(
+            descriptions = decoder.predict(
                 dissected,
                 strategy='beam' if args.no_mi else 'rerank',
                 mi=False if args.no_mi else None,
                 temperature=.2,
                 beam_size=50,
                 device=device)
-            print(f'saving captions to {captions_file}')
-            with captions_file.open('w') as handle:
-                handle.write('\n'.join(captions))
+            print(f'saving descriptions to {descriptions_file}')
+            with descriptions_file.open('w') as handle:
+                handle.write('\n'.join(descriptions))
 
         # Find candidate spurious neurons, and write them to disk.
         candidate_indices = [
-            index for index, caption in enumerate(captions)
-            if any(word in caption.lower() for word in target_words)
+            index for index, description in enumerate(descriptions)
+            if any(word in description.lower() for word in target_words)
         ]
         candidates_file = experiment_dir / f'{args.cnn}-{version}-units.txt'
         print(f'found {len(candidate_indices)} candidate units; '
@@ -343,7 +340,8 @@ for experiment in args.experiments:
                             patience=args.patience,
                             optimizer_kwargs={'lr': args.lr},
                             ablate=dissected.units(ablated_indices),
-                            layers=['fc'] if args.cnn == zoo.KEYS.RESNET18 else
+                            layers=['fc']
+                            if args.cnn == exemplars.models.KEYS.RESNET18 else
                             ['fc6', 'fc7', 'linear8'],
                             num_workers=0,
                             device=device,
@@ -361,7 +359,7 @@ for experiment in args.experiments:
                         )
                     samples = viz.random_neuron_wandb_images(
                         dissected,
-                        captions,
+                        descriptions,
                         indices=ablated_indices,
                         k=args.wandb_n_samples,
                         exp=experiment,

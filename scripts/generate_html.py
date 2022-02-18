@@ -1,22 +1,20 @@
-"""Generate HTML summary of top-images and captions."""
+"""Generate HTML summary of top-images and descriptions."""
 import argparse
 import csv
 import pathlib
 
-import src.datasets
-from src import milan, zoo
+import src.milannotations.datasets
+from src import milan, milannotations
 from src.utils import env, viz
 from src.utils.typing import StrSequence
 
 from torch import cuda
 
-parser = argparse.ArgumentParser(description='generate html page of captions')
-parser.add_argument('captioner',
-                    help='captioner variant (e.g. captioner-resnet101)')
-parser.add_argument('train', help='data captioner was trained on (e.g. all)')
-parser.add_argument(
-    'test',
-    help='dataset or dataset group to caption (e.g. dino_vit8/imagenet)')
+parser = argparse.ArgumentParser(
+    description='generate html page of descriptions')
+parser.add_argument('milan', help='pretrained MILAN config (e.g. all)')
+parser.add_argument('target',
+                    help='target model to describe (e.g. dino_vit8/imagenet)')
 parser.add_argument('--results-dir',
                     type=pathlib.Path,
                     help='where to write html (default: project results dir)')
@@ -34,26 +32,26 @@ device = args.device or 'cuda' if cuda.is_available() else 'cpu'
 base_url = args.base_url.rstrip('/')
 
 # Load model.
-decoder, _ = zoo.model(args.captioner, args.train, map_location=device)
+decoder = milan.pretrained(args.milan, map_location=device)
 assert isinstance(decoder, milan.Decoder)
 
 # Load dataset(s).
-if args.test in zoo.DATASET_GROUPINGS:
+if args.target in milannotations.DATASET_GROUPINGS:
     datasets = {}
-    for key in zoo.DATASET_GROUPINGS[args.test]:
-        dataset = zoo.dataset(key)
+    for key in milannotations.DATASET_GROUPINGS[args.target]:
+        dataset = milannotations.load(key)
         assert isinstance(dataset, (
-            src.datasets.TopImagesDataset,
-            src.datasets.AnnotatedTopImagesDataset,
+            src.milannotations.datasets.TopImagesDataset,
+            src.milannotations.datasets.AnnotatedTopImagesDataset,
         ))
         datasets[key] = dataset
 else:
-    dataset = zoo.dataset(args.test)
+    dataset = milannotations.load(args.target)
     assert isinstance(dataset, (
-        src.datasets.TopImagesDataset,
-        src.datasets.AnnotatedTopImagesDataset,
+        src.milannotations.datasets.TopImagesDataset,
+        src.milannotations.datasets.AnnotatedTopImagesDataset,
     ))
-    datasets = {args.test: dataset}
+    datasets = {args.target: dataset}
 
 # Prepare results dir.
 results_dir = args.results_dir or (env.results_dir() / 'generated-html')
@@ -75,7 +73,7 @@ for key, dataset in datasets.items():
             grid_images=args.grid_images)
 
 # Prepare HTML output directory.
-html_subdir = f'{args.captioner}-{args.train}/{args.test.replace("/", "-")}'
+html_subdir = f'milan-{args.milan}/{args.target.replace("/", "-")}'
 html_dir = results_dir / html_subdir
 html_dir.mkdir(exist_ok=True, parents=True)
 
@@ -89,13 +87,13 @@ for other in datasets.keys() - {key}:
     keys += [other] * len(datasets[other])
     ids += range(len(datasets[other]))
 
-# Run the captioner, or check if we already did.
-captions_file = html_dir / 'captions.csv'
-if captions_file.exists():
-    print(f'loading captions from {captions_file}')
-    with captions_file.open('r') as handle:
+# Run MILAN, or check if we already did.
+descriptions_file = html_dir / 'descriptions.csv'
+if descriptions_file.exists():
+    print(f'loading descriptions from {descriptions_file}')
+    with descriptions_file.open('r') as handle:
         rows = tuple(csv.DictReader(handle))
-    predictions: StrSequence = [row['caption'] for row in rows]
+    predictions: StrSequence = [row['description'] for row in rows]
 else:
     predictions = decoder.predict(dataset,
                                   strategy='rerank',
@@ -104,12 +102,12 @@ else:
                                   device=device)
 
     # Save them for later.
-    outputs = [('layer', 'unit', 'caption')]
-    for index, caption in enumerate(predictions):
+    outputs = [('layer', 'unit', 'description')]
+    for index, description in enumerate(predictions):
         sample = dataset[index]
-        outputs.append((sample.layer, str(sample.unit), caption))
-    print(f'saving captions to {captions_file}')
-    with captions_file.open('w') as handle:
+        outputs.append((sample.layer, str(sample.unit), description))
+    print(f'saving descriptions to {descriptions_file}')
+    with descriptions_file.open('w') as handle:
         csv.writer(handle).writerows(outputs)
 
 # Save the HTML results.

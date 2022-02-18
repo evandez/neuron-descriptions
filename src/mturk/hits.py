@@ -6,7 +6,7 @@ import random
 from typing import Callable, Mapping, Optional, Sequence
 from urllib import request
 
-from src import datasets
+from src.milannotations import datasets
 from src.utils import lang
 from src.utils.typing import Layer, PathLike, StrSequence
 
