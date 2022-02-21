@@ -30,7 +30,9 @@ import easydict
 import torch
 from torch import nn
 
-HOST = f'{hubs.HOST}/exemplars/models'
+# We don't host most of these models, either the NetDissect team does
+# or the torchvision people.
+HOST = 'https://dissect.csail.mit.edu/models'
 
 KEYS = easydict.EasyDict(d=milannotations.KEYS)
 
@@ -157,7 +159,7 @@ def model_hub() -> hubs.ModelHub:
         KEYS.ALEXNET_PLACES365:
             ModelConfig(
                 alexnet.AlexNet,
-                url=f'{HOST}/models/alexnet-places365.pth',
+                url=f'{HOST}/alexnet_places365-6d3c0e75.pth',
                 transform_weights=lambda weights: weights['state_dict'],
                 layers=LAYERS.ALEXNET),
         KEYS.BIGGAN_IMAGENET:
@@ -248,7 +250,7 @@ def model_hub() -> hubs.ModelHub:
                 load_weights=True,
                 layers=LAYERS.RESNET18,
                 transform_weights=lambda weights: weights['state_dict'],
-                url=f'{HOST}/models/resnet18-places365.pth',
+                url=f'{HOST}/resnet18_places365-2f475921.pth',
                 num_classes=365),
         KEYS.RESNET34_IMAGENET:
             ModelConfig(
@@ -295,7 +297,7 @@ def model_hub() -> hubs.ModelHub:
         KEYS.RESNET152_PLACES365:
             ModelConfig(
                 resnet152.OldResNet152,
-                url=f'{HOST}/models/resnet152-places365.pth',
+                url=f'{HOST}/resnet152_places365-f928166e5c.pth',
                 layers=(0, 4, 5, 6, 7),
             ),
         KEYS.SHUFFLENET_V2_X1_0_IMAGENET:

@@ -21,7 +21,7 @@ import torch.utils.data
 import torchvision.datasets
 import torchvision.transforms
 
-HOST = f'{hubs.HOST}/exemplars/data'
+HOST = f'{hubs.HOST}/data'
 
 KEYS = easydict.EasyDict(d=milannotations.KEYS)
 KEYS.IMAGENET_SPURIOUS_TEXT = 'imagenet-spurious-text'
