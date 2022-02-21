@@ -34,14 +34,14 @@ args = parser.parse_args()
 exclude_targets = [re.compile(exclude) for exclude in args.exclude_targets]
 targets = [
     target for target in args.root_dir.iterdir()
-    if target.is_dir() and not any(
-        exclude.match(target.name) for exclude in exclude_targets)
+    if not any(exclude.match(target.name) for exclude in exclude_targets)
 ]
 targets = [
     args.root_dir / target / subtarget
     for target in targets
     for subtarget in target.iterdir()
 ]
+targets = [target for target in targets if target.is_dir()]
 print(f'found {len(targets)} export targets')
 
 exclude_images = [re.compile(exclude) for exclude in args.exclude_images]
