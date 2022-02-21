@@ -31,16 +31,24 @@ parser.add_argument(
     help='do not package dirs matching this regex (default: imagenet, etc.)')
 args = parser.parse_args()
 
+# Apply arg exclusions.
 exclude_targets = [re.compile(exclude) for exclude in args.exclude_targets]
 targets = [
     target for target in args.root_dir.iterdir()
     if not any(exclude.match(target.name) for exclude in exclude_targets)
 ]
+
+# Filter out non-directories.
+targets = [target for target in targets if target.is_dir()]
+
+# Find all subtargets.
 targets = [
     args.root_dir / target / subtarget
     for target in targets
     for subtarget in target.iterdir()
 ]
+
+# Make sure these are also directories.
 targets = [target for target in targets if target.is_dir()]
 print(f'found {len(targets)} export targets')
 
