@@ -31,6 +31,8 @@ parser.add_argument(
     help='do not package dirs matching this regex (default: imagenet, etc.)')
 args = parser.parse_args()
 
+args.out_dir.mkdir(exist_ok=True, parents=True)
+
 # Apply arg exclusions.
 exclude_targets = [re.compile(exclude) for exclude in args.exclude_targets]
 targets = [
