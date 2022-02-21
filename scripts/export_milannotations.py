@@ -24,9 +24,9 @@ parser.add_argument(
     '--exclude-targets',
     nargs='+',
     default=(
-        'imagenet',
-        'imagenet-spurious-*',
-        'places365',
+        r'imagenet',
+        r'imagenet-spurious-*',
+        r'places365',
     ),
     help='do not package dirs matching this regex (default: imagenet, etc.)')
 args = parser.parse_args()
