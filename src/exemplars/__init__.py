@@ -1,16 +1,14 @@
-"""Functions for dissecting vision models.
+"""Tools for computing top-activating images in vision models.
 
-This module contains tools for dissecting arbitrary CNNs.
-Dissection outputs `k` images for each unit in the CNN, corresponding to
+The output of this process is `k` images for each unit, corresponding to
 the `k` samples in a dataset that caused the strongest activation of the unit.
 The activations can be visualized on the images with masks, and these in turn
 are what are annotated by crowdworkers. See NetDissect: Quantifying
 Interpretability of Deep Visual Representations [Bau et al., 2017] for a full
 description of the method.
 
-In addition to defining useful adapters for `third_party/netdissect`, this
-module provides wrappers for many well known vision models and datasets
-so that they can be plugged directly into dissection.
+The models to compute exemplars for are configured in `models.py`, and the
+datasets containing candidate exemplars are configured in `datasets.py`.
 """
 # flake8: noqa
 from src.exemplars import datasets, models

@@ -1,4 +1,12 @@
-"""Dataset configs for computing exemplars."""
+"""Dataset configs for computing exemplars.
+
+The main function here is `dataset_hub`, which returns a mapping from dataset
+name to a config specifying how to load it. The most important thing to know
+is that the config takes a factory function for the dataset and arbitrary
+kwargs to pass that factory. If a download URL is not specified, it expects
+the dataset to live at $MILAN_DATA_DIR/dataset_name by default. See
+`src/utils/hubs.py` for all the different options the configs support.
+"""
 import pathlib
 from typing import Any
 

@@ -1,4 +1,4 @@
-"""Module for interacting with MILANNOTATIONS."""
+"""Tools for downloading and interacting with MILANNOTATIONS."""
 # flake8: noqa
 from src.milannotations.datasets import (AnnotatedTopImages,
                                          AnnotatedTopImagesDataset,

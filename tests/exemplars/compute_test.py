@@ -1,4 +1,4 @@
-"""Unit tests for the lv/dissection/dissect module."""
+"""Unit tests for the `src.exemplars.compute` module."""
 import collections
 import csv
 import math
@@ -27,7 +27,7 @@ def test_run_bad_inputs(dataset, kwargs, error_pattern):
 
 
 def assert_results_dir_populated(results_dir, layer=None, units=None):
-    """Assert the results_dir contains dissection results."""
+    """Assert the results_dir contains exemplars."""
     if layer is not None:
         results_dir = results_dir / layer
     assert results_dir.is_dir()
@@ -148,7 +148,7 @@ def masks_cache_file(results_dir):
 
 @pytest.fixture
 def model():
-    """Return a fake torch model to dissect."""
+    """Return a fake torch model to compute exemplars for."""
     layers = [(
         'conv_1',
         nn.Conv2d(3, conftest.N_UNITS_PER_LAYER, 4, padding=2),

@@ -1,1 +1,1 @@
-"""Core first-party code for interacting with the latent vocabulary."""
+"""Core first-party code for downloading and using MILAN/MILANNOTATIONS."""

@@ -1,1 +1,1 @@
-"""Unit tests for lv/models submodule."""
+"""Unit tests for `src.models` submodule."""

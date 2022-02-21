@@ -1,4 +1,4 @@
-"""Defines the hub for MILANNOTATIONS data."""
+"""Tools for loading prepackaged MILANNOTATIONS data."""
 from typing import Any
 
 from src.milannotations import datasets

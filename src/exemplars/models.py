@@ -1,4 +1,19 @@
-"""Model and dataset configs for computing exemplars."""
+"""Configs describing how to compute exemplars for each model.
+
+The most important function here is `model_hub`, which returns a mapping
+from model name (formatted as <model architecture>/<training dataset>)
+to a special config object. The config object is described more in
+`src/utils/hubs.py`, but the most important thing to know is it takes
+an arbitrary factory function for the model and, optionally, will look
+for pretrained weights at $MILAN_MODELS_DIR/model_name.pth if
+load_weights=True (though this path can be overwritten at runtime).
+
+Additionally, the configs allow you to specify the *layers* to compute
+exemplars for (by default, all of them). These must be a fully specified
+path to the torch submodule, as they will be read using PyTorch hooks. To
+see the full list of possible layers for your model, look at
+`your_model.named_parameters()`.
+"""
 import dataclasses
 from typing import Any, Mapping, Optional, Sequence, Tuple
 

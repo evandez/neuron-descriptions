@@ -1,1 +1,1 @@
-"""Unit tests for lv/mturk module."""
+"""Unit tests for `src.mturk` module."""

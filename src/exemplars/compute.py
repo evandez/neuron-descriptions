@@ -1,4 +1,10 @@
-"""Functions for dissecting convolutional units in vision models."""
+"""Functions for computing top-activating images in vision models.
+
+Callers should generally only use `discriminative` or `generative`, depending
+on what type of model you are computing exemplars for. If you're feeling
+edgy, you can instead call `compute` directly, which only requires you
+pass an arbitrary function that computes activations given images.
+"""
 import pathlib
 import shutil
 from typing import Any, Callable, Optional, Sequence, Tuple

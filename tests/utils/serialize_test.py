@@ -1,4 +1,4 @@
-"""Unit tests for `lv/utils/serialize` module."""
+"""Unit tests for `src.utils.serialize` module."""
 import dataclasses
 import pathlib
 import tempfile

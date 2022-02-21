@@ -1,4 +1,4 @@
-"""Unit tests for lv/zoo/core module."""
+"""Unit tests for `src.utils.hubs` module."""
 import collections
 import pathlib
 import tempfile

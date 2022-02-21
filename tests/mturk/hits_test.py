@@ -1,4 +1,4 @@
-"""Unit tests for the vocabulary/mturk/hits module."""
+"""Unit tests for the `src.mturk.hits` module."""
 import csv
 import pathlib
 import tempfile

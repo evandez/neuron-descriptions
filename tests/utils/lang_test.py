@@ -1,4 +1,4 @@
-"""Unit tests for lv/utils/lang module."""
+"""Unit tests for `src.utils.lang` module."""
 import collections
 import itertools
 

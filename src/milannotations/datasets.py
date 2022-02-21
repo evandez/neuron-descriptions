@@ -1,4 +1,4 @@
-"""Datasets for dissection results and annotations."""
+"""PyTorch datasets that nicely wrap exemplars for every unit in a network."""
 import collections
 import csv
 import pathlib
@@ -105,7 +105,7 @@ class TopImagesDataset(data.Dataset):
 
         Args:
             root (PathLike): Root directory for the dataset. See
-                `dissection.dissect` function for expected format.
+                `src.exemplars.compute` function for expected format.
             name (Optional[str], optional): Human-readable name for this
                 dataset. Defaults to last two components of root directory.
             layers (Optional[Iterable[Layer]], optional): The layers to load.

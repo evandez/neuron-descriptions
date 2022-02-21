@@ -1,4 +1,4 @@
-"""Unit tests for exemplars zoo."""
+"""Unit tests `src.exemplars.models`."""
 import collections
 
 from src.exemplars import models

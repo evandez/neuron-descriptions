@@ -1,4 +1,4 @@
-"""Tests for the vocabulary/mturk/qualification module."""
+"""Tests for the `src.mturk.qualification` module."""
 import pathlib
 import tempfile
 from xml.etree import ElementTree

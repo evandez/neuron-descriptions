@@ -1,1 +1,1 @@
-"""Unit tests for MILANNOTATIONS submodules."""
+"""Unit tests for `src.milannotations` submodule."""

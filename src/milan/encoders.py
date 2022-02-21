@@ -1,4 +1,9 @@
-"""Models that map images and masks to features."""
+"""The visual encoder component of MILAN.
+
+These map image regions (given by an image and a mask) to a single vector.
+They do so by feeding the images to a pretrained image classifier, reading
+its intermediate features, and applying the mask to those features.
+"""
 from typing import (Any, Callable, Mapping, Optional, Sequence, Tuple, Type,
                     Union, overload)
 

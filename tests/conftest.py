@@ -1,4 +1,4 @@
-"""Test data shared across modules."""
+"""Test data shared across test modules."""
 import csv
 import pathlib
 import tempfile

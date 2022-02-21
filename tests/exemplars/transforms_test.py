@@ -1,4 +1,4 @@
-"""Unit tests for transforms module."""
+"""Unit tests for `src.exemplars.transforms` module."""
 from src.exemplars import transforms
 
 import pytest

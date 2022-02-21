@@ -1,4 +1,8 @@
-"""Generic RNN language models."""
+"""The language model component of MILAN.
+
+This is integrated with the decoder to compute PMI instead of probability
+while decoding descriptions.
+"""
 from typing import Any, Mapping, Optional, Sequence, Sized, Type, Union, cast
 
 from src.utils import lang, serialize, training

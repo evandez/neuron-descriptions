@@ -1,4 +1,4 @@
-"""Common transforms for input, hidden, and output data during dissection."""
+"""Transforms for inputs/hiddens/outputs during exemplar computation."""
 import math
 from typing import Any, Callable, Optional, Sequence, Tuple, TypeVar
 

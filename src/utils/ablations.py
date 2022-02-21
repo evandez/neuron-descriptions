@@ -1,4 +1,4 @@
-"""Ablation utilities."""
+"""Utilities for altering unit activations real-time."""
 import collections
 import contextlib
 from typing import Callable, Iterator, Sequence

@@ -1,4 +1,4 @@
-"""Test configuration shared by all lv/models tests."""
+"""Test configuration shared by all `src.models` tests."""
 from src.milan import encoders
 
 import numpy

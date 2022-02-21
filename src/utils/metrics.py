@@ -1,4 +1,4 @@
-"""Generic functions for computing standard performance metrics."""
+"""Utilities for computing standard performance metrics."""
 import warnings
 from typing import Mapping, Optional
 

@@ -1,4 +1,14 @@
-"""Models for decoding neuron captions."""
+"""The decoder component of MILAN.
+
+The decoder is an attention LSTM that is loosely based on the Show, Attend,
+and Tell architecture of Xu et al., 2015. Given k visual feature vectors
+(one for each top-activating image, i.e. exemplar), it attends over all of
+them and inputs the resulting vector and the previously generated token
+into a singe-layer LSTM. The main difference is it also uses a
+
+Most of the complexity in this file is around supporting other decoding
+techniques, like beam search. Don't worry too much about it.
+"""
 from typing import (Any, Dict, Mapping, NamedTuple, Optional, Sequence, Sized,
                     Tuple, Type, Union, cast)
 

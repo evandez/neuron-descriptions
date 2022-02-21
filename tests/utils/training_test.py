@@ -1,4 +1,4 @@
-"""Unit tests for the lv/utils/training module."""
+"""Unit tests for the `src.utils.training` module."""
 from src.utils import training
 
 PATIENCE = 5

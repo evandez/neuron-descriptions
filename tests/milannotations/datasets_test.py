@@ -1,4 +1,4 @@
-"""Unit tests for the datasets submodule."""
+"""Unit tests for the `src.milannotations.datasets` submodule."""
 import csv
 import shutil
 
