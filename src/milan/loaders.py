@@ -12,10 +12,12 @@ def hub() -> hubs.ModelHub:
         **{
             group: hubs.ModelConfig(
                 decoders.Decoder.load,
-                url=f'{hubs.HOST}/models/{group.replace("/", "_")}.pth',
+                url=f'{hubs.HOST}/models/milan-{group.replace("/", "_")}.pth',
                 requires_path=True,
                 load_weights=False,
-            ) for group in src.milannotations.loaders.DATASET_GROUPINGS
+            )
+            for group in src.milannotations.loaders.DATASET_GROUPINGS
+            if not group.startswith('NOT_')
         })
 
 
