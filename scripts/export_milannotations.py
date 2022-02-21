@@ -46,7 +46,7 @@ targets = [target for target in targets if target.is_dir()]
 # Apply exclusions
 exclude_targets = [re.compile(exclude) for exclude in args.exclude_targets]
 targets = [
-    target for target in args.root_dir.iterdir() if not any(
+    target for target in targets if not any(
         exclude.match(str(target.relative_to(args.root_dir)))
         for exclude in exclude_targets)
 ]
