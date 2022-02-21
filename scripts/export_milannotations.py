@@ -62,22 +62,24 @@ for target in progress:
     progress.set_description(f'exporting {name}')
     with tempfile.TemporaryDirectory(prefix=name) as tempdir:
         temp_out_dir = pathlib.Path(tempdir)
+
+        src_annotations_file = target / 'annotations.csv'
+        if src_annotations_file.exists():
+            dst_annotations_file = temp_out_dir / src_annotations_file.name
+            dst_annotations_file.parent.mkdir(exist_ok=True, parents=True)
+            shutil.copy(src_annotations_file, dst_annotations_file)
+
+        # Copy layer-wise files over.
         for layer_dir in target.iterdir():
-            # Copy necessary files over.
-            for file_name, required in (
-                ('masks.npy', True),
-                ('ids.csv', True),
-                ('annotations.csv', False),
-            ):
+            for file_name in ('masks.npy', 'ids.csv'):
                 src_file = layer_dir / file_name
-                if required and not src_file.exists():
+                if not src_file.exists():
                     raise FileNotFoundError(
                         f'missing required file: {src_file}')
 
-                if src_file.exists():
-                    dst_file = temp_out_dir / layer_dir.name / file_name
-                    dst_file.parent.mkdir(exist_ok=True, parents=True)
-                    shutil.copy(src_file, dst_file)
+                dst_file = temp_out_dir / layer_dir.name / file_name
+                dst_file.parent.mkdir(exist_ok=True, parents=True)
+                shutil.copy(src_file, dst_file)
 
             # Copy images file over if possible.
             if not any(exclude.match(dataset) for exclude in exclude_images):
