@@ -45,7 +45,7 @@ resnet_imagenet = milannotations.load('resnet152/imagenet')
 ```
 
 For a complete demo on interacting with `MILANNOTATIONS`, see
-[notebooks/milannotations.ipynb](repo/blob/master/notebooks/milannotations.ipynb).
+[notebooks/milannotations.ipynb](notebooks/milannotations.ipynb).
 
 ## Using `MILAN`
 
@@ -66,7 +66,7 @@ outputs = milan(sample.images, masks=sample.masks)
 print(outputs.captions[0])
 ```
 
-If you would like to apply `MILAN` to a new model, you must first compute the top-activating images for its neurons. You can do this in two steps. First, add a config to [src/exemplars/models.py](repo/blob/master/src/exemplars/models.py) for your model and to [src/exemplars/datasets.py](repo/blob/master/src/exemplars/datasets.py) for the dataset you want the top images to be taken from. Then, you can call the following script:
+If you would like to apply `MILAN` to a new model, you must first compute the top-activating images for its neurons. You can do this in two steps. First, add a config to [src/exemplars/models.py](src/exemplars/models.py) for your model and to [src/exemplars/datasets.py](src/exemplars/datasets.py) for the dataset you want the top images to be taken from. Then, you can call the following script:
 ```bash
 python3 -m scripts.compute_exemplars your_model_name your_dataset_name --device cuda
 ```
@@ -76,16 +76,16 @@ Please note that, by default, this script will:
 - write top images to `$MILAN_RESULTS_DIR/your_model_name/your_dataset_name`;
 - link the directory above to an equivalent directory in `$MILAN_DATA_DIR`.
 
-For a more detailed demo of `MILAN`'s features, see [notebooks/milan.ipynb](repo/blob/master/notebooks/milan.ipynb).
+For a more detailed demo of `MILAN`'s features, see [notebooks/milan.ipynb](notebooks/milan.ipynb).
 
 ## Running experiments & other scripts
 
-All experiments from the main paper can be reproduced using scripts in the [experiments](repo/blob/master/experiments) subdirectory. Here is an example of how to invoke these scripts with the correct `PYTHONPATH`:
+All experiments from the main paper can be reproduced using scripts in the [experiments](experiments) subdirectory. Here is an example of how to invoke these scripts with the correct `PYTHONPATH`:
 ```bash
 python3 -m experiments.generalization --experiments within-network --precompute-features --device cuda
 ```
 
-A myriad of other scripts can be found under the [scripts](repo/blob/master/scripts) directory. These do not correspond to any particular experiment, but are used for more general or miscellaneous tasks such as training `MILAN`, cleaning AMT data, and generating visualizations. For a full description of how to use a script, use the help (`-h`) flag.
+A myriad of other scripts can be found under the [scripts](scripts) directory. These do not correspond to any particular experiment, but are used for more general or miscellaneous tasks such as training `MILAN`, cleaning AMT data, and generating visualizations. For a full description of how to use a script, use the help (`-h`) flag.
 
 
 ## Contributing
