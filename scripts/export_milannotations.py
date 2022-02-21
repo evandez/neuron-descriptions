@@ -60,7 +60,7 @@ for target in progress:
     dataset = target.name
     name = f'{arch}-{dataset}'
     progress.set_description(f'exporting {name}')
-    with tempfile.TemporaryDirectory(prefix=name) as tempdir:
+    with tempfile.TemporaryDirectory() as tempdir:
         temp_out_dir = pathlib.Path(tempdir)
         for layer in target.iterdir():
             layer_dir = target / layer
