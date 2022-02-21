@@ -91,12 +91,12 @@ def dataset_hub() -> hubs.DatasetHub:
             KEYS.BIGGAN_ZS_IMAGENET:
                 hubs.DatasetConfig(
                     TensorDatasetOnDisk,
-                    url=f'{HOST}/{KEYS.BIGGAN_ZS_IMAGENET}.pth',
+                    url=f'{HOST}/{KEYS.BIGGAN_ZS_IMAGENET}.zip',
                 ),
             KEYS.BIGGAN_ZS_PLACES365:
                 hubs.DatasetConfig(
                     TensorDatasetOnDisk,
-                    url=f'{HOST}/{KEYS.BIGGAN_ZS_PLACES365}.pth',
+                    url=f'{HOST}/{KEYS.BIGGAN_ZS_PLACES365}.zip',
                 ),
         })
 
