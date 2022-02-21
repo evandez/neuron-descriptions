@@ -24,34 +24,32 @@ parser.add_argument(
     '--exclude-targets',
     nargs='+',
     default=(
-        r'imagenet',
-        r'imagenet-spurious-*',
-        r'places365',
+        r'imagenet.*',
+        r'places365.*',
     ),
     help='do not package dirs matching this regex (default: imagenet, etc.)')
 args = parser.parse_args()
 
 args.out_dir.mkdir(exist_ok=True, parents=True)
 
-# Apply arg exclusions.
-exclude_targets = [re.compile(exclude) for exclude in args.exclude_targets]
-targets = [
-    target for target in args.root_dir.iterdir()
-    if not any(exclude.match(target.name) for exclude in exclude_targets)
-]
-
 # Filter out non-directories.
-targets = [target for target in targets if target.is_dir()]
+targets = [target for target in args.root_dir.iterdir() if target.is_dir()]
 
-# Find all subtargets.
+# Find all subtargets, and make sure they're also subdirs.
 targets = [
     args.root_dir / target / subtarget
     for target in targets
     for subtarget in target.iterdir()
 ]
-
-# Make sure these are also directories.
 targets = [target for target in targets if target.is_dir()]
+
+# Apply exclusions
+exclude_targets = [re.compile(exclude) for exclude in args.exclude_targets]
+targets = [
+    target for target in args.root_dir.iterdir() if not any(
+        exclude.match(str(target.relative_to(args.root_dir)))
+        for exclude in exclude_targets)
+]
 print(f'found {len(targets)} export targets')
 
 exclude_images = [re.compile(exclude) for exclude in args.exclude_images]
