@@ -1,7 +1,7 @@
 """Tools for loading prepackaged MILANNOTATIONS data."""
 from typing import Any
 
-from src.milannotations import datasets
+from src.milannotations import datasets, merges
 from src.utils import hubs
 
 import easydict
@@ -186,19 +186,19 @@ def hub() -> hubs.DatasetHub:
                 KEYS.DINO_VITS8_IMAGENET, KEYS.RESNET152_IMAGENET,
                 KEYS.RESNET152_PLACES365):
         configs[key] = hubs.DatasetConfig(
-            datasets.AnnotatedTopImagesDataset,
+            merges.maybe_merge_and_load_dataset,
             url=f'{hubs.HOST}/data/{key.replace("/", "-")}.zip',
             annotation_count=3)
 
     # Extra configs for models that have blurred-imagenet versopns.
     for model in (KEYS.ALEXNET, KEYS.RESNET152):
         key = KEYS[f'{model.upper()}_IMAGENET_BLURRED']
-        configs[key] = hubs.DatasetConfig(datasets.TopImagesDataset)
+        configs[key] = hubs.DatasetConfig(merges.maybe_merge_and_load_dataset)
 
     # Extra configs for models that have places365 versions.
     for model in (KEYS.RESNET18,):
         key = KEYS[f'{model.upper()}_PLACES365']
-        configs[key] = hubs.DatasetConfig(datasets.TopImagesDataset)
+        configs[key] = hubs.DatasetConfig(merges.maybe_merge_and_load_dataset)
 
     # Configs for all other models that have both imagenet/blurred-imagenet
     # versions available.
@@ -208,7 +208,8 @@ def hub() -> hubs.DatasetHub:
                   KEYS.VGG13, KEYS.VGG16, KEYS.VGG19):
         for dataset in (KEYS.IMAGENET, KEYS.IMAGENET_BLURRED):
             key = KEYS[f'{model.upper()}_{dataset.upper().replace("-", "_")}']
-            configs[key] = hubs.DatasetConfig(datasets.TopImagesDataset)
+            configs[key] = hubs.DatasetConfig(
+                merges.maybe_merge_and_load_dataset)
 
     return hubs.DatasetHub(**configs)
 
