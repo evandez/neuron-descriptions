@@ -71,6 +71,9 @@ for target in progress:
 
         # Copy layer-wise files over.
         for layer_dir in target.iterdir():
+            if not layer_dir.is_dir():
+                continue
+
             for file_name in ('masks.npy', 'ids.csv'):
                 src_file = layer_dir / file_name
                 if not src_file.exists():
