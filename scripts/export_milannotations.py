@@ -50,7 +50,10 @@ targets = [
         exclude.match(str(target.relative_to(args.root_dir)))
         for exclude in exclude_targets)
 ]
-print(f'found {len(targets)} export targets: {targets}')
+
+names = '\n'.join(str(target.relative_to(args.root_dir)) for target in targets)
+names = '\n' + names
+print(f'found {len(targets)} export targets:{names}')
 
 exclude_images = [re.compile(exclude) for exclude in args.exclude_images]
 
