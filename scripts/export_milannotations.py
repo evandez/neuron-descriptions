@@ -32,12 +32,15 @@ parser.add_argument(
 args = parser.parse_args()
 
 exclude_targets = [re.compile(exclude) for exclude in args.exclude_targets]
-targets = [target for target in args.root_dir.iterdir() if target.is_dir()]
+targets = [
+    target for target in args.root_dir.iterdir()
+    if target.is_dir() and not any(
+        exclude.match(target.name) for exclude in exclude_targets)
+]
 targets = [
     args.root_dir / target / subtarget
     for target in targets
     for subtarget in target.iterdir()
-    if not any(exclude.match(str(target)) for exclude in exclude_targets)
 ]
 print(f'found {len(targets)} export targets')
 
