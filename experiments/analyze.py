@@ -5,7 +5,7 @@ import pathlib
 import shutil
 
 from src import exemplars, milan, milannotations
-from src.utils import env, training, viz
+from src.utils import ablations, env, training, viz
 from src.utils.typing import StrSequence
 
 import numpy as np
@@ -196,7 +196,7 @@ for dataset_name in args.datasets:
         model_results_dir.mkdir(exist_ok=True, parents=True)
 
         cnn, *_ = exemplars.models.load(f'{cnn_name}/{dataset_name}')
-        cnn = milan.classifier(cnn).to(device).eval()
+        cnn = ablations.ImageClassifier(cnn).to(device).eval()
 
         dissected = milannotations.load(f'{cnn_name}/{dataset_name}',
                                         path=data_dir)

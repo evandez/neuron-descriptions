@@ -7,7 +7,7 @@ import shutil
 
 from src import exemplars, milan, milannotations
 from src.deps.netdissect import renormalize
-from src.utils import env, training, viz
+from src.utils import ablations, env, training, viz
 from src.utils.typing import StrSequence
 
 import torch
@@ -210,7 +210,7 @@ for experiment in args.experiments:
             f'{args.cnn}/{exemplars.datasets.KEYS.IMAGENET}',
             pretrained=False,
         )
-        cnn = milan.classifier(cnn).to(device)
+        cnn = ablations.ImageClassifier(cnn).to(device)
 
         cnn_file = experiment_dir / f'{args.cnn}-{version}.pth'
         if cnn_file.exists():

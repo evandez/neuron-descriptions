@@ -10,7 +10,6 @@ To use a pretrained model, see the `pretrained` function in `loaders.py`.
 To train your own MILAN model, see `scripts/train_milan.py`.
 """
 # flake8: noqa
-from src.milan.classifiers import ImageClassifier, classifier
 from src.milan.decoders import Decoder, decoder
 from src.milan.encoders import (Encoder, PyramidConvEncoder,
                                 SpatialConvEncoder, encoder)
