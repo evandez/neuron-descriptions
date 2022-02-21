@@ -95,7 +95,4 @@ for target in progress:
                 shutil.copy(images_src_file, images_dst_file)
 
         # Zip it up to the final output directory.
-        shutil.make_archive(name,
-                            'zip',
-                            root_dir=args.out_dir,
-                            base_dir=temp_out_dir)
+        shutil.make_archive(name, 'zip', root_dir=temp_out_dir)
