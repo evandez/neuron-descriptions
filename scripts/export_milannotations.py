@@ -60,7 +60,7 @@ for target in progress:
     dataset = target.name
     name = f'{arch}-{dataset}'
     progress.set_description(f'exporting {name}')
-    with tempfile.TemporaryDirectory() as tempdir:
+    with tempfile.TemporaryDirectory(prefix=name) as tempdir:
         temp_out_dir = pathlib.Path(tempdir)
         for layer in target.iterdir():
             layer_dir = target / layer
@@ -72,11 +72,14 @@ for target in progress:
                 ('annotations.csv', False),
             ):
                 src_file = layer_dir / file_name
-                assert src_file.exists, src_file
+                if required and not src_file.exists():
+                    raise FileNotFoundError(
+                        f'missing required file: {src_file}')
 
-                dst_file = temp_out_dir / layer / file_name
-                dst_file.parent.mkdir(exist_ok=True, parents=True)
-                shutil.copy(src_file, dst_file)
+                if src_file.exists():
+                    dst_file = temp_out_dir / layer / file_name
+                    dst_file.parent.mkdir(exist_ok=True, parents=True)
+                    shutil.copy(src_file, dst_file)
 
             # Copy images file over if possible.
             if not any(exclude.match(dataset) for exclude in exclude_images):
