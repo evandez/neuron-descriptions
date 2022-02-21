@@ -203,6 +203,13 @@ def maybe_merge_and_load_dataset(
         source_shape = eg_masks.masks.shape[-2:]
 
         source_dir = env.data_dir() / source
+        if not source_dir.exists():
+            key = f'{root.parent.name}/{root.name}'
+            raise FileNotFoundError(
+                f'milannotations "{key}" is not packaged with source images; '
+                f'you need to download the source dataset ({source}) '
+                'and store in under $MILAN_DATA_DIR, which defaults '
+                'to ./data')
         source_dataset = torchvision.datasets.ImageFolder(
             str(source_dir),
             transform=transforms.Compose(
