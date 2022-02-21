@@ -33,8 +33,8 @@ args = parser.parse_args()
 
 exclude_targets = [re.compile(exclude) for exclude in args.exclude_targets]
 targets = [
-    args.root / target / subtarget
-    for target in args.root.iterdir()
+    args.root_dir / target / subtarget
+    for target in args.root_dir.iterdir()
     for subtarget in target.iterdir()
     if not any(exclude.match(str(target)) for exclude in exclude_targets)
 ]
