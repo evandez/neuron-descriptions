@@ -227,10 +227,11 @@ def load(name: str = 'base', **kwargs: Any) -> torch.utils.data.Dataset:
         torch.utils.data.Dataset: The loaded dataset.
 
     """
+    dataset_hub = hub()
     if name in DATASET_GROUPINGS:
-        dataset = hub().load_all(*DATASET_GROUPINGS[name], **kwargs)
-    elif name in KEYS:
-        dataset = hub().load(name, **kwargs)
+        dataset = dataset_hub.load_all(*DATASET_GROUPINGS[name], **kwargs)
+    elif name in dataset_hub.configs:
+        dataset = dataset_hub.load(name, **kwargs)
         assert isinstance(
             dataset,
             (datasets.TopImagesDataset, datasets.AnnotatedTopImagesDataset),
