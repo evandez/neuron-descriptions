@@ -34,6 +34,9 @@ parser.add_argument(
         r'places365.*',
     ),
     help='do not package dirs matching this regex (default: imagenet, etc.)')
+parser.add_argument('--targets',
+                    nargs='+',
+                    help='prespecified targets (default: read from data dir)')
 args = parser.parse_args()
 
 data_dir = args.data_dir or env.data_dir()
@@ -41,24 +44,31 @@ data_dir = args.data_dir or env.data_dir()
 results_dir = args.results_dir or (env.results_dir() / 'export-milannotations')
 results_dir.mkdir(exist_ok=True, parents=True)
 
-# Filter out non-directories.
-targets = [target for target in data_dir.iterdir() if target.is_dir()]
+targets = args.targets
+if args.targets:
+    targets = [data_dir / target for target in targets]
+    for target in targets:
+        if not target.is_dir():
+            raise FileNotFoundError(f'target not found: {target}')
+else:
+    # Filter out non-directories.
+    targets = [target for target in data_dir.iterdir() if target.is_dir()]
 
-# Find all subtargets, and make sure they're also subdirs.
-targets = [
-    data_dir / target / subtarget
-    for target in targets
-    for subtarget in target.iterdir()
-]
-targets = [target for target in targets if target.is_dir()]
+    # Find all subtargets, and make sure they're also subdirs.
+    targets = [
+        data_dir / target / subtarget
+        for target in targets
+        for subtarget in target.iterdir()
+    ]
+    targets = [target for target in targets if target.is_dir()]
 
-# Apply exclusions
-exclude_targets = [re.compile(exclude) for exclude in args.exclude_targets]
-targets = [
-    target for target in targets if not any(
-        exclude.match(str(target.relative_to(data_dir)))
-        for exclude in exclude_targets)
-]
+    # Apply exclusions
+    exclude_targets = [re.compile(exclude) for exclude in args.exclude_targets]
+    targets = [
+        target for target in targets if not any(
+            exclude.match(str(target.relative_to(data_dir)))
+            for exclude in exclude_targets)
+    ]
 
 names = '\n\t'.join(str(targ.relative_to(data_dir)) for targ in targets)
 names = '\n\t' + names
