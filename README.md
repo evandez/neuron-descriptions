@@ -78,7 +78,7 @@ Please note that, by default, this script will:
 - write top images to `$MILAN_RESULTS_DIR/your_model_name/your_dataset_name`;
 - link the directory above to an equivalent directory in `$MILAN_DATA_DIR`.
 
-For a more detailed demo of `MILAN`'s features, see [notebooks/milan.ipynb](notebooks/milan.ipynb).
+<!-- For a more detailed demo of `MILAN`'s features, see [notebooks/milan.ipynb](notebooks/milan.ipynb). -->
 
 ## Running experiments & other scripts
 
