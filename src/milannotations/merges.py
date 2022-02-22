@@ -17,7 +17,7 @@ directory.
 """
 import csv
 import pathlib
-from typing import Any, Sized, cast
+from typing import Any, Optional, Sized, cast
 
 from src.milannotations import datasets
 from src.utils import env
@@ -156,7 +156,7 @@ def merge(root: PathLike,
 
 def maybe_merge_and_load_dataset(
         root: PathLike,
-        source: str = 'imagenet/val',
+        source: Optional[str] = None,
         annotations: bool = True,
         force: bool = False,
         image_index: int = 0,
@@ -167,7 +167,7 @@ def maybe_merge_and_load_dataset(
         root (PathLike): Root directory for the dataset.
         source (str, optional): Name of the source dataset.
             This will be read from $MILAN_DATA_DIR using an ImageFolder.
-            Defaults to 'imagenet/val'.
+            Defaults to None.
         annotations (bool, optional): If set, use load annotations with final
             dataset when possible. Otherwise just load top images.
             Defaults to True.
@@ -183,14 +183,15 @@ def maybe_merge_and_load_dataset(
     root = pathlib.Path(root)
 
     needs_merge = False
-    for layer in root.iterdir():
-        layer_dir = root / layer
-
+    for layer_dir in root.iterdir():
         images_file = layer_dir / 'images.npy'
         if not images_file.exists():
             needs_merge = True
 
     if needs_merge:
+        if source is None:
+            raise ValueError('>= 1 layers are missing missing source images '
+                             'and no source dataset was provided')
         eg_masks_file = root / next(root.iterdir()) / 'masks.npy'
         if not eg_masks_file.exists():
             raise FileNotFoundError(

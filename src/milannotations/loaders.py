@@ -185,10 +185,11 @@ def hub() -> hubs.DatasetHub:
                 KEYS.BIGGAN_IMAGENET, KEYS.BIGGAN_PLACES365,
                 KEYS.DINO_VITS8_IMAGENET, KEYS.RESNET152_IMAGENET,
                 KEYS.RESNET152_PLACES365):
+        arch, dataset = key.split('/')
         configs[key] = hubs.DatasetConfig(
             merges.maybe_merge_and_load_dataset,
-            url=f'{hubs.HOST}/data/{key.replace("/", "-")}.zip',
-            source=f'{key.split("/")[-1]}/val',
+            url=f'{hubs.HOST}/data/{arch}-{dataset}.zip',
+            source=f'{dataset}/val' if arch != KEYS.BIGGAN else None,
             annotation_count=3)
 
     # Extra configs for models that have blurred-imagenet versopns.
