@@ -17,7 +17,7 @@ parser.add_argument('--results-dir',
 parser.add_argument('--datasets',
                     nargs='+',
                     default=('imagenet', 'places365'),
-                    help='versions of biggan to export zs for (default: all)e')
+                    help='versions of biggan to export zs for (default: all)')
 args = parser.parse_args()
 
 data_dir = args.data_dir or env.data_dir()
