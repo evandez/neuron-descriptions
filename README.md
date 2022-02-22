@@ -1,5 +1,7 @@
 # Describing Neurons in Neural Networks
 
+## DISCLAIMER: Under active changes! Things will break!
+
 ![MILAN overview](/www/milan-overview.png)
 
 ## Setup
