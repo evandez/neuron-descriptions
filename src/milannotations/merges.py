@@ -212,10 +212,10 @@ def maybe_merge_and_load_dataset(
                 'to ./data')
         source_dataset = torchvision.datasets.ImageFolder(
             str(source_dir),
-            transform=transforms.Compose(
+            transform=transforms.Compose([
                 transforms.Resize(source_shape),
                 transforms.ToTensor(),
-            ))
+            ]))
         merge(root, source_dataset, force=force, image_index=image_index)
 
     if annotations and has_annotations:
