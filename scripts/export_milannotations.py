@@ -10,9 +10,9 @@ import re
 import shutil
 import tempfile
 
-from tqdm.auto import tqdm
-
 from src.utils import env
+
+from tqdm.auto import tqdm
 
 parser = argparse.ArgumentParser(description='zip up milannotations')
 parser.add_argument('--data-dir',
