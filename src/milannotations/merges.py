@@ -20,12 +20,11 @@ import pathlib
 from typing import Any, Sized, cast
 
 from src.milannotations import datasets
-from src.utils import env
+from src.utils import env, training
 from src.utils.typing import PathLike
 
 import numpy
 import torch
-import torchvision.datasets
 from torch.utils import data
 from torchvision import transforms
 from tqdm.auto import tqdm
@@ -210,7 +209,7 @@ def maybe_merge_and_load_dataset(
                 f'you need to download the source dataset ({source}) '
                 'and store in under $MILAN_DATA_DIR, which defaults '
                 'to ./data')
-        source_dataset = torchvision.datasets.ImageFolder(
+        source_dataset = training.PreloadedImageFolder(
             str(source_dir),
             transform=transforms.Compose([
                 transforms.Resize(source_shape),
