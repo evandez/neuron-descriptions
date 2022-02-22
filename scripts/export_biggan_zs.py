@@ -32,4 +32,5 @@ for dataset in tqdm(args.datasets):
 
     shutil.make_archive(str(results_dir / zs_dir.name),
                         'zip',
-                        root_dir=data_dir)
+                        root_dir=data_dir,
+                        base_dir=zs_dir.relative_to(data_dir))
