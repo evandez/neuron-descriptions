@@ -75,10 +75,10 @@ def merge(root: PathLike,
 
     message = 'merging source images'
     progress = tqdm(root.iterdir(), desc=message)
-    for layer in progress:
+    for layer_dir in progress:
+        layer = layer_dir.name
         progress.set_description(f'{message} (layer {layer})')
 
-        layer_dir = root / layer
         images_file = layer_dir / 'images.npy'
         if images_file.exists() and not force:
             continue
