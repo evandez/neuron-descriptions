@@ -181,9 +181,10 @@ def maybe_merge_and_load_dataset(
 
     """
     root = pathlib.Path(root)
+    layer_dirs = [path for path in root.iterdir() if path.is_dir()]
 
     needs_merge = False
-    for layer_dir in root.iterdir():
+    for layer_dir in layer_dirs:
         images_file = layer_dir / 'images.npy'
         if not images_file.exists():
             needs_merge = True
