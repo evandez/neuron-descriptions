@@ -12,7 +12,7 @@ import torch
 from torch import hub, nn
 from torch.utils import data
 
-HOST = 'https://milan.csail.mit.edu'
+HOST = 'http://milan.csail.mit.edu'
 
 TransformWeights = Callable[[Any], OrderedDict[str, torch.Tensor]]
 ModelFactory = Callable[..., nn.Module]

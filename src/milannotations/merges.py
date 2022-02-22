@@ -186,7 +186,7 @@ def maybe_merge_and_load_dataset(
         layer_dir = root / layer
 
         images_file = layer_dir / 'images.npy'
-        if images_file.exists():
+        if not images_file.exists():
             needs_merge = True
 
         annotations_file = layer_dir / 'annotations.csv'
@@ -200,7 +200,7 @@ def maybe_merge_and_load_dataset(
                 f'tried to find example masks from {eg_masks_file} '
                 'but it does not exist?')
         eg_masks = numpy.load(eg_masks_file)
-        source_shape = eg_masks.masks.shape[-2:]
+        source_shape = eg_masks.shape[-2:]
 
         source_dir = env.data_dir() / source
         if not source_dir.exists():
