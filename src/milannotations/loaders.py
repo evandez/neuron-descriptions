@@ -214,14 +214,14 @@ def hub() -> hubs.DatasetHub:
     return hubs.DatasetHub(**configs)
 
 
-def load(name: str = 'all', **kwargs: Any) -> torch.utils.data.Dataset:
+def load(name: str = 'base', **kwargs: Any) -> torch.utils.data.Dataset:
     """Load some or all of MILANNOTATIONS.
 
     Args:
         name (str): Name of specific model to load top images and/or
             annotations for, or name of a group of models
-            (see DATASET_GROUPINGS) to load. Defaults to all annotated models
-            used for training MILAN.
+            (see DATASET_GROUPINGS) to load. Defaults to base set of annotated
+            models used for training MILAN.
 
     Returns:
         torch.utils.data.Dataset: The loaded dataset.
