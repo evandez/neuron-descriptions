@@ -182,17 +182,13 @@ def maybe_merge_and_load_dataset(
     """
     root = pathlib.Path(root)
 
-    needs_merge, has_annotations = False, False
+    needs_merge = False
     for layer in root.iterdir():
         layer_dir = root / layer
 
         images_file = layer_dir / 'images.npy'
         if not images_file.exists():
             needs_merge = True
-
-        annotations_file = layer_dir / 'annotations.csv'
-        if annotations_file.exists():
-            has_annotations = True
 
     if needs_merge:
         eg_masks_file = root / next(root.iterdir()) / 'masks.npy'
@@ -219,6 +215,8 @@ def maybe_merge_and_load_dataset(
             ]))
         merge(root, source_dataset, force=force, image_index=image_index)
 
+    annotations_file = root / 'annotations.csv'
+    has_annotations = annotations_file.exists()
     if annotations and has_annotations:
         return datasets.AnnotatedTopImagesDataset(root, **kwargs)
     else:
