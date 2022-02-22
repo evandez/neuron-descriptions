@@ -12,9 +12,15 @@ import tempfile
 
 from tqdm.auto import tqdm
 
+from src.utils import env
+
 parser = argparse.ArgumentParser(description='zip up milannotations')
-parser.add_argument('root_dir', type=pathlib.Path, help='root data dir')
-parser.add_argument('out_dir', type=pathlib.Path, help='output dir')
+parser.add_argument('--data-dir',
+                    type=pathlib.Path,
+                    help='data dir (default: project data dir)')
+parser.add_argument('--results-dir',
+                    type=pathlib.Path,
+                    help='results dir (default: project results dir)')
 parser.add_argument(
     '--exclude-images',
     nargs='+',
@@ -30,14 +36,17 @@ parser.add_argument(
     help='do not package dirs matching this regex (default: imagenet, etc.)')
 args = parser.parse_args()
 
-args.out_dir.mkdir(exist_ok=True, parents=True)
+data_dir = args.data_dir or env.data_dir()
+
+results_dir = args.results_dir or (env.results_dir() / 'export-milannotations')
+results_dir.mkdir(exist_ok=True, parents=True)
 
 # Filter out non-directories.
-targets = [target for target in args.root_dir.iterdir() if target.is_dir()]
+targets = [target for target in data_dir.iterdir() if target.is_dir()]
 
 # Find all subtargets, and make sure they're also subdirs.
 targets = [
-    args.root_dir / target / subtarget
+    data_dir / target / subtarget
     for target in targets
     for subtarget in target.iterdir()
 ]
@@ -47,11 +56,11 @@ targets = [target for target in targets if target.is_dir()]
 exclude_targets = [re.compile(exclude) for exclude in args.exclude_targets]
 targets = [
     target for target in targets if not any(
-        exclude.match(str(target.relative_to(args.root_dir)))
+        exclude.match(str(target.relative_to(data_dir)))
         for exclude in exclude_targets)
 ]
 
-names = '\n\t'.join(str(targ.relative_to(args.root_dir)) for targ in targets)
+names = '\n\t'.join(str(targ.relative_to(data_dir)) for targ in targets)
 names = '\n\t' + names
 print(f'found {len(targets)} export targets:{names}')
 
@@ -96,4 +105,6 @@ for target in progress:
                 shutil.copy(images_src_file, images_dst_file)
 
         # Zip it up to the final output directory.
-        shutil.make_archive(args.out_dir / name, 'zip', root_dir=temp_out_dir)
+        shutil.make_archive(str(results_dir / name),
+                            'zip',
+                            root_dir=temp_out_dir)
