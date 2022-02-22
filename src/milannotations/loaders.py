@@ -188,6 +188,7 @@ def hub() -> hubs.DatasetHub:
         configs[key] = hubs.DatasetConfig(
             merges.maybe_merge_and_load_dataset,
             url=f'{hubs.HOST}/data/{key.replace("/", "-")}.zip',
+            source=f'{key.split("/")[-1]}/val',
             annotation_count=3)
 
     # Extra configs for models that have blurred-imagenet versopns.
@@ -198,7 +199,8 @@ def hub() -> hubs.DatasetHub:
     # Extra configs for models that have places365 versions.
     for model in (KEYS.RESNET18,):
         key = KEYS[f'{model.upper()}_PLACES365']
-        configs[key] = hubs.DatasetConfig(merges.maybe_merge_and_load_dataset)
+        configs[key] = hubs.DatasetConfig(merges.maybe_merge_and_load_dataset,
+                                          source='places365/val')
 
     # Configs for all other models that have both imagenet/blurred-imagenet
     # versions available.
