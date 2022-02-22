@@ -74,7 +74,7 @@ def merge(root: PathLike,
     source_length = len(cast(Sized, source))
 
     message = 'merging source images'
-    progress = tqdm(root.iterdir(), desc=message)
+    progress = tqdm(tuple(root.iterdir()), desc=message)
     for layer_dir in progress:
         layer = layer_dir.name
         progress.set_description(f'{message} (layer {layer})')
