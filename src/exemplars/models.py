@@ -139,7 +139,7 @@ class ModelConfig(hubs.ModelConfig):
         self.exemplars = exemplars or ModelExemplarsConfig()
 
 
-def model_hub() -> hubs.ModelHub:
+def default_model_hub() -> hubs.ModelHub:
     """Return configs for all models for which we can extract exemplars."""
     configs = {
         KEYS.ALEXNET_IMAGENET:
@@ -382,18 +382,25 @@ Model = Tuple[nn.Module, Sequence[Layer], ModelConfig]
 
 
 def load(name: str,
-         hub: Optional[hubs.ModelHub] = None,
+         configs: Optional[Mapping[str, ModelConfig]] = None,
          **kwargs: Any) -> Model:
     """Load the model and also return its layers and config.
 
     Args:
         name (str): Model config name.
-        hub (Optional[hubs.ModelHub], optional): Model hub to pull from.
-            Defaults to one defined in this file.
+        configs (Optional[Mapping[str, ModelConfig]], optional): Model configs
+            to use when loading models. Defaults to those returned by
+            default_model_hub().
+
+    Returns:
+        Model: The loaded model, it's default exemplar-able layers, and its
+            config.
 
     """
-    if hub is None:
-        hub = model_hub()
+    if configs is None:
+        hub = default_model_hub()
+    else:
+        hub = hubs.ModelHub(**configs)
     model = hub.load(name, **kwargs)
 
     config = hub.configs[name]

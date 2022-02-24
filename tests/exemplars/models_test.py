@@ -2,7 +2,6 @@
 import collections
 
 from src.exemplars import models
-from src.utils import hubs
 
 import pytest
 from torch import nn
@@ -74,8 +73,7 @@ def model():
 def test_load(model, layers, expected):
     """Test load returns layers."""
     config = FakeModelConfig(model, layers)
-    hub = hubs.ModelHub(**{MODEL_KEY: config})
-    actuals = models.load(MODEL_KEY, hub=hub)
+    actuals = models.load(MODEL_KEY, configs={MODEL_KEY: config})
     assert len(actuals) == 3
     actual_model, actual_layers, actual_config = actuals
     assert actual_model is model

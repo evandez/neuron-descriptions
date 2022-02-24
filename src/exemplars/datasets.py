@@ -8,7 +8,7 @@ the dataset to live at $MILAN_DATA_DIR/dataset_name by default. See
 `src/utils/hubs.py` for all the different options the configs support.
 """
 import pathlib
-from typing import Any
+from typing import Any, Mapping, Optional
 
 from src import milannotations
 from src.deps.netdissect import renormalize
@@ -52,7 +52,7 @@ class TensorDatasetOnDisk(torch.utils.data.TensorDataset):
         super().__init__(*loaded)
 
 
-def dataset_hub() -> hubs.DatasetHub:
+def default_dataset_hub() -> hubs.DatasetHub:
     """Return configs for all datasets used in dissection."""
     return hubs.DatasetHub(
         **{
@@ -101,6 +101,22 @@ def dataset_hub() -> hubs.DatasetHub:
         })
 
 
-def load(name: str, **kwargs: Any) -> torch.utils.data.Dataset:
-    """Load the dataset."""
-    return dataset_hub().load(name, **kwargs)
+def load(name: str,
+         configs: Optional[Mapping[str, hubs.DatasetConfig]] = None,
+         **kwargs: Any) -> torch.utils.data.Dataset:
+    """Load the dataset.
+
+    Args:
+        name (str): The name of the dataset.
+        configs (Optional[Mapping[str, hubs.DatasetConfig]], optional): Configs
+            to load from. Defaults to those returned by default_dataset_hub().
+
+    Returns:
+        torch.utils.data.Dataset: The loaded dataset.
+
+    """
+    if configs is None:
+        hub = default_dataset_hub()
+    else:
+        hub = hubs.DatasetHub(**configs)
+    return hub.load(name, **kwargs)
