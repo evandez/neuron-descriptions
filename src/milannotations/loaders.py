@@ -1,8 +1,9 @@
 """Tools for loading prepackaged MILANNOTATIONS data."""
-from typing import Any
+import pathlib
+from typing import Any, Mapping, Optional
 
 from src.milannotations import datasets, merges
-from src.utils import hubs
+from src.utils import env, hubs
 
 import easydict
 import torch.utils.data
@@ -176,8 +177,10 @@ DATASET_GROUPINGS = {
 }
 
 
-def hub() -> hubs.DatasetHub:
-    """Return all dataset configs."""
+def default_dataset_configs(
+        **others: hubs.DatasetConfig,  # Put overrides here!
+) -> Mapping[str, hubs.DatasetConfig]:
+    """Return the default MILANNOTATIONS configs."""
     configs = {}
 
     # Configs for annotated models.
@@ -214,10 +217,19 @@ def hub() -> hubs.DatasetHub:
             configs[key] = hubs.DatasetConfig(
                 merges.maybe_merge_and_load_dataset)
 
+    configs.update(others)
+    return configs
+
+
+def default_dataset_hub(**others: hubs.DatasetConfig) -> hubs.DatasetHub:
+    """Return all dataset configs."""
+    configs = default_dataset_configs(**others)
     return hubs.DatasetHub(**configs)
 
 
-def load(name: str = 'base', **kwargs: Any) -> torch.utils.data.Dataset:
+def load(name: str = 'base',
+         configs: Optional[Mapping[str, hubs.DatasetConfig]] = None,
+         **kwargs: Any) -> torch.utils.data.Dataset:
     """Load some or all of MILANNOTATIONS.
 
     Args:
@@ -225,20 +237,31 @@ def load(name: str = 'base', **kwargs: Any) -> torch.utils.data.Dataset:
             annotations for, or name of a group of models
             (see DATASET_GROUPINGS) to load. Defaults to base set of annotated
             models used for training MILAN.
+        configs (Optional[Mapping[str, hubs.DatasetConfig]], optional): Any
+            additional dataset configs or overrides for existing ones.
+            Defaults to None.
 
     Returns:
         torch.utils.data.Dataset: The loaded dataset.
 
     """
-    dataset_hub = hub()
+    configs = configs or {}
+    dataset_hub = default_dataset_hub(**configs)
     if name in DATASET_GROUPINGS:
         dataset = dataset_hub.load_all(*DATASET_GROUPINGS[name], **kwargs)
     elif name in dataset_hub.configs:
         dataset = dataset_hub.load(name, **kwargs)
-        assert isinstance(
-            dataset,
-            (datasets.TopImagesDataset, datasets.AnnotatedTopImagesDataset),
-        ), dataset
     else:
-        raise KeyError(f'unknown milannotations set: {name}')
+        path = kwargs.get('path', env.data_dir() / name)
+        path = pathlib.Path(path)
+        if not path.exists():
+            raise KeyError(f'unknown milannotations set: {name}')
+        kwargs.setdefault('path', path)
+        dataset_hub = default_dataset_hub(
+            name=hubs.DatasetConfig(datasets.TopImagesDataset))
+        return dataset_hub.load(name, **kwargs)
+    assert isinstance(
+        dataset,
+        (datasets.TopImagesDataset, datasets.AnnotatedTopImagesDataset),
+    ), dataset
     return dataset
