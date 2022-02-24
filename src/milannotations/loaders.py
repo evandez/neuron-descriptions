@@ -85,12 +85,8 @@ KEYS.NOT_RESNET152_PLACES365 = f'not-{KEYS.RESNET152}-{KEYS.PLACES365}'
 KEYS.NOT_BIGGAN_IMAGENET = f'not-{KEYS.BIGGAN}-{KEYS.IMAGENET}'
 KEYS.NOT_BIGGAN_PLACES365 = f'not-{KEYS.BIGGAN}-{KEYS.PLACES365}'
 
-# We can group the datasets of neuron annotations in a bunch of interesting
-# ways. Here are the most common, used throughout the project. To load a
-# grouping, simply do e.g.:
-# >>> import lv.zoo
-# >>> group = lv.zoo.DATASET_GROUPS['gen']
-# >>> dataset = lv.zoo.datasets(*group)
+# Different partitions of MILANNOTATIONS based on the generalization
+# experiments from the original paper.
 DATASET_GROUPINGS = {
     KEYS.BASE: (
         KEYS.ALEXNET_IMAGENET,
