@@ -1,6 +1,6 @@
 # Describing Neurons in Neural Networks
 
-What concepts are encoded in the features of neural networks? One way to answer this question is to look at individual neurons in the network: do these individual units detect interesting concepts on their own?
+In this paper, we ask: what concepts are encoded in the features of neural networks? One way to answer this question is to look at individual neurons in the network: do these individual units detect interesting concepts on their own?
 
 We can represent the behavior of a neuron by the set of inputs that cause it to activate most strongly, a set we name the "top-activating exemplars"--in the case of networks trained on computer vision tasks, the exemplars take the form of image regions. While they highlight that the corresponding neurons are sensitive to interesting perceptual-, object-, scene-level concepts, it is challenging to analyze the exemplars for all of the neurons at scale. Previous automated labeling techniques pulled candidate labels from a fixed, pre-specified set, limiting the kinds of behaviors they could surface.
 
@@ -9,6 +9,10 @@ This project introduces **MILAN**, an approach for generating natural language d
 ![MILAN overview](/www/milan-overview.png)
 
 In our paper, we show that MILAN reliably generates useful descriptions for neurons in new, unseen vision networks. We also demonstrate how MILAN can be applied to a number of downstream interpretability tasks, such as analyzing feature importance, auditing models for unexpected features, and editing spurious correlations out of models.
+
+[**Natural Language Descriptions of Deep Visual Features**](https://arxiv.org/abs/2201.11114)<br>
+[Evan Hernandez](https://evandez.com), [Sarah Schwettmann](https://cogconfluence.com), [David Bau](http://davidbau.com), [Teona Bagashvili](https://sites.allegheny.edu/admissions/teona-bagashvili/), [Antonio Torralba](https://groups.csail.mit.edu/vision/torralbalab/), [Jacob Andreas](https://www.mit.edu/~jda/).<br>
+ICLR 2022 (oral).<br>
 
 ## Setup
 
