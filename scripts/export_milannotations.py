@@ -24,7 +24,7 @@ parser.add_argument('--results-dir',
 parser.add_argument(
     '--exclude-images',
     nargs='+',
-    default=('imagenet*',),
+    default=('.*(net|vgg|dino).*imagenet.*',),
     help='do not include source images when dataset matches regex')
 parser.add_argument(
     '--exclude-targets',
