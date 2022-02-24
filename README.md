@@ -30,7 +30,31 @@ MILAN_RESULTS_DIR=./results
 
 ## Using `MILANNOTATIONS`
 
-We collected over 50k human descriptions of sets of image regions, which were taken from the top-activating images of several base models. We provide a fully featured library for downloading and using this data. Here are some examples:
+We collected over 50k human descriptions of sets of image regions, which were taken from the top-activating images of several base models. We make the full set of annotations and top-image masks publicly available.
+
+For legal reasons, we cannot release the raw source images from ImageNet, but we include pointers to the images as they appear in a standard [`torchvision.datasets.ImageFolder`](https://pytorch.org/vision/stable/datasets.html#torchvision.datasets.ImageFolder). If you use the library described further down, it will automatically import your locally downloaded copy of ImageNet with MILANNOTATIONS.
+
+The table below details the annotated base models.
+
+| Model | Task | # Units | # Desc. | Source Images | Download |
+|-------|------|---------|---------|---------------|----------|
+| alexnet/imagenet | classification | 1k | 3k | [request access](https://www.image-net.org) | [zip](https://milan.csail.mit.edu/data/alexnet-imagenet.zip) |
+| alexnet/places365 | classification | 1k | 3k | included in zip | [zip](https://milan.csail.mit.edu/data/alexnet-places365.zip) |
+| resnet152/imagenet | classification | 3k | 9k | [request access](https://www.image-net.org) | [zip](https://milan.csail.mit.edu/data/resnet152-imagenet.zip) |
+| resnet152/places365 | classification | 4k | 12k | included in zip | [zip](https://milan.csail.mit.edu/data/resnet152-places365.zip)
+biggan/imagenet | generation | 4k | 12k | included in zip | [zip](https://milan.csail.mit.edu/data/biggan-imagenet.zip)
+biggan/places365 | generation | 4k | 12k | included in zip | [zip](https://milan.csail.mit.edu/data/biggan-places365.zip)
+dino_vits8/imagenet | BYOL | 1.2k | 3.6k | [request access](https://www.image-net.org) | [zip](https://milan.csail.mit.edu/data/dino_vits8-imagenet.zip)
+
+<!--
+We also provide precomputed exemplars for other image classification models analyzed in the original paper. They are all based on ImageNet and require you to have a local copy (i.e., `$MILAN_DATA_DIR/imagenet/val` should exist):
+
+| Model | # Units | Download |
+|-------|---------|----------|
+alexnet/imagenet-blurred | |
+
+-->
+We provide a fully featured library for downloading and using this data. Here are some examples:
 
 ```python
 from src import milannotations
