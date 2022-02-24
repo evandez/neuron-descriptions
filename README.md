@@ -168,7 +168,7 @@ All experiments from the main paper can be reproduced using scripts in the [expe
 python3 -m experiments.generalization --experiments within-network --precompute-features --device cuda
 ```
 
-A myriad of other scripts can be found under the [scripts](scripts) directory. These do not correspond to any particular experiment, but are used for more general or miscellaneous tasks such as training `MILAN`, cleaning AMT data, and generating visualizations. For a full description of how to use a script, use the help (`-h`) flag.
+A myriad of other scripts can be found under the [scripts](scripts) directory. These do not correspond to any particular experiment, but are used for more general or miscellaneous tasks such as training MILAN, cleaning AMT data, and generating visualizations. For a full description of how to use a script, use the help (`-h`) flag.
 
 
 ## Contributing
