@@ -120,14 +120,14 @@ MILAN first needs to know:
 
 This information is specified inside [src/exemplars/models.py](src/exemplars/models.py) and [src/exemplars/datasets.py](src/exemplars/datasets.py) using the `ModelConfig` and `DatasetConfig` constructs, respectively. Simply add configs for your model and dataset inside `default_model_configs` and `default_dataset_configs`.
 
-To illustrate how the configs work, here is a model config for one of the models from MILANNOTATIONS:
+To illustrate how the configs work, here is a model config for one of the models used in the original paper:
 
 ```python
 def default_model_configs(...):
   configs = {
     ...
-    'resnet152/imagenet': ModelConfig(
-      torchvision.models.resnet152,
+    'resnet18/imagenet': ModelConfig(
+      torchvision.models.resnet18,
       pretrained=True,
       load_weights=False,
       layers=('conv1', 'layer1', 'layer2', 'layer3', 'layer4'),
@@ -136,28 +136,30 @@ def default_model_configs(...):
   }
 ```
 Walking through each of the pieces:
-- **`torchvision.models.resnet152`**: A function that returns a torch module.
+- **`torchvision.models.resnet18`**: A function that returns a torch module.
 - **`pretrained`**: This argument is unrecognized by `ModelConfig`, so it will be forwarded to the factory function when it is called. In this case, it is used by torchvision to signal that we want to download the pretrained model.
-- **`load_weights`**: When this is true, the config will look for a file containing pretrained weights under `$MILAN_MODELS_DIR/resnet152-imagenet.pth` and try to load them into the model. Since torchvision downloads the weights for us, we set this to False.
-- **`layers`**: A sequence of fully specified paths to the layers you want to compute exemplars for. E.g., if you specifically want to use the first conv layer in the first sub-block of layer1 of resnet152, you would specify it as `layer1.0.conv1`.
+- **`load_weights`**: When this is true, the config will look for a file containing pretrained weights under `$MILAN_MODELS_DIR/resnet18-imagenet.pth` and try to load them into the model. Since torchvision downloads the weights for us, we set this to False.
+- **`layers`**: A sequence of fully specified paths to the layers you want to compute exemplars for. E.g., if you specifically want to use the first conv layer in the first sub-block of layer1 of resnet18, you would specify it as `layer1.0.conv1`.
 
 The dataset configs behave similarly. See the class definitions in [src/utils/hubs.py](src/utils/hubs.py) for a full list of options.
 
 ### Step 2: Compute top-activating images
 
-Once you've configured your model, you can run the script below to compute exemplars for your model. Continuing our ResNet152 example:
+Once you've configured your model, you can run the script below to compute exemplars for your model. Continuing our ResNet18 example:
 ```bash
-python3 -m scripts.compute_exemplars resnet152 imagenet --device cuda
+python3 -m scripts.compute_exemplars resnet18 imagenet --device cuda
 ```
-This will write the top images under `$MILAN_RESULTS_DIR/resnet152/imagenet` and link it to the corresponding directory in `$MILAN_DATA_DIR` so you can load it with the MILANNOTATIONS library.
+This will write the top images under `$MILAN_RESULTS_DIR/exemplars/resnet18/imagenet` and link it to the corresponding directory in `$MILAN_DATA_DIR` so you can load it with the MILANNOTATIONS library.
 
 ### Step 3: Decode Descriptions with MILAN
 
 Finally, you can use one of the pretrained MILAN models to get descriptions for the exemplars you just computed. As before, just call a script:
 
 ```bash
-python3 -m scripts.compute_milan_descriptions resnet152 imagenet --device cuda
+python3 -m scripts.compute_milan_descriptions resnet18 imagenet --device cuda
 ```
+
+This will write the descriptions to a CSV in `$MILAN_RESULTS_DIR/descriptions/resnet18/imagenet`.
 
 ## Running experiments
 
