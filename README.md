@@ -38,12 +38,12 @@ The table below details the annotated base models.
 
 | Model | Task | # Units | # Desc. | Source Images | Download |
 |-------|------|---------|---------|---------------|----------|
-| alexnet/imagenet | classification | 1k | 3k | [request access](https://www.image-net.org) | [zip](https://milan.csail.mit.edu/data/alexnet-imagenet.zip) |
-| alexnet/places365 | classification | 1k | 3k | included in zip | [zip](https://milan.csail.mit.edu/data/alexnet-places365.zip) |
-| resnet152/imagenet | classification | 3k | 9k | [request access](https://www.image-net.org) | [zip](https://milan.csail.mit.edu/data/resnet152-imagenet.zip) |
-| resnet152/places365 | classification | 4k | 12k | included in zip | [zip](https://milan.csail.mit.edu/data/resnet152-places365.zip)
-biggan/imagenet | generation | 4k | 12k | included in zip | [zip](https://milan.csail.mit.edu/data/biggan-imagenet.zip)
-biggan/places365 | generation | 4k | 12k | included in zip | [zip](https://milan.csail.mit.edu/data/biggan-places365.zip)
+| alexnet/imagenet | class | 1k | 3k | [request access](https://www.image-net.org) | [zip](https://milan.csail.mit.edu/data/alexnet-imagenet.zip) |
+| alexnet/places365 | class | 1k | 3k | included in zip | [zip](https://milan.csail.mit.edu/data/alexnet-places365.zip) |
+| resnet152/imagenet | class | 3k | 9k | [request access](https://www.image-net.org) | [zip](https://milan.csail.mit.edu/data/resnet152-imagenet.zip) |
+| resnet152/places365 | class | 4k | 12k | included in zip | [zip](https://milan.csail.mit.edu/data/resnet152-places365.zip)
+biggan/imagenet | gen | 4k | 12k | included in zip | [zip](https://milan.csail.mit.edu/data/biggan-imagenet.zip)
+biggan/places365 | gen | 4k | 12k | included in zip | [zip](https://milan.csail.mit.edu/data/biggan-places365.zip)
 dino_vits8/imagenet | BYOL | 1.2k | 3.6k | [request access](https://www.image-net.org) | [zip](https://milan.csail.mit.edu/data/dino_vits8-imagenet.zip)
 
 <!--
