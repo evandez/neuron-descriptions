@@ -16,7 +16,7 @@ source env/bin/activate
 pip3 install -r requirements.txt
 ```
 
-To validate that everything works, run the presubmit script, which in turn performs typing checking, linting and unit testing:
+To validate that everything works, run the presubmit script, which in turn performs type checking, linting and unit testing:
 ```bash
 ./presubmit.sh
 ```
