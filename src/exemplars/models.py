@@ -139,8 +139,8 @@ class ModelConfig(hubs.ModelConfig):
         self.exemplars = exemplars or ModelExemplarsConfig()
 
 
-def default_model_hub() -> hubs.ModelHub:
-    """Return configs for all models for which we can extract exemplars."""
+def default_model_configs(**others: ModelConfig) -> Mapping[str, ModelConfig]:
+    """Return the default model configs."""
     configs = {
         KEYS.ALEXNET_IMAGENET:
             ModelConfig(
@@ -375,6 +375,13 @@ def default_model_hub() -> hubs.ModelHub:
                 layers=LAYERS.VGG19,
             ),
     }
+    configs.update(others)
+    return configs
+
+
+def default_model_hub(**others: ModelConfig) -> hubs.ModelHub:
+    """Return configs for all models for which we can extract exemplars."""
+    configs = default_model_configs(**others)
     return hubs.ModelHub(**configs)
 
 
@@ -389,7 +396,8 @@ def load(name: str,
     Args:
         name (str): Model config name.
         configs (Optional[Mapping[str, ModelConfig]], optional): Model configs
-            to use when loading models. Defaults to those returned by
+            to use when loading models, in addition to those returned by
+            default_model_hub(). Defaults to just those returned by
             default_model_hub().
 
     Returns:
@@ -397,10 +405,8 @@ def load(name: str,
             config.
 
     """
-    if configs is None:
-        hub = default_model_hub()
-    else:
-        hub = hubs.ModelHub(**configs)
+    configs = configs or {}
+    hub = default_model_hub(**configs)
     model = hub.load(name, **kwargs)
 
     config = hub.configs[name]

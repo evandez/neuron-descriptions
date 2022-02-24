@@ -52,53 +52,60 @@ class TensorDatasetOnDisk(torch.utils.data.TensorDataset):
         super().__init__(*loaded)
 
 
-def default_dataset_hub() -> hubs.DatasetHub:
+def default_dataset_configs(
+        **others: hubs.DatasetConfig,  # Your overrides!
+) -> Mapping[str, hubs.DatasetConfig]:
+    """Return the default dataset configs."""
+    configs = {
+        KEYS.IMAGENET:
+            hubs.DatasetConfig(torchvision.datasets.ImageFolder,
+                               transform=torchvision.transforms.Compose([
+                                   torchvision.transforms.Resize(256),
+                                   torchvision.transforms.CenterCrop(224),
+                                   torchvision.transforms.ToTensor(),
+                                   renormalize.NORMALIZER['imagenet']
+                               ])),
+        KEYS.PLACES365:
+            hubs.DatasetConfig(torchvision.datasets.ImageFolder,
+                               transform=torchvision.transforms.Compose([
+                                   torchvision.transforms.Resize(256),
+                                   torchvision.transforms.CenterCrop(224),
+                                   torchvision.transforms.ToTensor(),
+                                   renormalize.NORMALIZER['imagenet'],
+                               ])),
+        KEYS.IMAGENET_SPURIOUS_TEXT:
+            hubs.DatasetConfig(torchvision.datasets.ImageFolder,
+                               transform=torchvision.transforms.Compose([
+                                   torchvision.transforms.Resize((224, 224)),
+                                   torchvision.transforms.ToTensor(),
+                                   renormalize.NORMALIZER['imagenet']
+                               ])),
+        KEYS.IMAGENET_SPURIOUS_COLOR:
+            hubs.DatasetConfig(torchvision.datasets.ImageFolder,
+                               transform=torchvision.transforms.Compose([
+                                   torchvision.transforms.Resize((224, 224)),
+                                   torchvision.transforms.ToTensor(),
+                                   renormalize.NORMALIZER['imagenet']
+                               ])),
+        KEYS.BIGGAN_ZS_IMAGENET:
+            hubs.DatasetConfig(
+                TensorDatasetOnDisk,
+                url=f'{HOST}/{KEYS.BIGGAN_ZS_IMAGENET}.zip',
+            ),
+        KEYS.BIGGAN_ZS_PLACES365:
+            hubs.DatasetConfig(
+                TensorDatasetOnDisk,
+                url=f'{HOST}/{KEYS.BIGGAN_ZS_PLACES365}.zip',
+            ),
+    }
+    configs.update(others)
+    return configs
+
+
+def default_dataset_hub(**others: hubs.DatasetConfig) -> hubs.DatasetHub:
     """Return configs for all datasets used in dissection."""
-    return hubs.DatasetHub(
-        **{
-            KEYS.IMAGENET:
-                hubs.DatasetConfig(torchvision.datasets.ImageFolder,
-                                   transform=torchvision.transforms.Compose([
-                                       torchvision.transforms.Resize(256),
-                                       torchvision.transforms.CenterCrop(224),
-                                       torchvision.transforms.ToTensor(),
-                                       renormalize.NORMALIZER['imagenet']
-                                   ])),
-            KEYS.PLACES365:
-                hubs.DatasetConfig(torchvision.datasets.ImageFolder,
-                                   transform=torchvision.transforms.Compose([
-                                       torchvision.transforms.Resize(256),
-                                       torchvision.transforms.CenterCrop(224),
-                                       torchvision.transforms.ToTensor(),
-                                       renormalize.NORMALIZER['imagenet'],
-                                   ])),
-            KEYS.IMAGENET_SPURIOUS_TEXT:
-                hubs.DatasetConfig(torchvision.datasets.ImageFolder,
-                                   transform=torchvision.transforms.Compose([
-                                       torchvision.transforms.Resize((224,
-                                                                      224)),
-                                       torchvision.transforms.ToTensor(),
-                                       renormalize.NORMALIZER['imagenet']
-                                   ])),
-            KEYS.IMAGENET_SPURIOUS_COLOR:
-                hubs.DatasetConfig(torchvision.datasets.ImageFolder,
-                                   transform=torchvision.transforms.Compose([
-                                       torchvision.transforms.Resize((224,
-                                                                      224)),
-                                       torchvision.transforms.ToTensor(),
-                                       renormalize.NORMALIZER['imagenet']
-                                   ])),
-            KEYS.BIGGAN_ZS_IMAGENET:
-                hubs.DatasetConfig(
-                    TensorDatasetOnDisk,
-                    url=f'{HOST}/{KEYS.BIGGAN_ZS_IMAGENET}.zip',
-                ),
-            KEYS.BIGGAN_ZS_PLACES365:
-                hubs.DatasetConfig(
-                    TensorDatasetOnDisk,
-                    url=f'{HOST}/{KEYS.BIGGAN_ZS_PLACES365}.zip',
-                ),
-        })
+    configs = default_dataset_configs(**others)
+    return hubs.DatasetHub(**configs)
 
 
 def load(name: str,
@@ -115,8 +122,6 @@ def load(name: str,
         torch.utils.data.Dataset: The loaded dataset.
 
     """
-    if configs is None:
-        hub = default_dataset_hub()
-    else:
-        hub = hubs.DatasetHub(**configs)
+    configs = configs or {}
+    hub = default_dataset_hub(**configs)
     return hub.load(name, **kwargs)
