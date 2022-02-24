@@ -28,7 +28,7 @@ MILAN_MODELS_DIR=./models
 MILAN_RESULTS_DIR=./results
 ```
 
-## Using MILANNOTATIONS
+## Downloading MILANNOTATIONS
 
 We collected over 50k human descriptions of sets of image regions, which were taken from the top-activating images of several base models. We make the full set of annotations and top-image masks publicly available.
 
@@ -73,9 +73,22 @@ resnet_imagenet = milannotations.load('resnet152/imagenet')
 For a complete demo on interacting with MILANNOTATIONS, see
 [notebooks/milannotations.ipynb](notebooks/milannotations.ipynb).
 
-## Using MILAN
+## Downloading MILAN
 
-We offer several pretrained MILAN models trained on different subsets of MILANNOTATIONS. The library automatically downloads and configures the models. Here is a minimal usage example applied to DINO:
+We offer several pretrained MILAN models trained on different subsets of MILANNOTATIONS:
+
+| Version | Trained On | Download |
+|---------|------------|----------|
+| base | {alexnet, resnet152, biggan} x {imagenet, places365} | [weights](https://milan.csail.mit.edu/models/milan-base.pth)
+| cls | {alexnet, resnet152} x {imagenet, places365} | [weights](https://milan.csail.mit.edu/models/milan-cls.pth)
+| gen | {biggan} x {imagenet, places365} | [weights](https://milan.csail.mit.edu/models/milan-gen.pth)
+| imagenet | {alexnet, resnet152, biggan} x {imagenet} | [weights](https://milan.csail.mit.edu/models/milan-imagenet.pth)
+| places365 | {alexnet, resnet152, biggan} x {places365} | [weights](https://milan.csail.mit.edu/models/milan-places365.pth)
+| alexnet | {alexnet} x {imagenet, places365} | [weights](https://milan.csail.mit.edu/models/milan-alexnet.pth)
+| resnet152 | {resnet152} x {imagenet, places365} | [weights](https://milan.csail.mit.edu/models/milan-resnet152.pth)
+| biggan | {resnet152} x {imagenet, places365} | [weights](https://milan.csail.mit.edu/models/milan-biggan.pth)
+
+The root module for MILAN is `Decoder` inside [src.milan.decoders](src/milan/decoders.py). However, you should not have to interact with it because the library will automatically download and configure the model for you. Here is a minimal usage example applied to DINO:
 
 ```python
 from src import milan, milannotations
@@ -92,19 +105,61 @@ outputs = milan(sample.images, masks=sample.masks)
 print(outputs.captions[0])
 ```
 
-If you would like to apply MILAN to a new model, you must first compute the top-activating images for its neurons. You can do this in two steps. First, add a config to [src/exemplars/models.py](src/exemplars/models.py) for your model and to [src/exemplars/datasets.py](src/exemplars/datasets.py) for the dataset you want the top images to be taken from. Then, you can call the following script:
-```bash
-python3 -m scripts.compute_exemplars your_model_name your_dataset_name --device cuda
+## Applying MILAN to new models
+
+Do you want to get neuron descriptions for your own model? Our library makes very few assumptions about the model to be described, other than (1) it has a PyTorch implementation, (2) the inputs or outputs of the model are images, and (3) the layer containing the target neurons corresponds directly to a torch module so its output can be hooked during exemplar construction.
+
+To get started, follow the next three steps.
+
+### Step 1: Configure your model
+
+MILAN first needs to know:
+- how to load your model
+- how to load the dataset containing source images
+- what layers look in for neurons
+
+This information is specified inside [src/exemplars/models.py](src/exemplars/models.py) and [src/exemplars/datasets.py](src/exemplars/datasets.py) using the `ModelConfig` and `DatasetConfig` constructs, respectively. Simply add configs for your model and dataset inside `default_model_configs` and `default_dataset_configs`.
+
+To illustrate how the configs work, here is a model config for one of the models from MILANNOTATIONS:
+
+```python
+def default_model_configs(...):
+  configs = {
+    ...
+    'resnet152/imagenet': ModelConfig(
+      torchvision.models.resnet152,
+      pretrained=True,
+      load_weights=False,
+      layers=('conv1', 'layer1', 'layer2', 'layer3', 'layer4'),
+    )
+    ...
+  }
 ```
-Please note that, by default, this script will:
-- look for your model under `$MILAN_MODELS_DIR/your_model_name.pth`;
-- look for your dataset under `$MILAN_DATA_DIR/your_dataset_name`;
-- write top images to `$MILAN_RESULTS_DIR/your_model_name/your_dataset_name`;
-- link the directory above to an equivalent directory in `$MILAN_DATA_DIR`.
+Walking through each of the pieces:
+- **`torchvision.models.resnet152`**: A function that returns a torch module.
+- **`pretrained`**: This argument is unrecognized by `ModelConfig`, so it will be forwarded to the factory function when it is called. In this case, it is used by torchvision to signal that we want to download the pretrained model.
+- **`load_weights`**: When this is true, the config will look for a file containing pretrained weights under `$MILAN_MODELS_DIR/resnet152-imagenet.pth` and try to load them into the model. Since torchvision downloads the weights for us, we set this to False.
+- **`layers`**: A sequence of fully specified paths to the layers you want to compute exemplars for. E.g., if you specifically want to use the first conv layer in the first sub-block of layer1 of resnet152, you would specify it as `layer1.0.conv1`.
 
-<!-- For a more detailed demo of `MILAN`'s features, see [notebooks/milan.ipynb](notebooks/milan.ipynb). -->
+The dataset configs behave similarly. See the class definitions in [src/utils/hubs.py](src/utils/hubs.py) for a full list of options.
 
-## Running experiments & other scripts
+### Step 2: Compute top-activating images
+
+Once you've configured your model, you can run the script below to compute exemplars for your model. Continuing our ResNet152 example:
+```bash
+python3 -m scripts.compute_exemplars resnet152 imagenet --device cuda
+```
+This will write the top images under `$MILAN_RESULTS_DIR/resnet152/imagenet` and link it to the corresponding directory in `$MILAN_DATA_DIR` so you can load it with the MILANNOTATIONS library.
+
+### Step 3: Decode Descriptions with MILAN
+
+Finally, you can use one of the pretrained MILAN models to get descriptions for the exemplars you just computed. As before, just call a script:
+
+```bash
+python3 -m scripts.compute_milan_descriptions resnet152 imagenet --device cuda
+```
+
+## Running experiments
 
 All experiments from the main paper can be reproduced using scripts in the [experiments](experiments) subdirectory. Here is an example of how to invoke these scripts with the correct `PYTHONPATH`:
 ```bash
