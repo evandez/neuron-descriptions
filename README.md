@@ -28,7 +28,7 @@ MILAN_MODELS_DIR=./models
 MILAN_RESULTS_DIR=./results
 ```
 
-## Using `MILANNOTATIONS`
+## Using MILANNOTATIONS
 
 We collected over 50k human descriptions of sets of image regions, which were taken from the top-activating images of several base models. We make the full set of annotations and top-image masks publicly available.
 
@@ -70,12 +70,12 @@ alexnet_imagenet = milannotations.load('alexnet/imagenet')
 resnet_imagenet = milannotations.load('resnet152/imagenet')
 ```
 
-For a complete demo on interacting with `MILANNOTATIONS`, see
+For a complete demo on interacting with MILANNOTATIONS, see
 [notebooks/milannotations.ipynb](notebooks/milannotations.ipynb).
 
-## Using `MILAN`
+## Using MILAN
 
-We offer several pretrained MILAN models trained on different subsets of `MILANNOTATIONS`. The library automatically downloads and configures the models. Here is a minimal usage example applied to DINO:
+We offer several pretrained MILAN models trained on different subsets of MILANNOTATIONS. The library automatically downloads and configures the models. Here is a minimal usage example applied to DINO:
 
 ```python
 from src import milan, milannotations
@@ -92,7 +92,7 @@ outputs = milan(sample.images, masks=sample.masks)
 print(outputs.captions[0])
 ```
 
-If you would like to apply `MILAN` to a new model, you must first compute the top-activating images for its neurons. You can do this in two steps. First, add a config to [src/exemplars/models.py](src/exemplars/models.py) for your model and to [src/exemplars/datasets.py](src/exemplars/datasets.py) for the dataset you want the top images to be taken from. Then, you can call the following script:
+If you would like to apply MILAN to a new model, you must first compute the top-activating images for its neurons. You can do this in two steps. First, add a config to [src/exemplars/models.py](src/exemplars/models.py) for your model and to [src/exemplars/datasets.py](src/exemplars/datasets.py) for the dataset you want the top images to be taken from. Then, you can call the following script:
 ```bash
 python3 -m scripts.compute_exemplars your_model_name your_dataset_name --device cuda
 ```
