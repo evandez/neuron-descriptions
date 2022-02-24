@@ -4,7 +4,7 @@ In this paper, we ask: what concepts are encoded in the features of neural netwo
 
 We can represent the behavior of a neuron by the set of inputs that cause it to activate most strongly, a set we name the "top-activating exemplars"--in the case of networks trained on computer vision tasks, the exemplars take the form of image regions. While they highlight that the corresponding neurons are sensitive to interesting perceptual-, object-, scene-level concepts, it is challenging to analyze the exemplars for all of the neurons at scale. Previous automated labeling techniques pulled candidate labels from a fixed, pre-specified set, limiting the kinds of behaviors they could surface.
 
-This project introduces **MILAN**, an approach for generating natural language descriptions of neurons in neural networks. MILAN is built on another set of neural networks, which in turned are trained on a novel dataset of (image regions, description) pairs called MILANNOTATIONS. The descriptions are chosen so that they have high pointwise mutual information with the neuron, encouraging them to be both truthful and specific.
+This project introduces **MILAN**, an approach for generating natural language descriptions of neurons in neural networks. MILAN is built on another set of neural networks, which in turned are trained on a novel dataset of (image regions, description) pairs called **MILANNOTATIONS**. The descriptions are chosen so that they have high pointwise mutual information with the neuron, encouraging them to be both truthful and specific.
 
 ![MILAN overview](/www/milan-overview.png)
 
