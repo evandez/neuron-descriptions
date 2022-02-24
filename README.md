@@ -32,7 +32,7 @@ MILAN_RESULTS_DIR=./results
 
 We collected over 50k human descriptions of sets of image regions, which were taken from the top-activating images of several base models. We make the full set of annotations and top-image masks publicly available.
 
-For legal reasons, we cannot release the raw source images from ImageNet, but we include pointers to the images as they appear in a standard [`torchvision.datasets.ImageFolder`](https://pytorch.org/vision/stable/datasets.html#torchvision.datasets.ImageFolder). If you use the library described further down, it will automatically import your locally downloaded copy of ImageNet with MILANNOTATIONS.
+For legal reasons, we cannot release the raw source images from ImageNet, but we include pointers to the images as they appear in a standard [`ImageFolder`](https://pytorch.org/vision/stable/datasets.html#torchvision.datasets.ImageFolder). If you use the library described further down, it will automatically import your locally downloaded copy of ImageNet with MILANNOTATIONS.
 
 The table below details the annotated base models.
 
