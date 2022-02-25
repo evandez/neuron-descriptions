@@ -82,9 +82,6 @@ alexnet_imagenet = milannotations.load('alexnet/imagenet')
 resnet_imagenet = milannotations.load('resnet152/imagenet')
 ```
 
-For a complete demo on interacting with MILANNOTATIONS, see
-[notebooks/milannotations.ipynb](notebooks/milannotations.ipynb).
-
 ## Downloading MILAN
 
 We offer several pretrained MILAN models trained on different subsets of MILANNOTATIONS:
