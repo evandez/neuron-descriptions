@@ -50,13 +50,13 @@ The table below details the annotated base models.
 
 | Model | Task | # Units | # Desc. | Source Images | Download |
 |-------|------|---------|---------|---------------|----------|
-| alexnet/imagenet | class | 1k | 3k | [request access](https://www.image-net.org) | [zip](https://milan.csail.mit.edu/data/alexnet-imagenet.zip) |
-| alexnet/places365 | class | 1k | 3k | included in zip | [zip](https://milan.csail.mit.edu/data/alexnet-places365.zip) |
-| resnet152/imagenet | class | 3k | 9k | [request access](https://www.image-net.org) | [zip](https://milan.csail.mit.edu/data/resnet152-imagenet.zip) |
-| resnet152/places365 | class | 4k | 12k | included in zip | [zip](https://milan.csail.mit.edu/data/resnet152-places365.zip)
-biggan/imagenet | gen | 4k | 12k | included in zip | [zip](https://milan.csail.mit.edu/data/biggan-imagenet.zip)
-biggan/places365 | gen | 4k | 12k | included in zip | [zip](https://milan.csail.mit.edu/data/biggan-places365.zip)
-dino_vits8/imagenet | BYOL | 1.2k | 3.6k | [request access](https://www.image-net.org) | [zip](https://milan.csail.mit.edu/data/dino_vits8-imagenet.zip)
+| alexnet/imagenet | class | 1k | 3k | [request access](https://www.image-net.org) | [zip](http://milan.csail.mit.edu/data/alexnet-imagenet.zip) |
+| alexnet/places365 | class | 1k | 3k | included in zip | [zip](http://milan.csail.mit.edu/data/alexnet-places365.zip) |
+| resnet152/imagenet | class | 3k | 9k | [request access](https://www.image-net.org) | [zip](http://milan.csail.mit.edu/data/resnet152-imagenet.zip) |
+| resnet152/places365 | class | 4k | 12k | included in zip | [zip](http://milan.csail.mit.edu/data/resnet152-places365.zip)
+biggan/imagenet | gen | 4k | 12k | included in zip | [zip](http://milan.csail.mit.edu/data/biggan-imagenet.zip)
+biggan/places365 | gen | 4k | 12k | included in zip | [zip](http://milan.csail.mit.edu/data/biggan-places365.zip)
+dino_vits8/imagenet | BYOL | 1.2k | 3.6k | [request access](https://www.image-net.org) | [zip](http://milan.csail.mit.edu/data/dino_vits8-imagenet.zip)
 
 <!--
 We also provide precomputed exemplars for other image classification models analyzed in the original paper. They are all based on ImageNet and require you to have a local copy (i.e., `$MILAN_DATA_DIR/imagenet/val` should exist):
@@ -88,14 +88,14 @@ We offer several pretrained MILAN models trained on different subsets of MILANNO
 
 | Version | Trained On | Download |
 |---------|------------|----------|
-| base | {alexnet, resnet152, biggan} x {imagenet, places365} | [weights](https://milan.csail.mit.edu/models/milan-base.pth)
-| cls | {alexnet, resnet152} x {imagenet, places365} | [weights](https://milan.csail.mit.edu/models/milan-cls.pth)
-| gen | {biggan} x {imagenet, places365} | [weights](https://milan.csail.mit.edu/models/milan-gen.pth)
-| imagenet | {alexnet, resnet152, biggan} x {imagenet} | [weights](https://milan.csail.mit.edu/models/milan-imagenet.pth)
-| places365 | {alexnet, resnet152, biggan} x {places365} | [weights](https://milan.csail.mit.edu/models/milan-places365.pth)
-| alexnet | {alexnet} x {imagenet, places365} | [weights](https://milan.csail.mit.edu/models/milan-alexnet.pth)
-| resnet152 | {resnet152} x {imagenet, places365} | [weights](https://milan.csail.mit.edu/models/milan-resnet152.pth)
-| biggan | {resnet152} x {imagenet, places365} | [weights](https://milan.csail.mit.edu/models/milan-biggan.pth)
+| base | {alexnet, resnet152, biggan} x {imagenet, places365} | [weights](http://milan.csail.mit.edu/models/milan-base.pth)
+| cls | {alexnet, resnet152} x {imagenet, places365} | [weights](http://milan.csail.mit.edu/models/milan-cls.pth)
+| gen | {biggan} x {imagenet, places365} | [weights](http://milan.csail.mit.edu/models/milan-gen.pth)
+| imagenet | {alexnet, resnet152, biggan} x {imagenet} | [weights](http://milan.csail.mit.edu/models/milan-imagenet.pth)
+| places365 | {alexnet, resnet152, biggan} x {places365} | [weights](http://milan.csail.mit.edu/models/milan-places365.pth)
+| alexnet | {alexnet} x {imagenet, places365} | [weights](http://milan.csail.mit.edu/models/milan-alexnet.pth)
+| resnet152 | {resnet152} x {imagenet, places365} | [weights](http://milan.csail.mit.edu/models/milan-resnet152.pth)
+| biggan | {resnet152} x {imagenet, places365} | [weights](http://milan.csail.mit.edu/models/milan-biggan.pth)
 
 The root module for MILAN is `Decoder` inside [src.milan.decoders](src/milan/decoders.py). However, you should not have to interact with it because the library will automatically download and configure the model for you. Here is a minimal usage example applied to DINO:
 
