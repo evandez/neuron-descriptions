@@ -3,6 +3,7 @@ import pathlib
 from typing import Any, Mapping, Optional
 
 from src.milannotations import datasets, merges
+from srcEt.milannotations import datasetsMini
 from src.utils import env, hubs
 
 import easydict
@@ -241,11 +242,13 @@ def load(name: str = 'base',
         torch.utils.data.Dataset: The loaded dataset.
 
     """
+
     configs = configs or {}
     dataset_hub = default_dataset_hub(**configs)
     if name in DATASET_GROUPINGS:
         dataset = dataset_hub.load_all(*DATASET_GROUPINGS[name], **kwargs)
     elif name in dataset_hub.configs:
+        print('WE ARE HERE IN  milannotations.loaders.py!!!!') # 
         dataset = dataset_hub.load(name, **kwargs)
     else:
         path = kwargs.get('path', env.data_dir() / name)
@@ -256,8 +259,10 @@ def load(name: str = 'base',
         dataset_hub = default_dataset_hub(
             name=hubs.DatasetConfig(datasets.TopImagesDataset))
         return dataset_hub.load(name, **kwargs)
+
     assert isinstance(
         dataset,
-        (datasets.TopImagesDataset, datasets.AnnotatedTopImagesDataset),
+        (datasets.TopImagesDataset, datasets.AnnotatedTopImagesDataset,
+         datasetsMini.TopImagesDataset, datasetsMini.AnnotatedTopImagesDataset,   ), # edited for mini version
     ), dataset
     return dataset

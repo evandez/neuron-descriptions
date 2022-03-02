@@ -248,6 +248,9 @@ class DatasetConfig:
         if not path.exists():
             raise FileNotFoundError(f'dataset path does not exist: {path}')
 
+        # print('this is so convoluted...\n HERE IN Dataset Config. ')
+        # print('factory:', factory) # maybe_merge_and_load_dataset
+        # raise Exception('gg')    
         return factory(path, **kwargs)
 
 
@@ -284,7 +287,6 @@ class DatasetHub:
             path = env.data_dir() / name
 
         dataset = config.load(path=path, **kwargs)
-
         return dataset
 
     def load_all(self,

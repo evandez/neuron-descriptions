@@ -182,7 +182,7 @@ def maybe_merge_and_load_dataset(
     """
     root = pathlib.Path(root)
     layer_dirs = [path for path in root.iterdir() if path.is_dir()]
-
+    
     needs_merge = False
     for layer_dir in layer_dirs:
         images_file = layer_dir / 'images.npy'
@@ -209,17 +209,55 @@ def maybe_merge_and_load_dataset(
                 f'you need to download the source dataset ({source}) '
                 'and store in under $MILAN_DATA_DIR, which defaults '
                 'to ./data')
-        source_dataset = torchvision.datasets.ImageFolder(
-            str(source_dir),
-            transform=transforms.Compose([
-                transforms.Resize(source_shape),
-                transforms.ToTensor(),
-            ]))
+
+        #########################################
+        # Edited this part to allow for rearrangment of Imagenet val data
+        #   Prevent error due to ImageFolder trying to find images arranged 
+        #   in folders classwise.
+        #                                                    - Erico 
+        
+        def get_source_dataset(source_dir, source_shape):
+            source_dataset = torchvision.datasets.ImageFolder(
+                str(source_dir),
+                transform=transforms.Compose([
+                    transforms.Resize(source_shape),
+                    transforms.ToTensor(),
+                ]))
+            return source_dataset
+        try:
+            source_dataset = get_source_dataset(source_dir, source_shape)
+        except BaseException as err:
+            if source_dir.parts[-1] == 'val':
+                # Check if the problem is really because of val folder not arranged in folders.
+                # if val folder is the problem, use this fix
+                from .adhocfix import try_alternative_val_folder 
+                alternative_source_dir = try_alternative_val_folder(source_dir, err)
+                source_dataset = get_source_dataset(alternative_source_dir, source_shape)
+            else: 
+                raise RuntimeError('Currently unknown error.')
+        # end edit
+        #########################################
+            
         merge(root, source_dataset, force=force, image_index=image_index)
+
+
 
     annotations_file = root / 'annotations.csv'
     has_annotations = annotations_file.exists()
-    if annotations and has_annotations:
-        return datasets.AnnotatedTopImagesDataset(root, **kwargs)
+    if kwargs['mini_mode']:
+        """ mini_mode edit:
+        Without mini mode, the original code is very memory-heavy. It is not suitable
+        for use in a small machine, e.g. for debugging. Here, we redirect the flow
+        to something lightweight, in which we do NOT load every layer. We load only
+        the layer that we are interested in at the moment.
+        """
+        from srcEt.milannotations import datasetsMini
+        if annotations and has_annotations:
+            return datasetsMini.AnnotatedTopImagesDataset(root, **kwargs)
+        else:
+            raise NotImplementeError('Not tested')
     else:
-        return datasets.TopImagesDataset(root, **kwargs)
+        if annotations and has_annotations:
+            return datasets.AnnotatedTopImagesDataset(root, **kwargs)
+        else:
+            return datasets.TopImagesDataset(root, **kwargs)

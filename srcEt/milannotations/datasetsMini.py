@@ -16,6 +16,9 @@ from torchvision import utils
 from torchvision.transforms import functional
 from tqdm.auto import tqdm
 
+"""
+This is similar to src/milannotations/datasets.py, except we don't always load everything
+"""
 
 class TopImages(NamedTuple):
     """Top images for a unit."""
@@ -100,7 +103,8 @@ class TopImagesDataset(data.Dataset):
                  device: Optional[Union[str, torch.device]] = None,
                  transform_images: Optional[TransformTensor] = None,
                  transform_masks: Optional[TransformTensor] = None,
-                 display_progress: bool = True):
+                 display_progress: bool = True,
+                 **kwargs):
         """Initialize the dataset.
 
         Args:
@@ -125,7 +129,8 @@ class TopImagesDataset(data.Dataset):
                 directory is missing images or masks.
             ValueError: If no layers found or provided, or if units have
                 different number of top images.
-
+    
+        Added **kwargs just to buffer against unused keywords
         """
         root = pathlib.Path(root)
         if not root.is_dir():
@@ -146,78 +151,86 @@ class TopImagesDataset(data.Dataset):
         self.transform_images = transform_images
         self.transform_masks = transform_masks
 
-        progress = layers
-        if display_progress is not None:
-            progress = tqdm(progress,
-                            desc=f'load {root.parent.name}/{root.name}')
+        # progress = layers
+        # if display_progress is not None:
+        #     progress = tqdm(progress,
+        #                     desc=f'load {root.parent.name}/{root.name}')
 
         self.images_by_layer = {}
         self.masks_by_layer = {}
         self.units_by_layer = {}
         renormalizer = renormalize.renormalizer(source='byte', target='pt')
-        for layer in progress:
-            images_file = root / str(layer) / 'images.npy'
-            masks_file = root / str(layer) / 'masks.npy'
-            for file in (images_file, masks_file):
-                if not file.exists():
-                    raise FileNotFoundError(f'{layer} is missing {file.name}')
+        
+        ######################################
+        layer = kwargs['lookup_layer']
+        # for layer in progress:
+        images_file = root / str(layer) / 'images.npy'
+        masks_file = root / str(layer) / 'masks.npy'
+        for file in (images_file, masks_file):
+            if not file.exists():
+                raise FileNotFoundError(f'{layer} is missing {file.name}')
 
-            images = torch.from_numpy(numpy.load(images_file))
-            masks = torch.from_numpy(numpy.load(masks_file))
+        images = torch.from_numpy(numpy.load(images_file))
+        masks = torch.from_numpy(numpy.load(masks_file))
 
-            for name, tensor in (('images', images), ('masks', masks)):
-                if tensor.dim() != 5:
-                    raise ValueError(f'expected 5D {name}, '
-                                     f'got {tensor.dim()}D '
-                                     f'in layer {layer}')
-            if images.shape[:2] != masks.shape[:2]:
-                raise ValueError(f'layer {layer} masks/images have '
-                                 'different # unit/images: '
-                                 f'{images.shape[:2]} vs. {masks.shape[:2]}')
-            if images.shape[3:] != masks.shape[3:]:
-                raise ValueError(f'layer {layer} masks/images have '
-                                 'different height/width '
-                                 f'{images.shape[3:]} vs. {masks.shape[3:]}')
+        for name, tensor in (('images', images), ('masks', masks)):
+            if tensor.dim() != 5:
+                raise ValueError(f'expected 5D {name}, '
+                                 f'got {tensor.dim()}D '
+                                 f'in layer {layer}')
+        if images.shape[:2] != masks.shape[:2]:
+            raise ValueError(f'layer {layer} masks/images have '
+                             'different # unit/images: '
+                             f'{images.shape[:2]} vs. {masks.shape[:2]}')
+        if images.shape[3:] != masks.shape[3:]:
+            raise ValueError(f'layer {layer} masks/images have '
+                             'different height/width '
+                             f'{images.shape[3:]} vs. {masks.shape[3:]}')
 
-            # Handle units separately, since they're optional.
-            units_file = root / str(layer) / 'units.npy'
-            if units_file.exists():
-                units = torch.from_numpy(numpy.load(units_file))
-                if units.dim() != 1:
-                    raise ValueError(f'expected 1D units, got {units.dim()}D')
-            else:
-                units = torch.arange(len(images))
+        
+        # Handle units separately, since they're optional.
+        units_file = root / str(layer) / 'units.npy'
+        if units_file.exists():
+            units = torch.from_numpy(numpy.load(units_file))
+            if units.dim() != 1:
+                raise ValueError(f'expected 1D units, got {units.dim()}D')
+        else:
+            units = torch.arange(len(images))
 
-            images = images.float()
-            masks = masks.float()
+        images = images.float()
+        masks = masks.float()
 
-            shape = images.shape
-            images = images.view(-1, *shape[2:])
-            images = renormalizer(images)
-            images = images.view(*shape)
+        shape = images.shape
+        images = images.view(-1, *shape[2:])
+        images = renormalizer(images)
+        images = images.view(*shape)
 
-            if device is not None:
-                images = images.to(device)
-                masks = masks.to(device)
+        if device is not None:
+            images = images.to(device)
+            masks = masks.to(device)
 
-            self.images_by_layer[layer] = images
-            self.masks_by_layer[layer] = masks
-            self.units_by_layer[layer] = units
+        self.images_by_layer[layer] = images
+        self.masks_by_layer[layer] = masks
+        self.units_by_layer[layer] = units
 
         self.samples = []
-        for layer in layers:
-            for unit, images, masks in zip(self.units_by_layer[layer],
-                                           self.images_by_layer[layer],
-                                           self.masks_by_layer[layer]):
-                if transform_images is not None:
-                    images = transform_images(images)
-                if transform_masks is not None:
-                    masks = transform_masks(masks)
-                sample = TopImages(layer=str(layer),
-                                   unit=unit.item(),
-                                   images=images,
-                                   masks=masks)
-                self.samples.append(sample)
+        ######################################
+
+        ######################################
+        # for layer in layers:
+        for unit, images, masks in zip(self.units_by_layer[layer],
+                                       self.images_by_layer[layer],
+                                       self.masks_by_layer[layer]):
+            if transform_images is not None:
+                images = transform_images(images)
+            if transform_masks is not None:
+                masks = transform_masks(masks)
+            sample = TopImages(layer=str(layer),
+                               unit=unit.item(),
+                               images=images,
+                               masks=masks)
+            self.samples.append(sample)   
+        ######################################
 
     def __getitem__(self, index: int) -> TopImages:
         """Return the top images.
@@ -249,6 +262,8 @@ class TopImagesDataset(data.Dataset):
             TopImages: The top images.
 
         """
+
+
         layer = str(layer)
         if layer not in self.images_by_layer:
             raise KeyError(f'layer "{layer}" does not exist')
@@ -418,6 +433,13 @@ class AnnotatedTopImagesDataset(data.Dataset):
                 samples.append(annotated_top_images)
         else:
             for key, annotations in annotations_by_layer_unit.items():
+                ######################################
+                # extract only the layer we need
+                this_layer = key[0]
+                if not (this_layer==kwargs['lookup_layer']):
+                    continue
+                ######################################
+
                 if len(annotations) < annotation_count:
                     continue
                 elif len(annotations) > annotation_count:
@@ -470,7 +492,7 @@ class AnnotatedTopImagesDataset(data.Dataset):
         """
         key = (str(layer), unit)
         if key not in self.samples_by_layer_unit:
-            raise KeyError(f'no annotated top images for: {key}')
+            raise KeyError(f'available: {self.samples_by_layer_unit}. No annotated top images for: {key}')
         sample = self.samples_by_layer_unit[key]
         return sample
 
