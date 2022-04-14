@@ -19,6 +19,7 @@ import csv
 import pathlib
 from typing import Any, Optional, Sized, cast
 
+from src.deps.netdissect import renormalize
 from src.milannotations import datasets
 from src.utils import env
 from src.utils.typing import PathLike
@@ -73,6 +74,7 @@ def merge(root: PathLike,
     root = pathlib.Path(root)
     source_length = len(cast(Sized, source))
     layers = [path for path in root.iterdir() if path.is_dir()]
+    renormalizer = renormalize.renormalizer(source='pt', target='byte')
 
     message = 'merging source images'
     progress = tqdm(layers, desc=message)
@@ -151,7 +153,8 @@ def merge(root: PathLike,
             # We're good! Throw em in.
             images_by_unit.append(images_stacked)
 
-        numpy.save(f'{layer_dir}/images.npy', torch.stack(images_by_unit))
+        numpy.save(f'{layer_dir}/images.npy',
+                   renormalizer(torch.stack(images_by_unit)).byte())
 
 
 def maybe_merge_and_load_dataset(
