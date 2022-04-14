@@ -151,7 +151,9 @@ class CLIPWithMasks(nn.Module):
     def forward(self,
                 images: torch.Tensor,
                 texts: StrSequence,
-                masks: torch.Tensor = None) -> torch.Tensor:
+                masks: torch.Tensor = None,
+                resize: bool = True,
+                renormalize: bool = True) -> torch.Tensor:
         """Compute similarity between the given images and texts.
 
         Args:
@@ -162,6 +164,10 @@ class CLIPWithMasks(nn.Module):
                 to the images, capturing the regions to match text to.
                 Should have shape (batch_size, 1, height, width).
                 Defaults to None.
+            resize (bool, optional): Resize images to appropriate resolution.
+                Defaults to True.
+            renormalize (bool, optional): Renormalize the images. Defaults
+                to True.
 
         Returns:
             torch.Tensor: Scores with shape (batch_size, len(texts)).
@@ -169,10 +175,20 @@ class CLIPWithMasks(nn.Module):
                 probability distribution over the candidate texts.
 
         """
-        image_inputs = self.renormalizer(images)
+        image_inputs = images
+        if resize:
+            image_inputs = functional.interpolate(image_inputs,
+                                                  size=(self.input_resolution,
+                                                        self.input_resolution),
+                                                  mode='bicubic',
+                                                  align_corners=False)
+        if renormalize:
+            image_inputs = self.renormalizer(images)
+
         text_inputs = torch\
             .cat([clip.tokenize(text) for text in texts])\
             .to(images.device)
+
         with nethook.InstrumentedModel(self.model) as instrumented:
             if masks is not None:
                 num_patches_xy = self.num_patches_xy
@@ -222,6 +238,11 @@ class CLIPWithMasks(nn.Module):
         size = math.isqrt(num_patches)
         assert size**2 == num_patches, 'non-square number of patches'
         return size
+
+    @property
+    def input_resolution(self) -> int:
+        """Return input resolution for CLIP model."""
+        return self.model.visual.input_resolution
 
 
 class RerankerOutput(NamedTuple):
