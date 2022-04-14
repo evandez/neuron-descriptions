@@ -1,9 +1,9 @@
 #!/bin/bash
 
 if [ -e env ]; then
-    PYTHON=env/bin/python
+    PYTHON=env/bin/python3
 else
-    PYTHON=python
+    PYTHON=python3
 fi
 
 function shutdown() {
