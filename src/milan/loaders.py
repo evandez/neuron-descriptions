@@ -8,18 +8,21 @@ from src.utils import hubs
 
 def hub() -> hubs.ModelHub:
     """Create the model hub."""
-    return hubs.ModelHub(
-        **{
-            group: hubs.ModelConfig(
-                decoders.Decoder.load,
+    configs = {}
+    for group in src.milannotations.loaders.DATASET_GROUPINGS:
+        if group.startswith('NOT_'):
+            continue
+        for rerank_with_clip in (False, True):
+            key = f'{group}+clip' if rerank_with_clip else group
+            configs[key] = hubs.ModelConfig(
+                decoders.DecoderWithCLIP.load
+                if rerank_with_clip else decoders.Decoder.load,
                 url=f'{hubs.HOST}/models/milan-{group.replace("/", "_")}.pth',
                 requires_path=True,
                 load_weights=False,
                 map_location='cpu',
             )
-            for group in src.milannotations.loaders.DATASET_GROUPINGS
-            if not group.startswith('NOT_')
-        })
+    return hubs.ModelHub(**configs)
 
 
 def pretrained(config: str = 'base', **kwargs: Any) -> decoders.Decoder:

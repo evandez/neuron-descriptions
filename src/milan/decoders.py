@@ -10,10 +10,10 @@ Most of the complexity in this file is around supporting other decoding
 techniques, like beam search. Don't worry too much about it.
 """
 from typing import (Any, Dict, Mapping, NamedTuple, Optional, Sequence, Sized,
-                    Tuple, Type, Union, cast)
+                    Tuple, Type, TypeVar, Union, cast)
 
 from src.deps.ext import bert_score
-from src.milan import encoders, lms
+from src.milan import encoders, lms, rerankers
 from src.utils import lang, metrics, serialize, training
 from src.utils.typing import Device, OptionalTensors, StrSequence
 
@@ -145,7 +145,9 @@ class DecoderOutput(NamedTuple):
     attentions: Optional[torch.Tensor]
 
     # For reranking and debugging, we need to output the full beam.
-    beam: Optional[Sequence[StrSequence]]
+    beam_captions: Optional[Sequence[StrSequence]]
+    beam_scores: Optional[torch.Tensor]
+    beam_tokens: Optional[torch.Tensor]
 
 
 class AllenNLPDecoderState(dict):
@@ -420,7 +422,9 @@ class Decoder(serialize.SerializableModule):
         # Declare optional outputs for later.
         predictions: Optional[torch.Tensor] = None
         attentions: Optional[torch.Tensor] = None
-        beam: Optional[Sequence[StrSequence]] = None
+        beam_captions: Optional[Sequence[StrSequence]] = None
+        beam_scores: Optional[torch.Tensor] = None
+        beam_tokens: Optional[torch.Tensor] = None
 
         # Begin decoding. Handle non-beam search cases first.
         if strategy not in {STRATEGY_BEAM, STRATEGY_RERANK}:
@@ -479,7 +483,10 @@ class Decoder(serialize.SerializableModule):
             tokens, scores = runner.search(
                 currents, AllenNLPDecoderState(features, state), step)
 
-            beam = tuple(map(self.indexer.reconstruct, tokens.tolist()))
+            beam_captions = tuple(
+                map(self.indexer.reconstruct, tokens.tolist()))
+            beam_scores = scores
+            beam_tokens = tokens
 
             # Prepare output sequences, depending on strategy.
             if strategy == STRATEGY_BEAM:
@@ -510,7 +517,9 @@ class Decoder(serialize.SerializableModule):
             scores=scores,
             predictions=predictions,
             attentions=attentions,
-            beam=beam,
+            beam_captions=beam_captions,
+            beam_scores=beam_scores,
+            beam_tokens=beam_tokens,
         )
 
     def encode(self,
@@ -1100,8 +1109,89 @@ class Decoder(serialize.SerializableModule):
         return resolved
 
 
+DecoderWithCLIPT = TypeVar('DecoderWithCLIPT', bound='DecoderWithCLIP')
+
+
+class DecoderWithCLIP(Decoder):
+    """Decoder that uses CLIP to rerank the final beam."""
+
+    def __init__(self,
+                 *args: Any,
+                 reranker_kwargs: Optional[Mapping[str, Any]] = None,
+                 **kwargs: Any):
+        """Initialize the decoder."""
+        kwargs.setdefault('strategy', STRATEGY_BEAM)
+        kwargs.setdefault('beam_size', 1000)
+        kwargs.setdefault('temperature', .5)
+        super().__init__(*args, **kwargs)
+
+        self.reranker_kwargs = dict(reranker_kwargs) if reranker_kwargs else {}
+        self.reranker_kwargs.setdefault('name', 'ViT-B/32')
+        self.reranker_kwargs.setdefault('jit', False)
+        self.reranker_kwargs.setdefault('device', 'cpu')
+        self.reranker = rerankers.reranker(**self.reranker_kwargs)
+
+    def forward(  # type: ignore[override]
+        self,
+        images_or_features: torch.Tensor,
+        masks: Optional[torch.Tensor] = None,
+        lam: Optional[float] = None,
+        **kwargs: Any,
+    ) -> DecoderOutput:
+        """Use MILAN to decode descriptions, then rerank the beam with CLIP.
+
+        Args:
+            images_or_features (torch.Tensor): Top images for a neuron. Despite
+                the parameter name, this *cannot* be precomputed features
+                because the images must be passed to CLIP intact.
+            masks (Optional[torch.Tensor], optional): Activation masks for the
+                images. Again, despite the default, *must* be specified for
+                reranking to work. Defaults to None.
+            lam (Optional[float], optional): Lambda value to pass to CLIP
+                reranker. Defaults to None.
+
+        Raises:
+            ValueError: If masks not specified.
+
+        Returns:
+            DecoderOutput: Output in which captions/scores/tokens are result
+                of reranking.
+
+        """
+        if masks is None:
+            raise ValueError('must specify masks in DecoderWithCLIP')
+        images = images_or_features  # Name correction.
+        outputs = super().forward(images, masks=masks, **kwargs)
+        rerankeds = self.reranker(images, masks, outputs.beam, lam=lam)
+
+        # We have to make sure Decoder's contract is still satisfied,
+        # so this class can be used interchangably with it. Hence,
+        # reorder the tokens, scores, etc. as necessary.
+        captions = tuple(reranked[0] for reranked in rerankeds.texts)
+        scores = torch.stack(
+            [outputs.scores[order[0]] for order in rerankeds.orders])
+        tokens = torch.stack(
+            [outputs.tokens[order[0]] for order in rerankeds.orders])
+
+        return DecoderOutput(captions, scores, tokens, *outputs[3:])
+
+    def properties(self) -> serialize.Properties:
+        """Return all serializable properties."""
+        return {
+            **super().properties(),
+            'reranker_kwargs': self.reranker_kwargs,
+        }
+
+    @classmethod
+    def from_decoder(cls: Type[DecoderWithCLIPT],
+                     decoder: Decoder) -> DecoderWithCLIPT:
+        """Convert a base Decoder to a DecoderWithCLIP."""
+        return cls.deserialize(decoder.serialize())
+
+
 def decoder(dataset: data.Dataset,
             encoder: encoders.Encoder,
+            rerank_with_clip: bool = False,
             annotation_index: int = 4,
             indexer_kwargs: Optional[Mapping[str, Any]] = None,
             **kwargs: Any) -> Decoder:
@@ -1110,6 +1200,9 @@ def decoder(dataset: data.Dataset,
     Args:
         dataset (data.Dataset): Dataset to draw vocabulary from.
         encoder (encoders.Encoder): Visual encoder.
+        reranker (Optional[rerankers.CLIPWithMasksReranker], optional): A CLIP
+            ranker. If set, will return DecoderWithCLIP instead of Decoder.
+            Defaults to None.
         annotation_index (int, optional): Index of language annotations in
             dataset samples. Defaults to 4 to be compatible with
             AnnotatedTopImagesDataset.
@@ -1139,4 +1232,7 @@ def decoder(dataset: data.Dataset,
         indexer_kwargs.setdefault(key, True)
     indexer = lang.indexer(annotations, **indexer_kwargs)
 
-    return Decoder(indexer, encoder, **kwargs)
+    if rerank_with_clip:
+        return DecoderWithCLIP(indexer, encoder, **kwargs)
+    else:
+        return Decoder(indexer, encoder, **kwargs)

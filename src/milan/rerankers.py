@@ -22,7 +22,7 @@ The full reranking procedure:
 
 """
 import math
-from typing import Any, Optional, Sequence, Tuple
+from typing import Any, NamedTuple, Optional, Sequence, Tuple
 
 from src.deps.netdissect import nethook, renormalize
 from src.utils.typing import StrSequence
@@ -224,6 +224,13 @@ class CLIPWithMasks(nn.Module):
         return size
 
 
+class RerankerOutput(NamedTuple):
+    """Output of a reranking algorithm."""
+
+    texts: Sequence[StrSequence]
+    orders: Sequence[Sequence[int]]
+
+
 class CLIPWithMasksReranker(nn.Module):
     """Rerank sampled captions using CLIP."""
 
@@ -246,7 +253,7 @@ class CLIPWithMasksReranker(nn.Module):
         masks: torch.Tensor,
         texts: Sequence[StrSequence],
         lam: Optional[float] = None,
-    ) -> Sequence[StrSequence]:
+    ) -> RerankerOutput:
         """Use MILAN to sample captions, then rerank them using CLIP scores.
 
         A smaller batch size is ideal, as this function is expensive!
@@ -263,7 +270,7 @@ class CLIPWithMasksReranker(nn.Module):
                 similarity scores. Defaults to 1 (equal weight).
 
         Returns:
-            Sequence[StrSequence]: The reranked decoder output.
+            RerankerOutput: The reranked texts and corresponding indices.
 
         """
         if len(images) != len(masks):
@@ -276,7 +283,7 @@ class CLIPWithMasksReranker(nn.Module):
         if lam is None:
             lam = self.lam
 
-        rerankeds = []
+        rerankeds, orders = [], []
         for b_images, b_masks, b_texts in zip(images, masks, texts):
             sim_masked = self.clip_with_masks(b_images, b_texts, masks=b_masks)
             sim_masked = sim_masked.sum(dim=0)
@@ -287,7 +294,18 @@ class CLIPWithMasksReranker(nn.Module):
             sim = (1. - lam) * sim_masked + lam * sim_unmasked
 
             _, indices = sim.sort(descending=True)
+
             reranked = [b_texts[index] for index in indices.tolist()]
             rerankeds.append(tuple(reranked))
+            orders.append(tuple(indices.tolist()))
 
-        return tuple(rerankeds)
+        return RerankerOutput(tuple(rerankeds), tuple(orders))
+
+
+def reranker(lam: float = 1., **kwargs: Any) -> CLIPWithMasksReranker:
+    """Create a new CLIPWithMasksReranker.
+
+    The **kwargs are forwarded to CLIPWithMasks.
+    """
+    clip_with_masks = CLIPWithMasks(**kwargs)
+    return CLIPWithMasksReranker(clip_with_masks, lam=lam)
