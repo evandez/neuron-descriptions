@@ -15,6 +15,7 @@ def hub() -> hubs.ModelHub:
                 url=f'{hubs.HOST}/models/milan-{group.replace("/", "_")}.pth',
                 requires_path=True,
                 load_weights=False,
+                map_location='cpu',
             )
             for group in src.milannotations.loaders.DATASET_GROUPINGS
             if not group.startswith('NOT_')
