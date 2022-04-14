@@ -1147,6 +1147,7 @@ class DecoderWithCLIP(Decoder):
             masks (Optional[torch.Tensor], optional): Activation masks for the
                 images. Again, despite the default, *must* be specified for
                 reranking to work. Defaults to None.
+
             lam (Optional[float], optional): Lambda value to pass to CLIP
                 reranker. Defaults to None.
 
@@ -1160,8 +1161,15 @@ class DecoderWithCLIP(Decoder):
         """
         if masks is None:
             raise ValueError('must specify masks in DecoderWithCLIP')
+
+        if 'strategy' in kwargs:
+            raise ValueError('cannot set "strategy" in DecoderWithCLIP')
+
         images = images_or_features  # Name correction.
-        outputs = super().forward(images, masks=masks, **kwargs)
+        outputs = super().forward(images,
+                                  masks=masks,
+                                  strategy=STRATEGY_BEAM,
+                                  **kwargs)
         rerankeds = self.reranker(images,
                                   masks,
                                   outputs.beam_captions,
