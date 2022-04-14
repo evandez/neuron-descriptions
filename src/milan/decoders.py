@@ -1162,7 +1162,10 @@ class DecoderWithCLIP(Decoder):
             raise ValueError('must specify masks in DecoderWithCLIP')
         images = images_or_features  # Name correction.
         outputs = super().forward(images, masks=masks, **kwargs)
-        rerankeds = self.reranker(images, masks, outputs.beam, lam=lam)
+        rerankeds = self.reranker(images,
+                                  masks,
+                                  outputs.beam_captions,
+                                  lam=lam)
 
         # We have to make sure Decoder's contract is still satisfied,
         # so this class can be used interchangably with it. Hence,
