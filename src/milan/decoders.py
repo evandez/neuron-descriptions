@@ -144,6 +144,9 @@ class DecoderOutput(NamedTuple):
     predictions: Optional[torch.Tensor]
     attentions: Optional[torch.Tensor]
 
+    # For reranking and debugging, we need to output the full beam.
+    beam: Optional[Sequence[StrSequence]]
+
 
 class AllenNLPDecoderState(dict):
     """Wraps decoder state for AllenNLP implementation of beam search."""
@@ -417,6 +420,7 @@ class Decoder(serialize.SerializableModule):
         # Declare optional outputs for later.
         predictions: Optional[torch.Tensor] = None
         attentions: Optional[torch.Tensor] = None
+        beam: Optional[Sequence[StrSequence]] = None
 
         # Begin decoding. Handle non-beam search cases first.
         if strategy not in {STRATEGY_BEAM, STRATEGY_RERANK}:
@@ -475,6 +479,8 @@ class Decoder(serialize.SerializableModule):
             tokens, scores = runner.search(
                 currents, AllenNLPDecoderState(features, state), step)
 
+            beam = tuple(map(self.indexer.reconstruct, tokens.tolist()))
+
             # Prepare output sequences, depending on strategy.
             if strategy == STRATEGY_BEAM:
                 tokens = tokens[:, 0]
@@ -504,6 +510,7 @@ class Decoder(serialize.SerializableModule):
             scores=scores,
             predictions=predictions,
             attentions=attentions,
+            beam=beam,
         )
 
     def encode(self,
