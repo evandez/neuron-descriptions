@@ -261,7 +261,7 @@ class RerankerOutput(NamedTuple):
 class CLIPWithMasksReranker(nn.Module):
     """Rerank sampled captions using CLIP."""
 
-    def __init__(self, clip_with_masks: CLIPWithMasks, lam: float = 1.):
+    def __init__(self, clip_with_masks: CLIPWithMasks, lam: float = .5):
         """Initialize the reranker.
 
         Args:
@@ -294,7 +294,7 @@ class CLIPWithMasksReranker(nn.Module):
             texts (Sequence[StrSequence]): The candidate texts. Should be
                 batch_size lists of arbitrary length.
             lam (float, optional): Trade off between masked and unmasked CLIP
-                similarity scores. Defaults to 1 (equal weight).
+                similarity scores. Defaults to .5 (equal weight).
 
         Returns:
             RerankerOutput: The reranked texts and corresponding indices.
