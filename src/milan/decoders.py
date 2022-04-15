@@ -1170,19 +1170,26 @@ class DecoderWithCLIP(Decoder):
                                   masks=masks,
                                   strategy=STRATEGY_BEAM,
                                   **kwargs)
-        rerankeds = self.reranker(images,
-                                  masks,
-                                  outputs.beam_captions,
-                                  lam=lam)
+
+        beam_captions = outputs.beam_captions
+        assert beam_captions is not None
+
+        beam_scores = outputs.beam_scores
+        assert beam_scores is not None
+
+        beam_tokens = outputs.beam_tokens
+        assert beam_tokens is not None
+
+        rerankeds = self.reranker(images, masks, beam_captions, lam=lam)
 
         # We have to make sure Decoder's contract is still satisfied,
         # so this class can be used interchangably with it. Hence,
         # reorder the tokens, scores, etc. as necessary.
         captions = tuple(reranked[0] for reranked in rerankeds.texts)
         scores = torch.stack(
-            [outputs.beam_scores[order[0]] for order in rerankeds.orders])
+            [beam_scores[order[0]] for order in rerankeds.orders])
         tokens = torch.stack(
-            [outputs.beam_tokens[order[0]] for order in rerankeds.orders])
+            [beam_tokens[order[0]] for order in rerankeds.orders])
 
         return DecoderOutput(captions, scores, tokens, *outputs[3:])
 
