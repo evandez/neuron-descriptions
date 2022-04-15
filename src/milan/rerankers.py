@@ -201,9 +201,11 @@ class CLIPWithMasks(nn.Module):
 
                 def rule(attentions: torch.Tensor) -> torch.Tensor:
                     assert masks is not None
-                    masked = attentions[:, 0, 1:] * masks
+                    attentions_by_head = attentions.view(
+                        len(masks), -1, *attentions.shape[-2:])
+                    attentions_masked = attentions_by_head[:, 0, 1:] * masks
                     attentions = attentions.clone()
-                    attentions[:, 0, 1:] = masked
+                    attentions[:, 0, 1:] = attentions_masked
                     return attentions
 
                 for layer in self.mask_layers:
