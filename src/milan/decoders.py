@@ -1186,10 +1186,14 @@ class DecoderWithCLIP(Decoder):
         # so this class can be used interchangably with it. Hence,
         # reorder the tokens, scores, etc. as necessary.
         captions = tuple(reranked[0] for reranked in rerankeds.texts)
-        scores = torch.stack(
-            [beam_scores[order[0]] for order in rerankeds.orders])
-        tokens = torch.stack(
-            [beam_tokens[order[0]] for order in rerankeds.orders])
+        scores = torch.stack([
+            beam_scores[position, order[0]]
+            for position, order in enumerate(rerankeds.orders)
+        ])
+        tokens = torch.stack([
+            beam_tokens[position, order[0]]
+            for position, order in enumerate(rerankeds.orders)
+        ])
 
         return DecoderOutput(captions, scores, tokens, *outputs[3:])
 
