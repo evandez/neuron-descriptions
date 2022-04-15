@@ -203,7 +203,7 @@ class CLIPWithMasks(nn.Module):
                     assert masks is not None
                     attentions_by_head = attentions.view(
                         len(masks), -1, *attentions.shape[-2:])
-                    attentions_masked = attentions_by_head[:, 0, 1:] * masks
+                    attentions_masked = attentions_by_head[:, :, 0, 1:] * masks
                     attentions = attentions.clone()
                     attentions[:, 0, 1:] = attentions_masked
                     return attentions
