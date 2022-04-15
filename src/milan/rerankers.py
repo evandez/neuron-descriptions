@@ -197,7 +197,7 @@ class CLIPWithMasks(nn.Module):
                                  size=(num_patches_xy, num_patches_xy),
                                  mode='bilinear',
                                  align_corners=False)\
-                    .view(len(masks), self.num_patches)
+                    .view(len(masks), 1, self.num_patches)
 
                 def rule(attentions: torch.Tensor) -> torch.Tensor:
                     assert masks is not None
