@@ -209,7 +209,6 @@ class CLIPWithMasks(nn.Module):
                     attentions_masked = attentions_masked.view(
                         attentions.shape[0], -1)
 
-                    attentions = attentions.clone()
                     attentions[:, 0, 1:] = attentions_masked
                     return attentions
 
