@@ -58,14 +58,6 @@ biggan/imagenet | gen | 4k | 12k | included in zip | [zip](http://milan.csail.mi
 biggan/places365 | gen | 4k | 12k | included in zip | [zip](http://milan.csail.mit.edu/data/biggan-places365.zip)
 dino_vits8/imagenet | BYOL | 1.2k | 3.6k | [request access](https://www.image-net.org) | [zip](http://milan.csail.mit.edu/data/dino_vits8-imagenet.zip)
 
-<!--
-We also provide precomputed exemplars for other image classification models analyzed in the original paper. They are all based on ImageNet and require you to have a local copy (i.e., `$MILAN_DATA_DIR/imagenet/val` should exist):
-
-| Model | # Units | Download |
-|-------|---------|----------|
-alexnet/imagenet-blurred | |
-
--->
 We provide a fully featured library for downloading and using this data. Here are some examples:
 
 ```python
@@ -113,6 +105,8 @@ sample = dataset.lookup('blocks.9.mlp.fc1', 10)
 outputs = milan(sample.images[None], masks=sample.masks[None])
 print(outputs.captions[0])
 ```
+
+**New, April 2022**: Add `+clip` to any of the keys above (e.g. `base+clip`) to augment the MILAN decoder with CLIP. This works by first sampling candidate descriptions from MILAN, and then reranking them with CLIP. This approach was not evaluated in the original paper, but  qualitatively produces more detailed, if less fluent, descriptions.
 
 ## Applying MILAN to new models
 
