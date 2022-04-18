@@ -12,6 +12,7 @@ PathLike = Union[str, pathlib.Path]
 TensorPair = Tuple[torch.Tensor, torch.Tensor]
 TensorTriplet = Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
 OptionalTensors = Tuple[Optional[torch.Tensor], ...]
+StateDict = Mapping[str, torch.Tensor]
 
 Device = Union[str, torch.device]
 

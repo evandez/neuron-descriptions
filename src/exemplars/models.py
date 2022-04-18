@@ -24,7 +24,7 @@ from src.deps.ext.torchvision import models
 from src.deps.netdissect import renormalize
 from src.exemplars import datasets, transforms
 from src.utils import hubs
-from src.utils.typing import Layer
+from src.utils.typing import Layer, StateDict
 
 import easydict
 import torch
@@ -58,20 +58,24 @@ LAYERS.VGG13 = tuple(f'features.{index}' for index in (2, 7, 12, 17, 22))
 LAYERS.VGG16 = tuple(f'features.{index}' for index in (2, 7, 14, 21, 28))
 LAYERS.VGG19 = tuple(f'features.{index}' for index in (2, 7, 16, 25, 34))
 
-def rekey_vgg16(d):
-    mappings = dict([
-            ('conv1_1', '0'), ('conv1_2', '2'),
-            ('conv2_1', '5'), ('conv2_2', '7'),
-            ('conv3_1', '10'), ('conv3_2', '12'), ('conv3_3', '14'),
-            ('conv4_1', '17'), ('conv4_2', '19'), ('conv4_3', '21'),
-            ('conv5_1', '24'), ('conv5_2', '26'), ('conv5_3', '28'),
-            ('fc6', '0'), ('fc7', '3'), ('fc8', '6'), ('fc8a', '6')])
-    def translate_name(n):
-        p = n.split('.')
-        if p[1] in mappings:
-            p[1] = mappings[p[1]]
-        return '.'.join(p)
-    return { translate_name(k): v for k, v in d.items() }
+
+def rekey_vgg16(state_dict: StateDict) -> StateDict:
+    """Convert places365-style vgg16 state dict to torchvision-style."""
+    mappings = dict([('conv1_1', '0'), ('conv1_2', '2'), ('conv2_1', '5'),
+                     ('conv2_2', '7'), ('conv3_1', '10'), ('conv3_2', '12'),
+                     ('conv3_3', '14'), ('conv4_1', '17'), ('conv4_2', '19'),
+                     ('conv4_3', '21'), ('conv5_1', '24'), ('conv5_2', '26'),
+                     ('conv5_3', '28'), ('fc6', '0'), ('fc7', '3'),
+                     ('fc8', '6'), ('fc8a', '6')])
+
+    def translate_name(name: str) -> str:
+        parts = name.split('.')
+        if parts[1] in mappings:
+            parts[1] = mappings[parts[1]]
+        return '.'.join(parts)
+
+    return {translate_name(k): v for k, v in state_dict.items()}
+
 
 @dataclasses.dataclass(frozen=True)
 class ModelExemplarsConfig:
@@ -177,12 +181,11 @@ def default_model_configs(**others: ModelConfig) -> Mapping[str, ModelConfig]:
                 transform_weights=lambda weights: weights['state_dict'],
                 layers=LAYERS.ALEXNET),
         KEYS.VGG16_PLACES365:
-            ModelConfig(
-                models.vgg16,
-                url=f'{HOST}/vgg16_places365-0bafbc55.pth',
-                transform_weights=rekey_vgg16,
-                layers=LAYERS.VGG16,
-                num_classes=365),
+            ModelConfig(models.vgg16,
+                        url=f'{HOST}/vgg16_places365-0bafbc55.pth',
+                        transform_weights=rekey_vgg16,
+                        layers=LAYERS.VGG16,
+                        num_classes=365),
         KEYS.BIGGAN_IMAGENET:
             ModelConfig(
                 biggan.SeqBigGAN,
