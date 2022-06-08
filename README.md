@@ -102,7 +102,7 @@ dataset = milannotations.load('dino_vits8/imagenet')
 sample = dataset.lookup('blocks.9.mlp.fc1', 10)
 
 # Caption the top images.
-outputs = milan(sample.images[None], masks=sample.masks[None])
+outputs = decoder(sample.images[None], masks=sample.masks[None])
 print(outputs.captions[0])
 ```
 
