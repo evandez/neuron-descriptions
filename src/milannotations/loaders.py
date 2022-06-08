@@ -259,6 +259,10 @@ def load(name: str = 'base',
         return dataset_hub.load(name, **kwargs)
     assert isinstance(
         dataset,
-        (datasets.TopImagesDataset, datasets.AnnotatedTopImagesDataset),
+        (
+            datasets.TopImagesDataset,
+            datasets.AnnotatedTopImagesDataset,
+            torch.utils.data.ConcatDataset,
+        ),
     ), dataset
     return dataset
