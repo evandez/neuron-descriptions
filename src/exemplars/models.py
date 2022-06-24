@@ -177,7 +177,7 @@ def default_model_configs(**others: ModelConfig) -> Mapping[str, ModelConfig]:
         KEYS.ALEXNET_PLACES365:
             ModelConfig(
                 alexnet.AlexNet,
-                url=f'{HOST}/alexnet_places365-6d3c0e75.pth',
+                url=f'{hubs.HOST}/models/alexnet-places365.pth',
                 transform_weights=lambda weights: weights['state_dict'],
                 layers=LAYERS.ALEXNET),
         KEYS.VGG16_PLACES365:
