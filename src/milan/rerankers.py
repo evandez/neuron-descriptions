@@ -255,6 +255,7 @@ class RerankerOutput(NamedTuple):
 
     texts: Sequence[StrSequence]
     orders: Sequence[Sequence[int]]
+    scores: Sequence[Sequence[float]]
 
 
 class CLIPWithMasksReranker(nn.Module):
@@ -309,7 +310,7 @@ class CLIPWithMasksReranker(nn.Module):
         if lam is None:
             lam = self.lam
 
-        rerankeds, orders = [], []
+        rerankeds, orders, scores = [], [], []
         for b_images, b_masks, b_texts in zip(images, masks, texts):
             sim_masked = self.clip_with_masks(b_images, b_texts, masks=b_masks)
             sim_masked = sim_masked.sum(dim=0)
@@ -319,13 +320,14 @@ class CLIPWithMasksReranker(nn.Module):
 
             sim = (1. - lam) * sim_masked + lam * sim_unmasked
 
-            _, indices = sim.sort(descending=True)
+            scoring, indices = sim.sort(descending=True)
 
             reranked = [b_texts[index] for index in indices.tolist()]
             rerankeds.append(tuple(reranked))
             orders.append(tuple(indices.tolist()))
+            scores.append(tuple(scoring.tolist()))
 
-        return RerankerOutput(tuple(rerankeds), tuple(orders))
+        return RerankerOutput(tuple(rerankeds), tuple(orders), tuple(scores))
 
 
 def reranker(lam: float = 1., **kwargs: Any) -> CLIPWithMasksReranker:
