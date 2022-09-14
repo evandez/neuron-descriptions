@@ -87,7 +87,7 @@ We offer several pretrained MILAN models trained on different subsets of MILANNO
 | places365 | {alexnet, resnet152, biggan} x {places365} | [weights](http://milan.csail.mit.edu/models/milan-places365.pth)
 | alexnet | {alexnet} x {imagenet, places365} | [weights](http://milan.csail.mit.edu/models/milan-alexnet.pth)
 | resnet152 | {resnet152} x {imagenet, places365} | [weights](http://milan.csail.mit.edu/models/milan-resnet152.pth)
-| biggan | {resnet152} x {imagenet, places365} | [weights](http://milan.csail.mit.edu/models/milan-biggan.pth)
+| biggan | {biggan} x {imagenet, places365} | [weights](http://milan.csail.mit.edu/models/milan-biggan.pth)
 
 The root module for MILAN is `Decoder` inside [src.milan.decoders](src/milan/decoders.py). However, you should not have to interact with it because the library will automatically download and configure the model for you. Here is a minimal usage example applied to DINO:
 
