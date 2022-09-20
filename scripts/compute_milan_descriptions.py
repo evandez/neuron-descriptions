@@ -68,5 +68,5 @@ for index, description in enumerate(predictions):
     row = (str(sample.layer), str(sample.unit), description)
     rows.append(row)
 results_csv_file = results_dir / f'{key.replace("/", "_")}.csv'
-with results_csv_file.open('r') as handle:
+with results_csv_file.open('w') as handle:
     csv.writer(handle).writerows(rows)
