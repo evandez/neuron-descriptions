@@ -1,12 +1,11 @@
-allennlp==2.10
+allennlp
 bert-score
 black
 boto3
 clip @ git+https://github.com/openai/CLIP.git@e58d49454c92986a1d2a6a48add2333bbfbeaf51
 easydict
-en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.3.0/en_core_web_sm-3.3.0-py3-none-any.whl
 gdown
-google-api-core==2.8.0
+google-api-core<=2.8.0
 h5py
 flake8
 flake8-docstrings
@@ -20,7 +19,7 @@ sacrebleu==1.5.1
 spacy
 statsmodels
 torch
-torchvision==0.12.0
+torchvision<=0.12.0
 tqdm
 types-pyyaml
 wandb

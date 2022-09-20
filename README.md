@@ -25,7 +25,8 @@ To run the code, set up a virtual environment and install the dependencies:
 ```bash
 python3 -m venv env
 source env/bin/activate
-pip3 install -r requirements.txt
+pip3 install -r requirements.in
+spacy download en_core_web_sm
 ```
 
 To validate that everything works, run the presubmit script, which in turn performs type checking, linting and unit testing:

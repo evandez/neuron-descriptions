@@ -69,8 +69,6 @@ docker-pycreds==0.4.0
     # via wandb
 easydict==1.9
     # via -r requirements.in
-en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.3.0/en_core_web_sm-3.3.0-py3-none-any.whl
-    # via -r requirements.in
 fairscale==0.4.6
     # via allennlp
 filelock==3.7.1
@@ -350,7 +348,6 @@ spacy==3.3.1
     # via
     #   -r requirements.in
     #   allennlp
-    #   en-core-web-sm
 spacy-legacy==3.0.10
     # via spacy
 spacy-loggers==1.0.3
