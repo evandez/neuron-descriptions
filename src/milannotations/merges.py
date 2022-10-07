@@ -151,10 +151,9 @@ def merge(root: PathLike,
                     'did you forget to normalize?')
 
             # We're good! Throw em in.
-            images_by_unit.append(images_stacked)
+            images_by_unit.append(renormalizer(images_stacked).byte())
 
-        numpy.save(f'{layer_dir}/images.npy',
-                   renormalizer(torch.stack(images_by_unit)).byte())
+        numpy.save(f'{layer_dir}/images.npy', torch.stack(images_by_unit))
 
 
 def maybe_merge_and_load_dataset(
