@@ -9,7 +9,7 @@ from torch import cuda
 
 parser = argparse.ArgumentParser(description='compute unit exemplars')
 parser.add_argument('model', help='model architecture')
-parser.add_argument('dataset', help='dataset model is trained on')
+parser.add_argument('dataset', help='dataset of unseen examples for model')
 parser_ex = parser.add_mutually_exclusive_group()
 parser_ex.add_argument('--layer-names',
                        nargs='+',
