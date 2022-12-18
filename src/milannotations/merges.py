@@ -195,7 +195,8 @@ def maybe_merge_and_load_dataset(
         if source is None:
             raise ValueError('>= 1 layers are missing missing source images '
                              'and no source dataset was provided')
-        eg_masks_file = root / next(root.iterdir()) / 'masks.npy'
+        eg_layer_name = next(ld.name for ld in root.iterdir() if ld.is_dir())
+        eg_masks_file = root / eg_layer_name / 'masks.npy'
         if not eg_masks_file.exists():
             raise FileNotFoundError(
                 f'tried to find example masks from {eg_masks_file} '
