@@ -122,4 +122,4 @@ for layer in layers:
                                **config.exemplars.kwargs)
 
 if not args.no_link:
-    results_dir.symlink_to(data_dir, target_is_directory=True)
+    data_dir.symlink_to(results_dir, target_is_directory=True)
