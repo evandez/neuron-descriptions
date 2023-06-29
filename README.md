@@ -51,13 +51,13 @@ The table below details the annotated base models.
 
 | Model | Task | # Units | # Desc. | Source Images | Download |
 |-------|------|---------|---------|---------------|----------|
-| alexnet/imagenet | class | 1k | 3k | [request access](https://www.image-net.org) | [zip](http://milan.csail.mit.edu/data/alexnet-imagenet.zip) |
-| alexnet/places365 | class | 1k | 3k | included in zip | [zip](http://milan.csail.mit.edu/data/alexnet-places365.zip) |
-| resnet152/imagenet | class | 3k | 9k | [request access](https://www.image-net.org) | [zip](http://milan.csail.mit.edu/data/resnet152-imagenet.zip) |
-| resnet152/places365 | class | 4k | 12k | included in zip | [zip](http://milan.csail.mit.edu/data/resnet152-places365.zip)
-biggan/imagenet | gen | 4k | 12k | included in zip | [zip](http://milan.csail.mit.edu/data/biggan-imagenet.zip)
-biggan/places365 | gen | 4k | 12k | included in zip | [zip](http://milan.csail.mit.edu/data/biggan-places365.zip)
-dino_vits8/imagenet | BYOL | 1.2k | 3.6k | [request access](https://www.image-net.org) | [zip](http://milan.csail.mit.edu/data/dino_vits8-imagenet.zip)
+| alexnet/imagenet | class | 1k | 3k | [request access](https://www.image-net.org) | <a href="http://milan.csail.mit.edu/data/alexnet-imagenet.zip" download>zip</a> |
+| alexnet/places365 | class | 1k | 3k | included in zip | <a href="http://milan.csail.mit.edu/data/alexnet-places365.zip" download>zip</a> |
+| resnet152/imagenet | class | 3k | 9k | [request access](https://www.image-net.org) | <a href="http://milan.csail.mit.edu/data/resnet152-imagenet.zip" download>zip</a> |
+| resnet152/places365 | class | 4k | 12k | included in zip | <a href="http://milan.csail.mit.edu/data/resnet152-places365.zip" download>zip</a> |
+| biggan/imagenet | gen | 4k | 12k | included in zip | <a href="http://milan.csail.mit.edu/data/biggan-imagenet.zip" download>zip</a> |
+| biggan/places365 | gen | 4k | 12k | included in zip | <a href="http://milan.csail.mit.edu/data/biggan-places365.zip" download>zip</a>
+| dino_vits8/imagenet | BYOL | 1.2k | 3.6k | [request access](https://www.image-net.org) | <a href="http://milan.csail.mit.edu/data/dino_vits8-imagenet.zip" download>zip</a> |
 
 We provide a fully featured library for downloading and using this data. Here are some examples:
 
@@ -177,7 +177,7 @@ A myriad of other scripts can be found under the [scripts](scripts) directory. T
 
 ## Contributing
 
-This library is not designed for industrial use (it's just a research project) and is no longer actively maintained. If you have issues running our code in the supported environment, you may open an issue on this repository, but responses will be slow.
+This library is not designed for industrial use (it's just a research project) and is no longer actively maintained. If you have issues running our code in the specified environment, you may open an issue on this repository, but responses will be slow.
 
 If you find ways to improve the code, you may submit a pull request. Before doing so, please ensure that the code type checks, lints cleanly, and passes all unit tests. The following command should produce green text:
 ```bash
