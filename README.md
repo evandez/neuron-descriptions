@@ -195,3 +195,7 @@ If you find ways to improve the code, you may submit a pull request. Before doin
   url       =   {https://arxiv.org/abs/2201.11114}
 }
 ```
+
+## Errata
+
+- In the original exemplar construction code, there was an off-by-one error in how ViT activations were spatialized. As a result, exemplar image regions for ViT models are slightly shifted. Issue is now fixed in `main`.
