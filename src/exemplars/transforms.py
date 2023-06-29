@@ -70,7 +70,7 @@ def spatialize_vit_mlp(hiddens: torch.Tensor) -> torch.Tensor:
     batch_size, n_patches, n_units = hiddens.shape
 
     # Exclude CLS token.
-    hiddens = hiddens[:, :-1]
+    hiddens = hiddens[:, 1:]
     n_patches -= 1
 
     # Compute spatial size.
