@@ -1,6 +1,7 @@
 """Transforms for inputs/hiddens/outputs during exemplar computation."""
 import math
-from typing import Any, Callable, Dict, Optional, Sequence, Tuple, TypeVar, Union
+from typing import (Any, Callable, Dict, Optional, Sequence, Tuple, TypeVar,
+                    Union)
 
 from src.utils.typing import Device
 

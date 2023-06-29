@@ -294,8 +294,8 @@ def discriminative(
             visualizations to (e.g., individual png images, lightbox, etc.).
             If set and layer is also set, layer name will be appended to path.
             Defaults to same as `run`.
-        transform_inputs (transforms.TransformToArgsOrKwargs, optional): Pass batch
-            as *args to this function and use output as *args to model.
+        transform_inputs (transforms.TransformToArgsOrKwargs, optional): Pass
+            batch as *args to this function and use output as *args to model.
             Defaults to identity, i.e. entire batch is passed to model.
         transform_hiddens (transforms.TransformToTensor, optional): Pass hidden
             representations, i.e. the activations, to this function and hand
@@ -322,8 +322,8 @@ def discriminative(
             layer = str(layer)
             instr.retain_layer(layer, detach=False)
 
-        def compute_topk_and_quantile(*inputs: Any) -> TensorPair:
-            inputs = transform_inputs(*transforms.map_location(inputs, device))
+        def compute_topk_and_quantile(*args: Any) -> TensorPair:
+            inputs = transform_inputs(*transforms.map_location(args, device))
             with torch.no_grad():
                 outputs = _run_model(instr, inputs)
             hiddens = outputs if layer is None else instr.retained_layer(layer)
@@ -333,8 +333,8 @@ def discriminative(
             pooled, _ = hiddens.view(batch_size, channels, -1).max(dim=2)
             return pooled, activations
 
-        def compute_activations(*inputs: Any) -> torch.Tensor:
-            inputs = transform_inputs(*transforms.map_location(inputs, device))
+        def compute_activations(*args: Any) -> torch.Tensor:
+            inputs = transform_inputs(*transforms.map_location(args, device))
             with torch.no_grad():
                 outputs = _run_model(instr, inputs)
             hiddens = outputs if layer is None else instr.retained_layer(layer)
@@ -356,7 +356,8 @@ def generative(
     device: Optional[Device] = None,
     results_dir: Optional[PathLike] = None,
     viz_dir: Optional[PathLike] = None,
-    transform_inputs: transforms.TransformToArgsOrKwargs = transforms.identities,
+    transform_inputs: transforms.TransformToArgsOrKwargs = transforms.
+    identities,
     transform_hiddens: transforms.TransformToTensor = transforms.identity,
     transform_outputs: transforms.TransformToTensor = transforms.identity,
     **kwargs: Any,
@@ -383,8 +384,8 @@ def generative(
             visualizations to (e.g., individual png images, lightbox, etc.).
             If set and layer is also set, layer name will be appended to path.
             Defaults to same as `run`.
-        transform_inputs (transforms.TransformToArgsOrKwargs, optional): Pass batch
-            as *args to this function and use output as *args to model.
+        transform_inputs (transforms.TransformToArgsOrKwargs, optional): Pass
+            batch as *args to this function and use output as *args to model.
             Defaults to identity, i.e. entire batch is passed to model.
         transform_hiddens (transforms.TransformToTensor, optional): Pass output
             of intermediate layer to this function and hand the result to
@@ -410,8 +411,8 @@ def generative(
     with nethook.InstrumentedModel(model) as instr:
         instr.retain_layer(layer, detach=False)
 
-        def compute_topk_and_quantile(*inputs: Any) -> TensorPair:
-            inputs = transform_inputs(*transforms.map_location(inputs, device))
+        def compute_topk_and_quantile(*args: Any) -> TensorPair:
+            inputs = transform_inputs(*transforms.map_location(args, device))
             with torch.no_grad():
                 _run_model(instr, inputs)
             hiddens = transform_hiddens(instr.retained_layer(layer))
@@ -420,8 +421,8 @@ def generative(
             pooled, _ = hiddens.view(batch_size, channels, -1).max(dim=2)
             return pooled, activations
 
-        def compute_activations(*inputs: Any) -> TensorPair:
-            inputs = transform_inputs(*transforms.map_location(inputs, device))
+        def compute_activations(*args: Any) -> TensorPair:
+            inputs = transform_inputs(*transforms.map_location(args, device))
             with torch.no_grad():
                 images = _run_model(instr, inputs)
             hiddens = transform_hiddens(instr.retained_layer(layer))
