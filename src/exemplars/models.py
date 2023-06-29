@@ -98,7 +98,7 @@ class ModelExemplarsConfig:
         return kwargs
 
 
-TransformInputs = transforms.TransformToTuple
+TransformInputs = transforms.TransformToArgsOrKwargs
 TransformHiddens = transforms.TransformToTensor
 TransformOutputs = transforms.TransformToTensor
 

@@ -1,6 +1,7 @@
 """Transforms for inputs/hiddens/outputs during exemplar computation."""
 import math
-from typing import Any, Callable, Optional, Sequence, Tuple, TypeVar
+from typing import (Any, Callable, Dict, Optional, Sequence, Tuple, TypeVar,
+                    Union)
 
 from src.utils.typing import Device
 
@@ -29,7 +30,7 @@ def map_location(data: Sequence[Any],
 
 
 Transform = Callable[..., Any]
-TransformToTuple = Callable[..., Tuple[Any, ...]]
+TransformToArgsOrKwargs = Callable[..., Union[Tuple[Any, ...], Dict[str, Any]]]
 TransformToTensor = Callable[..., torch.Tensor]
 
 

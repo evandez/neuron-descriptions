@@ -177,9 +177,9 @@ A myriad of other scripts can be found under the [scripts](scripts) directory. T
 
 ## Contributing
 
-While this library is not designed for industrial use (it's just a research project), we do believe research code should support reproducibility.  If you have issues running our code in the supported environment, please open an issue on this repository.
+This library is not designed for industrial use (it's just a research project) and is no longer actively maintained. If you have issues running our code in the supported environment, you may open an issue on this repository, but responses will be slow.
 
-If you find ways to improve our code, you may also submit a pull request. Before doing so, please ensure that the code type checks, lints cleanly, and passes all unit tests. The following command should produce green text:
+If you find ways to improve the code, you may submit a pull request. Before doing so, please ensure that the code type checks, lints cleanly, and passes all unit tests. The following command should produce green text:
 ```bash
 ./presubmit.sh
 ```
