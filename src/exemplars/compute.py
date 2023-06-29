@@ -246,7 +246,7 @@ def compute(compute_topk_and_quantile: Callable[..., TensorPair],
     return topk, rq
 
 
-def _run_model(model: nn.Module, inputs: Union[Tuple, Dict]) -> Any:
+def _run_model(model: nn.Module, inputs: Union[Tuple, Dict[str, Any]]) -> Any:
     """Call the model with the given inputs.
 
     If inputs are a dict, treat them like kwargs. If inputs are a tuple, treat
